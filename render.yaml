@@ -18,7 +18,7 @@ services:
       - key: PUBLIC_APP_URL
         value: https://saidhere.app
       - key: CORS_ORIGIN
-        value: https://saidhere.app,https://www.saidhere.app
+        value: https://saidhere.app,https://www.saidhere.app,https://saidhere-api-9ab3.onrender.com
       - key: ADMIN_KEY
         generateValue: true
 
