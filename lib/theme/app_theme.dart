@@ -77,7 +77,7 @@ class SaidHereTheme {
           borderRadius: hardCorners,
           borderSide: BorderSide(color: ink),
         ),
-        enabledBorder: BorderSideInputBorder(borderRadius: hardCorners),
+        enabledBorder: const BorderSideInputBorder(borderRadius: hardCorners),
         focusedBorder: const OutlineInputBorder(
           borderRadius: hardCorners,
           borderSide: BorderSide(color: ink, width: 2),
@@ -94,6 +94,6 @@ class SaidHereTheme {
 }
 
 class BorderSideInputBorder extends OutlineInputBorder {
-  BorderSideInputBorder({required super.borderRadius})
+  const BorderSideInputBorder({required super.borderRadius})
       : super(borderSide: const BorderSide(color: SaidHereTheme.ink, width: 1.3));
 }
