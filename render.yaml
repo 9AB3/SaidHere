@@ -19,6 +19,8 @@ services:
         value: https://saidhere.app
       - key: CORS_ORIGIN
         value: https://saidhere.app,https://www.saidhere.app
+      - key: ADMIN_KEY
+        generateValue: true
 
 databases:
   - name: saidhere-db-9ab3
