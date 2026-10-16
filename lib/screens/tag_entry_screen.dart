@@ -5,6 +5,7 @@ import '../services/local_history_service.dart';
 import '../services/said_here_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/brand_mark.dart';
+import '../widgets/wall_background.dart';
 
 class TagEntryScreen extends StatefulWidget {
   const TagEntryScreen({
@@ -59,69 +60,96 @@ class _TagEntryScreenState extends State<TagEntryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SaidHereTheme.ink,
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const BrandMark(color: SaidHereTheme.paper),
-                const SizedBox(height: 32),
-                if (_error == null) ...[
-                  const SizedBox(
-                    width: 38,
-                    height: 38,
-                    child: CircularProgressIndicator(
-                      color: SaidHereTheme.paper,
-                      strokeWidth: 3,
+      body: WallBackground(
+        heavy: true,
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(26),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 500),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const BrandMark(),
+                    const SizedBox(height: 26),
+                    Transform.rotate(
+                      angle: .006,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(22, 24, 22, 22),
+                        decoration: BoxDecoration(
+                          color: const Color(0xE8D8CCB6),
+                          border: Border.all(
+                            color: SaidHereTheme.ink.withValues(alpha: .65),
+                            width: 1.5,
+                          ),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x44000000),
+                              offset: Offset(4, 5),
+                              blurRadius: 0,
+                            ),
+                          ],
+                        ),
+                        child: _error == null
+                            ? const Column(
+                                children: [
+                                  SizedBox(
+                                    width: 38,
+                                    height: 38,
+                                    child: CircularProgressIndicator(
+                                      color: SaidHereTheme.ink,
+                                      strokeWidth: 3,
+                                    ),
+                                  ),
+                                  SizedBox(height: 18),
+                                  Text(
+                                    'OPENING THIS WALL…',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: SaidHereTheme.ink,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: .3,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                children: [
+                                  const Icon(
+                                    Icons.error_outline,
+                                    color: SaidHereTheme.ink,
+                                    size: 38,
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    _error!,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: SaidHereTheme.ink,
+                                      height: 1.4,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  FilledButton.icon(
+                                    onPressed: _claim,
+                                    icon: const Icon(Icons.refresh),
+                                    label: const Text('TRY AGAIN'),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  OutlinedButton(
+                                    onPressed: () => context.go('/'),
+                                    child: const Text('GO HOME'),
+                                  ),
+                                ],
+                              ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 18),
-                  const Text(
-                    'Getting the wall…',
-                    style: TextStyle(
-                      color: SaidHereTheme.paper,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ] else ...[
-                  const Icon(
-                    Icons.error_outline,
-                    color: SaidHereTheme.paper,
-                    size: 36,
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    _error!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: SaidHereTheme.paper,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  FilledButton.icon(
-                    onPressed: _claim,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Try again'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: SaidHereTheme.paper,
-                      foregroundColor: SaidHereTheme.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton(
-                    onPressed: () => context.go('/'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: SaidHereTheme.paper,
-                      side: const BorderSide(color: SaidHereTheme.paper),
-                    ),
-                    child: const Text('Go home'),
-                  ),
-                ],
-              ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),
