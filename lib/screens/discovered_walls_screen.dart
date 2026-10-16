@@ -28,7 +28,19 @@ class _DiscoveredWallsScreenState extends State<DiscoveredWallsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Walls you've found")),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
+        ),
+        title: const Text("Walls you've found"),
+      ),
       body: WallBackground(
         child: FutureBuilder<List<Wall>>(
           future: _future,
@@ -64,7 +76,7 @@ class _DiscoveredWallsScreenState extends State<DiscoveredWallsScreen> {
                   color: Colors.white.withValues(alpha: .32),
                   elevation: 0,
                   child: ListTile(
-                    onTap: () => context.go('/w/${wall.slug}'),
+                    onTap: () => context.push('/w/${wall.slug}'),
                     leading: CircleAvatar(
                       backgroundColor: SaidHereTheme.ink,
                       foregroundColor: SaidHereTheme.paper,
