@@ -66,7 +66,12 @@ workflows:
           security cms -D -i "$SAIDHERE_PROFILE" > /tmp/saidhere-profile.plist
           /usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' /tmp/saidhere-profile.plist
           /usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.associated-domains' /tmp/saidhere-profile.plist | tee /tmp/saidhere-domains.txt
-          grep -q 'saidhere.app' /tmp/saidhere-domains.txt || { echo 'FAIL: provisioning profile is missing Associated Domains for saidhere.app'; exit 1; }
+          if grep -q 'saidhere.app' /tmp/saidhere-domains.txt || grep -qx '\*' /tmp/saidhere-domains.txt; then
+            echo 'PASS: provisioning profile authorizes Associated Domains'
+          else
+            echo 'FAIL: provisioning profile does not authorize Associated Domains'
+            exit 1
+          fi
       - name: Analyze
         script: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Build signed IPA
@@ -76,6 +81,13 @@ workflows:
             --export-options-plist=/Users/builder/export_options.plist \
             --dart-define=API_BASE_URL="$API_BASE_URL" \
             --dart-define=APP_HOST="$APP_HOST"
+          APP_PATH=$(find build/ios/archive/Runner.xcarchive/Products/Applications -maxdepth 1 -name '*.app' | head -1)
+          test -n "$APP_PATH"
+          codesign -d --entitlements :- "$APP_PATH" > /tmp/saidhere-signed-entitlements.plist 2>/dev/null
+          echo '--- Final signed SaidHere entitlements ---'
+          cat /tmp/saidhere-signed-entitlements.plist
+          /usr/libexec/PlistBuddy -c 'Print :com.apple.developer.associated-domains' /tmp/saidhere-signed-entitlements.plist | tee /tmp/saidhere-signed-domains.txt
+          grep -q 'applinks:saidhere.app' /tmp/saidhere-signed-domains.txt || { echo 'FAIL: final signed app is missing applinks:saidhere.app'; exit 1; }
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
