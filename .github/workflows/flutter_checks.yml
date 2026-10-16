@@ -1,4 +1,4 @@
-name: Flutter checks
+name: SaidHere checks
 
 on:
   push:
@@ -17,3 +17,5 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      - name: Check Render API JavaScript
+        run: npm --prefix server run check
