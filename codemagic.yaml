@@ -6,6 +6,7 @@ workflows:
       flutter: stable
       vars:
         APP_HOST: saidhere.app
+        API_BASE_URL: https://saidhere-api-9ab3.onrender.com
     scripts:
       - name: Generate Flutter platform projects
         script: python3 tool/bootstrap_platforms.py --host "$APP_HOST"
@@ -18,20 +19,17 @@ workflows:
       - name: Build web
         script: >-
           flutter build web --release
-          --dart-define=SUPABASE_URL="${SUPABASE_URL:-}"
-          --dart-define=SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
+          --dart-define=API_BASE_URL="$API_BASE_URL"
           --dart-define=APP_HOST="$APP_HOST"
       - name: Build Android debug APK
         script: >-
           flutter build apk --debug
-          --dart-define=SUPABASE_URL="${SUPABASE_URL:-}"
-          --dart-define=SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
+          --dart-define=API_BASE_URL="$API_BASE_URL"
           --dart-define=APP_HOST="$APP_HOST"
       - name: Compile iOS without signing
         script: >-
           flutter build ios --release --no-codesign
-          --dart-define=SUPABASE_URL="${SUPABASE_URL:-}"
-          --dart-define=SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
+          --dart-define=API_BASE_URL="$API_BASE_URL"
           --dart-define=APP_HOST="$APP_HOST"
     artifacts:
       - build/web/**
