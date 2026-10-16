@@ -45,7 +45,7 @@ const sessionLimiter = rateLimit({
 
 const adminLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  limit: 60,
+  limit: 120,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
 });
@@ -107,38 +107,45 @@ function formatAdminDate(value) {
 }
 
 function adminPage(result = null, error = null, walls = null, notice = null) {
-  const resultHtml = result
-    ? `<hr><h2>Wall created</h2>
+  const resultHtml = result?.nfc_url
+    ? `<hr><h2>${escapeHtml(result.result_title || 'NFC URL ready')}</h2>
        <p><strong>Name:</strong> ${escapeHtml(result.display_name)}</p>
        <p><strong>Public Wall ID:</strong> ${escapeHtml(result.slug)}</p>
        <p><strong>NFC URL:</strong></p>
-       <p><a href="${escapeHtml(result.nfc_url)}">${escapeHtml(result.nfc_url)}</a></p>
+       <p class="nfc-url"><a href="${escapeHtml(result.nfc_url)}">${escapeHtml(result.nfc_url)}</a></p>
        <p><strong>Save this NFC URL now.</strong> The raw tag token is intentionally not stored and cannot be shown again later.</p>
-       <p>Write that exact URL to the NFC tag. Test it before permanently write-locking the tag.</p>`
+       <p>Write that exact URL to the NFC tag and test it before permanently write-locking the tag.</p>`
     : '';
   const errorHtml = error ? `<p class="error"><strong>Error:</strong> ${escapeHtml(error)}</p>` : '';
   const noticeHtml = notice ? `<p class="notice"><strong>${escapeHtml(notice)}</strong></p>` : '';
   const wallRows = Array.isArray(walls)
-    ? walls.map((wall) => `<tr>
+    ? walls.map((wall) => {
+      const encodedName = encodeURIComponent(wall.display_name || '');
+      const encodedLocation = encodeURIComponent(wall.location_hint || '');
+      return `<tr>
         <td>${escapeHtml(wall.display_name)}</td>
         <td>${escapeHtml(wall.location_hint || '—')}</td>
         <td><code>${escapeHtml(wall.slug)}</code></td>
-        <td>${wall.active ? 'Active' : 'Inactive'}</td>
+        <td><span class="status ${wall.active ? 'active' : 'inactive'}">${wall.active ? 'Active' : 'Inactive'}</span></td>
         <td>${escapeHtml(wall.discovered_by)}</td>
         <td>${escapeHtml(wall.post_count)}</td>
         <td>${escapeHtml(formatAdminDate(wall.created_at))}</td>
         <td class="actions">
+          <button type="button" class="secondary" onclick="editWall('${escapeHtml(wall.id)}','${encodedName}','${encodedLocation}')">Edit</button>
+          <button type="button" class="secondary" onclick="toggleWall('${escapeHtml(wall.id)}',${wall.active ? 'false' : 'true'})">${wall.active ? 'Deactivate' : 'Reactivate'}</button>
+          <button type="button" class="secondary" onclick="adminAction('rotate','${escapeHtml(wall.id)}')">Replace NFC</button>
           <button type="button" class="secondary" onclick="adminAction('clear','${escapeHtml(wall.id)}')">Clear messages</button>
           <button type="button" class="danger" onclick="adminAction('delete','${escapeHtml(wall.id)}')">Delete Wall</button>
         </td>
-      </tr>`).join('')
+      </tr>`;
+    }).join('')
     : '';
   const wallsHtml = Array.isArray(walls)
     ? `<hr><h2>All Walls <span class="count">(${walls.length})</span></h2>
        ${walls.length === 0
          ? '<p>No Walls have been created yet.</p>'
-         : `<p><label><strong>Admin key for Wall actions</strong><br><input id="wall-action-key" type="password" autocomplete="current-password" placeholder="Required to clear or delete"></label></p>
-            <p class="help">Clear messages keeps the Wall and NFC tag working. Delete Wall permanently removes the Wall, tag association, visits and messages.</p>
+         : `<p><label><strong>Admin key for Wall actions</strong><br><input id="wall-action-key" type="password" autocomplete="current-password" placeholder="Required for Wall changes"></label></p>
+            <p class="help">Deactivate pauses a Wall without deleting history. Replace NFC preserves the Wall but invalidates all old plaque URLs. Clear messages removes posts only. Delete removes everything.</p>
             <div class="table-wrap"><table>
               <thead><tr><th>Name</th><th>Location</th><th>Public ID</th><th>Status</th><th>Discovered by</th><th>Messages</th><th>Created</th><th>Actions</th></tr></thead>
               <tbody>${wallRows}</tbody>
@@ -146,6 +153,9 @@ function adminPage(result = null, error = null, walls = null, notice = null) {
             <form id="wall-action-form" method="post" class="hidden-form">
               <input id="wall-action-admin-key" type="hidden" name="admin_key">
               <input id="wall-action-confirmation" type="hidden" name="confirmation">
+              <input id="wall-action-active" type="hidden" name="active">
+              <input id="wall-action-name" type="hidden" name="display_name">
+              <input id="wall-action-location" type="hidden" name="location_hint">
             </form>`}`
     : '';
 
@@ -156,11 +166,11 @@ function adminPage(result = null, error = null, walls = null, notice = null) {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>SaidHere Admin</title>
   <style>
-    body{font-family:Arial,sans-serif;background:#f3efe4;color:#151515;margin:0;padding:28px}main{max-width:1200px;margin:auto}
-    input{padding:10px;border:1px solid #777;border-radius:8px;max-width:100%;width:420px}button{padding:11px 16px;border:0;border-radius:999px;background:#151515;color:#fff;font-weight:700;cursor:pointer}
+    body{font-family:Arial,sans-serif;background:#f3efe4;color:#151515;margin:0;padding:28px}main{max-width:1400px;margin:auto}
+    input{padding:10px;border:1px solid #777;border-radius:8px;max-width:100%;width:420px}button{padding:10px 14px;border:0;border-radius:999px;background:#151515;color:#fff;font-weight:700;cursor:pointer}
     form{background:rgba(255,255,255,.45);padding:18px;border-radius:14px;margin:14px 0 24px}.error{color:#9f1b1b}.notice{background:#dcebd7;padding:12px 14px;border-radius:10px}.table-wrap{overflow:auto}
     table{width:100%;border-collapse:collapse;background:rgba(255,255,255,.5)}th,td{text-align:left;padding:10px;border-bottom:1px solid #c9c2b5;white-space:nowrap}th{background:#e5dfd2}.count{font-weight:400;color:#6d685f}
-    code{font-size:12px}.actions{display:flex;gap:8px}.secondary{background:#5b584f}.danger{background:#9f1b1b}.help{color:#6d685f;font-size:14px}.hidden-form{display:none}
+    code{font-size:12px}.actions{display:flex;gap:7px}.secondary{background:#5b584f}.danger{background:#9f1b1b}.help{color:#6d685f;font-size:14px}.hidden-form{display:none}.status{font-weight:700}.status.inactive{color:#9f1b1b}.status.active{color:#37652d}.nfc-url{overflow-wrap:anywhere;white-space:normal}
   </style>
 </head>
 <body>
@@ -185,40 +195,83 @@ function adminPage(result = null, error = null, walls = null, notice = null) {
     ${wallsHtml}
   </main>
   <script>
-    function adminAction(action, wallId) {
+    function actionKey() {
       const keyInput = document.getElementById('wall-action-key');
       const key = keyInput ? keyInput.value.trim() : '';
       if (!key) {
         alert('Enter the admin key above the Walls table first.');
         if (keyInput) keyInput.focus();
-        return;
+        return null;
       }
-      const requiredWord = action === 'delete' ? 'DELETE' : 'CLEAR';
-      const explanation = action === 'delete'
-        ? 'This permanently deletes the Wall, its NFC tag association, visits, messages and reports.'
-        : 'This permanently deletes every message, reply and report on the Wall. The Wall and NFC tag will remain active.';
-      const typed = prompt(explanation + '\n\nWall ID: ' + wallId + '\n\nType ' + requiredWord + ' to continue.');
-      if (typed !== requiredWord) return;
+      return key;
+    }
 
+    function submitWallAction(action, wallId, key) {
       const form = document.getElementById('wall-action-form');
       document.getElementById('wall-action-admin-key').value = key;
-      document.getElementById('wall-action-confirmation').value = requiredWord;
       form.action = '/admin/walls/' + encodeURIComponent(wallId) + '/' + action;
       form.submit();
+    }
+
+    function adminAction(action, wallId) {
+      const key = actionKey();
+      if (!key) return;
+      const words = { delete: 'DELETE', clear: 'CLEAR', rotate: 'ROTATE' };
+      const messages = {
+        delete: 'This permanently deletes the Wall, its NFC tag association, visits, messages and reports.',
+        clear: 'This permanently deletes every message, reply and report on the Wall. The Wall and NFC tag remain.',
+        rotate: 'This creates a new NFC URL and permanently disables every previous NFC URL for this Wall. Wall history is preserved.'
+      };
+      const requiredWord = words[action];
+      const typed = prompt(messages[action] + '\n\nWall ID: ' + wallId + '\n\nType ' + requiredWord + ' to continue.');
+      if (typed !== requiredWord) return;
+      document.getElementById('wall-action-confirmation').value = requiredWord;
+      submitWallAction(action, wallId, key);
+    }
+
+    function toggleWall(wallId, active) {
+      const key = actionKey();
+      if (!key) return;
+      const verb = active ? 'reactivate' : 'deactivate';
+      if (!confirm('Are you sure you want to ' + verb + ' this Wall?')) return;
+      document.getElementById('wall-action-active').value = active ? 'true' : 'false';
+      submitWallAction('status', wallId, key);
+    }
+
+    function editWall(wallId, encodedName, encodedLocation) {
+      const key = actionKey();
+      if (!key) return;
+      const currentName = decodeURIComponent(encodedName);
+      const currentLocation = decodeURIComponent(encodedLocation);
+      const name = prompt('Wall name:', currentName);
+      if (name === null) return;
+      const trimmedName = name.trim();
+      if (!trimmedName) {
+        alert('Wall name cannot be empty.');
+        return;
+      }
+      const location = prompt('Location hint:', currentLocation);
+      if (location === null) return;
+      document.getElementById('wall-action-name').value = trimmedName;
+      document.getElementById('wall-action-location').value = location.trim();
+      submitWallAction('edit', wallId, key);
     }
   </script>
 </body>
 </html>`;
 }
 
-async function createWall(displayName, locationHint) {
+function validateWallFields(displayName, locationHint) {
   if (!displayName || displayName.length > 80) {
     throw new Error('Wall name must be between 1 and 80 characters.');
   }
   if (locationHint.length > 120) {
     throw new Error('Location hint must be 120 characters or fewer.');
   }
+}
 
+async function createWall(displayName, locationHint) {
+  validateWallFields(displayName, locationHint);
   const slug = crypto.randomBytes(5).toString('hex').toUpperCase();
   const tagToken = makeToken(36);
   const tagHash = hashToken(tagToken);
@@ -238,9 +291,9 @@ async function createWall(displayName, locationHint) {
       [wallResult.rows[0].id, tagHash],
     );
     await client.query('commit');
-
     return {
       ...wallResult.rows[0],
+      result_title: 'Wall created',
       nfc_url: `${appBase}/t/${tagToken}`,
     };
   } catch (error) {
@@ -265,14 +318,69 @@ async function listWalls() {
   return result.rows;
 }
 
+async function editWall(wallId, displayName, locationHint) {
+  validateWallFields(displayName, locationHint);
+  const result = await pool.query(
+    `update walls
+        set display_name = $2,
+            location_hint = $3
+      where id = $1
+      returning id, slug, display_name, location_hint, active`,
+    [wallId, displayName, locationHint],
+  );
+  if (result.rowCount === 0) throw new Error('Wall not found.');
+  return result.rows[0];
+}
+
+async function setWallActive(wallId, active) {
+  const result = await pool.query(
+    `update walls set active = $2 where id = $1 returning display_name, active`,
+    [wallId, active],
+  );
+  if (result.rowCount === 0) throw new Error('Wall not found.');
+  return result.rows[0];
+}
+
+async function rotateWallTag(wallId) {
+  const tagToken = makeToken(36);
+  const tagHash = hashToken(tagToken);
+  const appBase = (process.env.PUBLIC_APP_URL || 'https://saidhere.app').replace(/\/$/, '');
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const wallResult = await client.query(
+      `select id, slug, display_name from walls where id = $1 for update`,
+      [wallId],
+    );
+    if (wallResult.rowCount === 0) {
+      await client.query('rollback');
+      throw new Error('Wall not found.');
+    }
+    await client.query(`update wall_tags set active = false where wall_id = $1 and active = true`, [wallId]);
+    await client.query(
+      `insert into wall_tags (wall_id, token_hash, active) values ($1, $2, true)`,
+      [wallId, tagHash],
+    );
+    await client.query('commit');
+    return {
+      ...wallResult.rows[0],
+      result_title: 'Replacement NFC URL created',
+      nfc_url: `${appBase}/t/${tagToken}`,
+    };
+  } catch (error) {
+    try { await client.query('rollback'); } catch (_) {}
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function clearWallMessages(wallId) {
   const wallResult = await pool.query(
     `select id, display_name from walls where id = $1 limit 1`,
     [wallId],
   );
-  if (wallResult.rowCount === 0) {
-    throw new Error('Wall not found.');
-  }
+  if (wallResult.rowCount === 0) throw new Error('Wall not found.');
   const deleted = await pool.query(
     `delete from wall_posts where wall_id = $1 returning id`,
     [wallId],
@@ -288,9 +396,7 @@ async function deleteWall(wallId) {
     `delete from walls where id = $1 returning display_name`,
     [wallId],
   );
-  if (result.rowCount === 0) {
-    throw new Error('Wall not found.');
-  }
+  if (result.rowCount === 0) throw new Error('Wall not found.');
   return result.rows[0].display_name;
 }
 
@@ -304,6 +410,16 @@ async function discoveredWall(sessionId, wallId) {
     [sessionId, wallId],
   );
   return result.rows[0] || null;
+}
+
+async function renderWalls(res, { result = null, notice = null, error = null, status = 200 } = {}) {
+  try {
+    const walls = await listWalls();
+    return res.type('html').status(status).send(adminPage(result, error, walls, notice));
+  } catch (loadError) {
+    console.error('[admin/render-walls]', loadError);
+    return res.type('html').status(500).send(adminPage(result, loadError?.message || 'Could not load Walls.'));
+  }
 }
 
 app.get('/health', async (_req, res, next) => {
@@ -332,50 +448,85 @@ app.post('/admin/create', adminLimiter, requireAdmin, async (req, res) => {
 });
 
 app.post('/admin/walls', adminLimiter, requireAdmin, async (_req, res) => {
+  return renderWalls(res);
+});
+
+app.post('/admin/walls/:wallId/edit', adminLimiter, requireAdmin, async (req, res) => {
   try {
-    const walls = await listWalls();
-    return res.type('html').send(adminPage(null, null, walls));
+    const wall = await editWall(
+      req.params.wallId,
+      cleanBody(req.body?.display_name),
+      cleanBody(req.body?.location_hint),
+    );
+    return renderWalls(res, { notice: `Updated ${wall.display_name}.` });
   } catch (error) {
-    console.error('[admin/walls]', error);
-    return res.type('html').status(500).send(adminPage(null, error?.message || 'Could not load Walls.'));
+    console.error('[admin/walls/edit]', error);
+    return renderWalls(res, { error: error?.message || 'Could not edit Wall.', status: 400 });
+  }
+});
+
+app.post('/admin/walls/:wallId/status', adminLimiter, requireAdmin, async (req, res) => {
+  const activeText = cleanBody(req.body?.active).toLowerCase();
+  if (activeText !== 'true' && activeText !== 'false') {
+    return renderWalls(res, { error: 'Invalid Wall status.', status: 400 });
+  }
+  try {
+    const wall = await setWallActive(req.params.wallId, activeText === 'true');
+    return renderWalls(res, {
+      notice: `${wall.display_name} is now ${wall.active ? 'active' : 'inactive'}.`,
+    });
+  } catch (error) {
+    console.error('[admin/walls/status]', error);
+    return renderWalls(res, { error: error?.message || 'Could not change Wall status.', status: 400 });
+  }
+});
+
+app.post('/admin/walls/:wallId/rotate', adminLimiter, requireAdmin, async (req, res) => {
+  if (cleanBody(req.body?.confirmation) !== 'ROTATE') {
+    return renderWalls(res, { error: 'NFC replacement confirmation was not accepted.', status: 400 });
+  }
+  try {
+    const result = await rotateWallTag(req.params.wallId);
+    const walls = await listWalls();
+    return res.type('html').send(adminPage(
+      result,
+      null,
+      walls,
+      'All previous NFC URLs for this Wall are now inactive. Program the new URL onto the replacement plaque.',
+    ));
+  } catch (error) {
+    console.error('[admin/walls/rotate]', error);
+    return renderWalls(res, { error: error?.message || 'Could not replace NFC tag.', status: 400 });
   }
 });
 
 app.post('/admin/walls/:wallId/clear', adminLimiter, requireAdmin, async (req, res) => {
   if (cleanBody(req.body?.confirmation) !== 'CLEAR') {
-    return res.type('html').status(400).send(adminPage(null, 'Clear confirmation was not accepted.'));
+    return renderWalls(res, { error: 'Clear confirmation was not accepted.', status: 400 });
   }
   try {
     const result = await clearWallMessages(req.params.wallId);
-    const walls = await listWalls();
-    return res.type('html').send(adminPage(
-      null,
-      null,
-      walls,
-      `Cleared ${result.deletedCount} message${result.deletedCount === 1 ? '' : 's'} from ${result.displayName}. The Wall and NFC tag are still active.`,
-    ));
+    return renderWalls(res, {
+      notice: `Cleared ${result.deletedCount} message${result.deletedCount === 1 ? '' : 's'} from ${result.displayName}. The Wall and NFC tag are still active.`,
+    });
   } catch (error) {
     console.error('[admin/walls/clear]', error);
-    return res.type('html').status(400).send(adminPage(null, error?.message || 'Could not clear Wall messages.'));
+    return renderWalls(res, { error: error?.message || 'Could not clear Wall messages.', status: 400 });
   }
 });
 
 app.post('/admin/walls/:wallId/delete', adminLimiter, requireAdmin, async (req, res) => {
   if (cleanBody(req.body?.confirmation) !== 'DELETE') {
-    return res.type('html').status(400).send(adminPage(null, 'Delete confirmation was not accepted.'));
+    return renderWalls(res, { error: 'Delete confirmation was not accepted.', status: 400 });
   }
   try {
     const displayName = await deleteWall(req.params.wallId);
-    const walls = await listWalls();
-    return res.type('html').send(adminPage(
-      null,
-      null,
-      walls,
-      `Deleted ${displayName}. Its old NFC URL is now permanently invalid.`,
-    ));
+    return renderWalls(res, {
+      notice: `Deleted ${displayName}. Its old NFC URL is now permanently invalid.`,
+    });
   } catch (error) {
     console.error('[admin/walls/delete]', error);
-    return res.type('html').status(400).send(adminPage(null, error?.message || 'Could not delete Wall.'));
+    return renderWalls(res, { error: error?.message || 'Could not delete Wall.', status: 400 });
   }
 });
 
@@ -394,6 +545,35 @@ app.post('/api/admin/walls', adminLimiter, requireAdmin, async (req, res, next) 
 app.get('/api/admin/walls', adminLimiter, requireAdmin, async (_req, res, next) => {
   try {
     return res.json(await listWalls());
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.patch('/api/admin/walls/:wallId', adminLimiter, requireAdmin, async (req, res, next) => {
+  try {
+    const wall = await editWall(
+      req.params.wallId,
+      cleanBody(req.body?.display_name),
+      cleanBody(req.body?.location_hint),
+    );
+    return res.json(wall);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.post('/api/admin/walls/:wallId/status', adminLimiter, requireAdmin, async (req, res, next) => {
+  try {
+    return res.json(await setWallActive(req.params.wallId, req.body?.active === true));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.post('/api/admin/walls/:wallId/rotate', adminLimiter, requireAdmin, async (req, res, next) => {
+  try {
+    return res.status(201).json(await rotateWallTag(req.params.wallId));
   } catch (error) {
     return next(error);
   }
@@ -601,6 +781,18 @@ app.post('/api/posts/:postId/report', requireSession, async (req, res, next) => 
     const client = await pool.connect();
     try {
       await client.query('begin');
+      const recentReports = await client.query(
+        `select count(*)::int as count
+           from post_reports
+          where reporter_session_id = $1
+            and created_at > now() - interval '1 hour'`,
+        [req.sessionId],
+      );
+      if (recentReports.rows[0].count >= 20) {
+        await client.query('rollback');
+        return res.status(429).json({ error: 'Too many reports. Try again later.' });
+      }
+
       const postResult = await client.query(
         `select p.id, p.wall_id
            from wall_posts p
