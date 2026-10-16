@@ -24,6 +24,7 @@ class TagEntryScreen extends StatefulWidget {
 
 class _TagEntryScreenState extends State<TagEntryScreen> {
   String? _error;
+  bool _loading = false;
 
   @override
   void initState() {
@@ -32,6 +33,11 @@ class _TagEntryScreenState extends State<TagEntryScreen> {
   }
 
   Future<void> _claim() async {
+    if (_loading) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final wall = await widget.service.claimWallVisit(widget.tagToken);
       await widget.localHistory.rememberWall(
@@ -43,7 +49,10 @@ class _TagEntryScreenState extends State<TagEntryScreen> {
       context.go('/w/${wall.slug}?fresh=1');
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = error.toString());
+      setState(() {
+        _loading = false;
+        _error = error.toString();
+      });
     }
   }
 
@@ -93,6 +102,16 @@ class _TagEntryScreenState extends State<TagEntryScreen> {
                     ),
                   ),
                   const SizedBox(height: 18),
+                  FilledButton.icon(
+                    onPressed: _claim,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Try again'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: SaidHereTheme.paper,
+                      foregroundColor: SaidHereTheme.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   OutlinedButton(
                     onPressed: () => context.go('/'),
                     style: OutlinedButton.styleFrom(
