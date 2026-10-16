@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f3efe4">
+  <title>SaidHere</title>
+  <style>
+    :root { color-scheme: light; --paper:#f3efe4; --ink:#151515; --muted:#6d685f; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:var(--paper); color:var(--ink); font-family:Arial,Helvetica,sans-serif; display:grid; place-items:center; padding:28px; }
+    main { width:min(620px,100%); text-align:center; }
+    .mark { font-size:clamp(44px,11vw,76px); font-weight:900; letter-spacing:-4px; margin:0 0 12px; }
+    .tagline { font-size:18px; line-height:1.5; margin:0 auto 34px; max-width:460px; }
+    .card { border:2px solid var(--ink); border-radius:20px; padding:28px 22px; background:rgba(255,255,255,.26); }
+    .tap { font-size:34px; margin-bottom:10px; }
+    h1 { font-size:24px; margin:0 0 10px; }
+    p { line-height:1.5; }
+    .muted { color:var(--muted); font-size:14px; }
+    .button { display:inline-block; margin-top:12px; padding:14px 20px; background:var(--ink); color:var(--paper); border-radius:999px; text-decoration:none; font-weight:800; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="mark">SAID HERE</div>
+    <p class="tagline">Things people left behind in this exact place.</p>
+    <section class="card">
+      <div class="tap">◉</div>
+      <h1>You found a Wall.</h1>
+      <p id="message">Open SaidHere to read what was said here and leave something behind.</p>
+      <a id="open-app" class="button" href="saidhere://">Open SaidHere</a>
+      <p class="muted">If SaidHere is installed, NFC links normally open the app automatically.</p>
+    </section>
+  </main>
+  <script>
+    const path = window.location.pathname;
+    const link = document.getElementById('open-app');
+    if (path.startsWith('/t/')) link.href = 'saidhere://' + path.slice(1);
+    else if (path.startsWith('/w/')) link.href = 'saidhere://' + path.slice(1);
+  </script>
+</body>
+</html>
