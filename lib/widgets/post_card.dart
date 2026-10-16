@@ -25,26 +25,29 @@ class PostCard extends StatelessWidget {
     final seed = post.id.codeUnits.fold<int>(0, (a, b) => a + b);
     final rng = math.Random(seed);
     final colors = [
-      SaidHereTheme.fadedRed.withValues(alpha: .13),
-      SaidHereTheme.fadedBlue.withValues(alpha: .15),
-      SaidHereTheme.fadedYellow.withValues(alpha: .18),
-      Colors.white.withValues(alpha: .28),
+      const Color(0xFFCEC0A8),
+      const Color(0xFFC5B59B),
+      const Color(0xFFD5C7B0),
+      const Color(0xFFBFAE95),
     ];
 
-    final angle = (rng.nextDouble() - .5) * .025;
-    final left = depth == 0 ? 8.0 : 26.0;
+    final angle = (rng.nextDouble() - .5) * .045;
+    final left = depth == 0 ? 6.0 : 24.0;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(left, 6, 8, 6),
+      padding: EdgeInsets.fromLTRB(left, 7, 7, 7),
       child: Transform.rotate(
         angle: angle,
-        child: Material(
-          color: colors[seed % colors.length],
-          elevation: 0,
-          borderRadius: BorderRadius.circular(4),
+        child: Container(
+          decoration: BoxDecoration(
+            color: colors[seed % colors.length].withValues(alpha: .91),
+            border: Border.all(color: SaidHereTheme.ink.withValues(alpha: .26), width: 1.2),
+            boxShadow: const [
+              BoxShadow(color: Color(0x33000000), offset: Offset(2, 3), blurRadius: 0),
+            ],
+          ),
           child: InkWell(
             onLongPress: onReport,
-            borderRadius: BorderRadius.circular(4),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 12, 10),
               child: Column(
@@ -53,20 +56,24 @@ class PostCard extends StatelessWidget {
                   Text(
                     post.body,
                     style: TextStyle(
-                      color: SaidHereTheme.ink.withValues(alpha: .92),
+                      color: SaidHereTheme.ink.withValues(alpha: .96),
                       fontSize: depth == 0 ? 17 : 15,
-                      height: 1.35,
-                      fontWeight: FontWeight.w600,
+                      height: 1.32,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -.15,
                     ),
                   ),
-                  const SizedBox(height: 9),
+                  const SizedBox(height: 10),
+                  Container(height: 1, color: SaidHereTheme.ink.withValues(alpha: .18)),
+                  const SizedBox(height: 5),
                   Row(
                     children: [
                       Text(
-                        DateFormat('d MMM yyyy').format(post.createdAt),
+                        DateFormat('d MMM yyyy').format(post.createdAt).toUpperCase(),
                         style: TextStyle(
-                          fontSize: 11,
-                          color: SaidHereTheme.ink.withValues(alpha: .58),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: SaidHereTheme.ink.withValues(alpha: .6),
                         ),
                       ),
                       const Spacer(),
@@ -74,9 +81,9 @@ class PostCard extends StatelessWidget {
                         TextButton.icon(
                           onPressed: onReply,
                           icon: const Icon(Icons.subdirectory_arrow_right, size: 16),
-                          label: const Text('reply'),
+                          label: const Text('REPLY'),
                           style: TextButton.styleFrom(
-                            foregroundColor: SaidHereTheme.ink.withValues(alpha: .68),
+                            foregroundColor: SaidHereTheme.ink.withValues(alpha: .76),
                             visualDensity: VisualDensity.compact,
                           ),
                         ),
