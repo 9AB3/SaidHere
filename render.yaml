@@ -25,7 +25,7 @@ services:
   - type: web
     name: saidhere-web-9ab3
     runtime: static
-    buildCommand: echo "SaidHere static site ready"
+    buildCommand: cp "lib/theme/Grungy Graffiti Wall_ The Wall.png" site/the-wall.png
     staticPublishPath: ./site
     domains:
       - saidhere.app
