@@ -73,8 +73,20 @@ const replacementWallRows = `  const wallRows = Array.isArray(walls)
 
 source = source.slice(0, wallRowsStart) + replacementWallRows + source.slice(wallsHtmlStart);
 
-// Remove the now-unneeded JavaScript completely.
-source = source.replace(/  <script>[\\s\\S]*?<\\/script>\\n/, '');
+// Remove the now-unneeded inline JavaScript without a regex so this is safe on
+// current Render/GitHub Node runtimes.
+const scriptStart = source.indexOf('  <script>');
+if (scriptStart >= 0) {
+  const scriptEndTag = '</script>';
+  const scriptEnd = source.indexOf(scriptEndTag, scriptStart);
+  if (scriptEnd < 0) {
+    throw new Error('Found admin script start but not its closing tag.');
+  }
+  let afterScript = scriptEnd + scriptEndTag.length;
+  if (source.startsWith('\r\n', afterScript)) afterScript += 2;
+  else if (source.startsWith('\n', afterScript)) afterScript += 1;
+  source = source.slice(0, scriptStart) + source.slice(afterScript);
+}
 
 // Replace the obsolete global admin-key prompt with instructions for the row forms.
 source = source.replace(
