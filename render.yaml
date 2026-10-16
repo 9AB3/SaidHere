@@ -22,6 +22,28 @@ services:
       - key: ADMIN_KEY
         generateValue: true
 
+  - type: web
+    name: saidhere-web-9ab3
+    runtime: static
+    buildCommand: echo "SaidHere static site ready"
+    staticPublishPath: ./site
+    domains:
+      - saidhere.app
+    headers:
+      - path: /.well-known/apple-app-site-association
+        name: Content-Type
+        value: application/json
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
+    routes:
+      - type: rewrite
+        source: /t/*
+        destination: /index.html
+      - type: rewrite
+        source: /w/*
+        destination: /index.html
+
 databases:
   - name: saidhere-db-9ab3
     plan: free
