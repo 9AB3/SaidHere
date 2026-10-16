@@ -19,14 +19,15 @@ const allowedOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map((value) => value.trim())
   .filter(Boolean);
-app.use(cors({
+const apiCors = cors({
   origin(origin, callback) {
     if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     return callback(new Error('Origin not allowed'));
   },
-}));
+});
+app.use('/api', apiCors);
 
 app.use(rateLimit({
   windowMs: 60 * 1000,
@@ -206,7 +207,8 @@ app.post('/admin/create', adminLimiter, requireAdmin, async (req, res) => {
     const wall = await createWall(displayName, locationHint);
     return res.type('html').status(201).send(adminPage(wall));
   } catch (error) {
-    return res.type('html').status(400).send(adminPage(null, error.message));
+    console.error('[admin/create]', error);
+    return res.type('html').status(400).send(adminPage(null, error?.message || 'Could not create Wall.'));
   }
 });
 
@@ -489,10 +491,13 @@ app.get('/', (_req, res) => {
   res.type('text/plain').send('SaidHere API');
 });
 
-app.use((error, _req, res, _next) => {
+app.use((error, req, res, _next) => {
   const requestId = crypto.randomUUID();
   console.error(`[${requestId}]`, error);
-  res.status(500).json({ error: 'Something went wrong.', request_id: requestId });
+  if (req.path.startsWith('/admin')) {
+    return res.type('html').status(500).send(adminPage(null, `${error?.message || 'Something went wrong.'} (request ${requestId})`));
+  }
+  return res.status(500).json({ error: 'Something went wrong.', request_id: requestId });
 });
 
 app.listen(port, '0.0.0.0', () => {
