@@ -18,6 +18,8 @@
     p { line-height:1.5; }
     .muted { color:var(--muted); font-size:14px; }
     .button { display:inline-block; margin-top:12px; padding:14px 20px; background:var(--ink); color:var(--paper); border-radius:999px; text-decoration:none; font-weight:800; }
+    footer { margin-top:24px; color:var(--muted); font-size:13px; }
+    footer a { color:var(--ink); font-weight:700; text-decoration:none; }
   </style>
 </head>
 <body>
@@ -31,6 +33,7 @@
       <a id="open-app" class="button" href="saidhere://">Open SaidHere</a>
       <p class="muted">If SaidHere is installed, NFC links normally open the app automatically.</p>
     </section>
+    <footer><a href="/privacy/">Privacy</a> · <a href="/support/">Support</a></footer>
   </main>
   <script>
     const path = window.location.pathname;
