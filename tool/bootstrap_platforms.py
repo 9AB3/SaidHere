@@ -45,12 +45,28 @@ def patch_ios(host: str) -> None:
 
     project = ROOT / 'ios/Runner.xcodeproj/project.pbxproj'
     text = project.read_text(encoding='utf-8')
-    # Flutter's generated bundle prefix varies with project name. Normalize Runner and
-    # RunnerTests to a stable App ID that we register in Apple Developer.
     text = text.replace('app.saidhere.saidHere', IOS_BUNDLE_ID)
     if 'CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;' not in text:
-        text = text.replace('CODE_SIGN_STYLE = Automatic;', 'CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;\n\t\t\t\tCODE_SIGN_STYLE = Automatic;')
+        text = text.replace(
+            'CODE_SIGN_STYLE = Automatic;',
+            'CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;\n\t\t\t\tCODE_SIGN_STYLE = Automatic;',
+        )
     project.write_text(text, encoding='utf-8')
+
+    # Explicitly wire the entitlements file into every Flutter build configuration.
+    # This survives Codemagic's xcode-project use-profiles step and guarantees the
+    # signed archive requests Associated Domains.
+    for name in ('Debug', 'Profile', 'Release'):
+        xcconfig = ROOT / f'ios/Flutter/{name}.xcconfig'
+        if not xcconfig.exists():
+            continue
+        xc = xcconfig.read_text(encoding='utf-8')
+        line = 'CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements'
+        if line not in xc:
+            if not xc.endswith('\n'):
+                xc += '\n'
+            xc += f'{line}\n'
+            xcconfig.write_text(xc, encoding='utf-8')
 
 
 def write_domain_templates(host: str) -> None:
