@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -30,18 +32,39 @@ class _WallScreenState extends State<WallScreen> {
   bool _loading = true;
   String? _error;
   int? _year;
+  bool _newestFirst = true;
+  Timer? _writeTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _writeTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted && _wall?.writeAccessUntil != null) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _writeTimer?.cancel();
+    super.dispose();
+  }
+
+  void _goBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/');
+    }
   }
 
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     try {
       final wall = await widget.service.getWallBySlug(widget.slug);
@@ -69,17 +92,27 @@ class _WallScreenState extends State<WallScreen> {
     return years.reversed.toList(growable: false);
   }
 
-  List<WallPost> get _filteredPosts => _year == null
-      ? _posts
-      : _posts.where((p) => p.createdAt.year == _year).toList();
+  List<WallPost> get _filteredPosts {
+    if (_year == null) return _posts;
+    final matching = _posts.where((p) => p.createdAt.year == _year).toList();
+    final parentIds = matching
+        .where((p) => p.parentId != null)
+        .map((p) => p.parentId!)
+        .toSet();
+    final parents = _posts.where((p) => parentIds.contains(p.id));
+    final byId = <String, WallPost>{for (final p in [...matching, ...parents]) p.id: p};
+    return byId.values.toList();
+  }
 
   @override
   Widget build(BuildContext context) {
     final wall = _wall;
+    final canWrite = wall?.canWriteNow == true;
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          onPressed: () => context.go('/found'),
+          onPressed: _goBack,
           icon: const Icon(Icons.arrow_back),
         ),
         title: Column(
@@ -100,6 +133,16 @@ class _WallScreenState extends State<WallScreen> {
           ],
         ),
         actions: [
+          PopupMenuButton<bool>(
+            tooltip: 'Sort messages',
+            initialValue: _newestFirst,
+            onSelected: (value) => setState(() => _newestFirst = value),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: true, child: Text('Newest first')),
+              PopupMenuItem(value: false, child: Text('Oldest first')),
+            ],
+            icon: const Icon(Icons.sort),
+          ),
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
         ],
       ),
@@ -107,15 +150,10 @@ class _WallScreenState extends State<WallScreen> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(28),
-                      child: Text(_error!, textAlign: TextAlign.center),
-                    ),
-                  )
+                ? _WallError(message: _error!, onRetry: _load)
                 : Column(
                     children: [
-                      if (widget.freshVisit && wall?.canWriteNow == true)
+                      if (widget.freshVisit && canWrite)
                         Container(
                           width: double.infinity,
                           margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
@@ -152,22 +190,16 @@ class _WallScreenState extends State<WallScreen> {
                             ],
                           ),
                         ),
-                      Expanded(child: _buildPosts()),
+                      Expanded(child: _buildPosts(canWrite)),
                       SafeArea(
                         top: false,
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
                           child: FilledButton.icon(
-                            onPressed: wall?.canWriteNow == true
-                                ? () => _openComposer()
-                                : () => _showLocationLimit(),
-                            icon: Icon(
-                              wall?.canWriteNow == true
-                                  ? Icons.edit
-                                  : Icons.lock_outline,
-                            ),
+                            onPressed: canWrite ? () => _openComposer() : _showLocationLimit,
+                            icon: Icon(canWrite ? Icons.edit : Icons.lock_outline),
                             label: Text(
-                              wall?.canWriteNow == true
+                              canWrite
                                   ? 'Write on the wall…'
                                   : 'Visit this Wall to write',
                             ),
@@ -180,7 +212,7 @@ class _WallScreenState extends State<WallScreen> {
     );
   }
 
-  Widget _buildPosts() {
+  Widget _buildPosts(bool canWrite) {
     final posts = _filteredPosts;
     if (posts.isEmpty) {
       return const Center(
@@ -195,15 +227,22 @@ class _WallScreenState extends State<WallScreen> {
       );
     }
 
-    final roots = posts.where((post) => post.parentId == null).toList();
+    final roots = posts.where((post) => post.parentId == null).toList()
+      ..sort((a, b) => _newestFirst
+          ? b.createdAt.compareTo(a.createdAt)
+          : a.createdAt.compareTo(b.createdAt));
     final repliesByParent = <String, List<WallPost>>{};
     for (final post in posts.where((post) => post.parentId != null)) {
       repliesByParent.putIfAbsent(post.parentId!, () => []).add(post);
+    }
+    for (final replies in repliesByParent.values) {
+      replies.sort((a, b) => a.createdAt.compareTo(b.createdAt));
     }
 
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(8, 8, 8, 20),
         itemCount: roots.length,
         itemBuilder: (context, index) {
@@ -213,14 +252,13 @@ class _WallScreenState extends State<WallScreen> {
             children: [
               PostCard(
                 post: root,
-                onReply: () => _openComposer(parent: root),
+                onReply: canWrite ? () => _openComposer(parent: root) : null,
                 onReport: () => _report(root),
               ),
               for (final reply in replies)
                 PostCard(
                   post: reply,
                   depth: 1,
-                  onReply: () {},
                   onReport: () => _report(reply),
                 ),
             ],
@@ -233,19 +271,23 @@ class _WallScreenState extends State<WallScreen> {
   Future<void> _openComposer({WallPost? parent}) async {
     final wall = _wall;
     if (wall == null) return;
+    if (!wall.canWriteNow) {
+      await _showLocationLimit();
+      return;
+    }
 
     final controller = TextEditingController();
     final posted = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: SaidHereTheme.paper,
-      builder: (context) {
+      builder: (sheetContext) {
         return Padding(
           padding: EdgeInsets.fromLTRB(
             18,
             18,
             18,
-            MediaQuery.viewInsetsOf(context).bottom + 18,
+            MediaQuery.viewInsetsOf(sheetContext).bottom + 18,
           ),
           child: _Composer(
             controller: controller,
@@ -258,12 +300,13 @@ class _WallScreenState extends State<WallScreen> {
                 body: body,
                 parentId: parent?.id,
               );
-              if (context.mounted) Navigator.pop(context, true);
+              if (sheetContext.mounted) Navigator.pop(sheetContext, true);
             },
           ),
         );
       },
     );
+    controller.dispose();
 
     if (posted == true) await _load();
   }
@@ -290,12 +333,19 @@ class _WallScreenState extends State<WallScreen> {
     );
 
     if (shouldReport != true) return;
-    await widget.service.reportPost(post.id);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Message reported. Thanks.')),
-    );
-    await _load();
+    try {
+      await widget.service.reportPost(post.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Message reported. Thanks.')),
+      );
+      await _load();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not report this message. ${error.toString()}')),
+      );
+    }
   }
 
   Future<void> _showLocationLimit() async {
@@ -313,6 +363,35 @@ class _WallScreenState extends State<WallScreen> {
             child: const Text('Got it'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _WallError extends StatelessWidget {
+  const _WallError({required this.message, required this.onRetry});
+  final String message;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_outlined, size: 40),
+            const SizedBox(height: 12),
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try again'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -349,6 +428,7 @@ class _Composer extends StatefulWidget {
 
 class _ComposerState extends State<_Composer> {
   bool _posting = false;
+  String? _error;
 
   @override
   Widget build(BuildContext context) {
@@ -396,16 +476,30 @@ class _ComposerState extends State<_Composer> {
           maxLines: 7,
           textCapitalization: TextCapitalization.sentences,
           decoration: const InputDecoration(hintText: 'Leave something behind…'),
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) => setState(() {
+            _error = null;
+          }),
         ),
+        if (_error != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            _error!,
+            style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+          ),
+        ],
         const SizedBox(height: 8),
         FilledButton(
           onPressed: _posting || widget.controller.text.trim().isEmpty
               ? null
               : () async {
-                  setState(() => _posting = true);
+                  setState(() {
+                    _posting = true;
+                    _error = null;
+                  });
                   try {
                     await widget.onPost();
+                  } catch (error) {
+                    if (mounted) setState(() => _error = error.toString());
                   } finally {
                     if (mounted) setState(() => _posting = false);
                   }
