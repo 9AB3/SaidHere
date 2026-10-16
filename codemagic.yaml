@@ -1,0 +1,38 @@
+workflows:
+  saidhere-checks:
+    name: SaidHere checks
+    max_build_duration: 30
+    environment:
+      flutter: stable
+      vars:
+        APP_HOST: saidhere.app
+    scripts:
+      - name: Generate Flutter platform projects
+        script: python3 tool/bootstrap_platforms.py --host "$APP_HOST"
+      - name: Get packages
+        script: flutter pub get
+      - name: Analyze
+        script: flutter analyze
+      - name: Test
+        script: flutter test
+      - name: Build web
+        script: >-
+          flutter build web --release
+          --dart-define=SUPABASE_URL="${SUPABASE_URL:-}"
+          --dart-define=SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
+          --dart-define=APP_HOST="$APP_HOST"
+      - name: Build Android debug APK
+        script: >-
+          flutter build apk --debug
+          --dart-define=SUPABASE_URL="${SUPABASE_URL:-}"
+          --dart-define=SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
+          --dart-define=APP_HOST="$APP_HOST"
+      - name: Compile iOS without signing
+        script: >-
+          flutter build ios --release --no-codesign
+          --dart-define=SUPABASE_URL="${SUPABASE_URL:-}"
+          --dart-define=SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
+          --dart-define=APP_HOST="$APP_HOST"
+    artifacts:
+      - build/web/**
+      - build/app/outputs/flutter-apk/*.apk

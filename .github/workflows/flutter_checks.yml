@@ -1,0 +1,19 @@
+name: Flutter checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  analyze-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: python3 tool/bootstrap_platforms.py --host saidhere.app
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
