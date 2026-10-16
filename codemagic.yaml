@@ -58,6 +58,7 @@ workflows:
           flutter pub get
           grep -q 'com.9ab3.saidhere' ios/Runner.xcodeproj/project.pbxproj
           grep -q 'applinks:saidhere.app' ios/Runner/Runner.entitlements
+          grep -q '^CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements$' ios/Flutter/Release.xcconfig
       - name: Configure iOS signing
         script: |
           set -euo pipefail
@@ -72,6 +73,13 @@ workflows:
             echo 'FAIL: provisioning profile does not authorize Associated Domains'
             exit 1
           fi
+          echo '--- Requested SaidHere entitlements ---'
+          cat ios/Runner/Runner.entitlements
+          /usr/libexec/PlistBuddy -c 'Print :com.apple.developer.associated-domains:0' ios/Runner/Runner.entitlements | tee /tmp/requested-domain.txt
+          grep -qx 'applinks:saidhere.app' /tmp/requested-domain.txt || { echo 'FAIL: Runner.entitlements is missing applinks:saidhere.app'; exit 1; }
+          echo '--- Release CODE_SIGN_ENTITLEMENTS build setting ---'
+          xcodebuild -project ios/Runner.xcodeproj -scheme Runner -configuration Release -showBuildSettings | grep 'CODE_SIGN_ENTITLEMENTS' | tee /tmp/code-sign-entitlements.txt
+          grep -q 'Runner/Runner.entitlements' /tmp/code-sign-entitlements.txt || { echo 'FAIL: Xcode Release build is not using Runner.entitlements'; exit 1; }
       - name: Analyze
         script: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Build signed IPA
