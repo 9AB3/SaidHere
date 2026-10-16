@@ -9,14 +9,14 @@ import '../theme/app_theme.dart';
 class PostCard extends StatelessWidget {
   const PostCard({
     required this.post,
-    required this.onReply,
     required this.onReport,
+    this.onReply,
     this.depth = 0,
     super.key,
   });
 
   final WallPost post;
-  final VoidCallback onReply;
+  final VoidCallback? onReply;
   final VoidCallback onReport;
   final int depth;
 
@@ -70,7 +70,7 @@ class PostCard extends StatelessWidget {
                         ),
                       ),
                       const Spacer(),
-                      if (depth == 0)
+                      if (depth == 0 && onReply != null)
                         TextButton.icon(
                           onPressed: onReply,
                           icon: const Icon(Icons.subdirectory_arrow_right, size: 16),
