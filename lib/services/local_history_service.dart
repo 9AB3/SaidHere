@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/wall.dart';
+
 class LocalHistoryService {
   static const _key = 'saidhere_recent_walls';
 
@@ -38,5 +40,19 @@ class LocalHistoryService {
     return decoded
         .whereType<Map<String, dynamic>>()
         .toList(growable: false);
+  }
+
+  Future<List<Wall>> cachedWalls() async {
+    final items = await recentWalls();
+    return items.map((item) {
+      final visitedAt = DateTime.tryParse((item['visitedAt'] ?? '').toString())?.toLocal();
+      return Wall(
+        id: '',
+        slug: (item['slug'] ?? '').toString(),
+        displayName: (item['displayName'] ?? 'A Wall').toString(),
+        locationHint: (item['locationHint'] ?? '').toString(),
+        lastVisitedAt: visitedAt,
+      );
+    }).where((wall) => wall.slug.isNotEmpty).toList(growable: false);
   }
 }
