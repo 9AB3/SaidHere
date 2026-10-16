@@ -54,7 +54,10 @@ class _SaidHereAppState extends State<SaidHereApp> {
           ),
           GoRoute(
             path: '/found',
-            builder: (_, _) => DiscoveredWallsScreen(service: service),
+            builder: (_, _) => DiscoveredWallsScreen(
+              service: service,
+              localHistory: history,
+            ),
           ),
         ],
         errorBuilder: (_, state) => Scaffold(
