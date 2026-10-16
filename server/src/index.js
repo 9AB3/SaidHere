@@ -106,7 +106,7 @@ function formatAdminDate(value) {
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('en-AU');
 }
 
-function adminPage(result = null, error = null, walls = null) {
+function adminPage(result = null, error = null, walls = null, notice = null) {
   const resultHtml = result
     ? `<hr><h2>Wall created</h2>
        <p><strong>Name:</strong> ${escapeHtml(result.display_name)}</p>
@@ -117,6 +117,7 @@ function adminPage(result = null, error = null, walls = null) {
        <p>Write that exact URL to the NFC tag. Test it before permanently write-locking the tag.</p>`
     : '';
   const errorHtml = error ? `<p class="error"><strong>Error:</strong> ${escapeHtml(error)}</p>` : '';
+  const noticeHtml = notice ? `<p class="notice"><strong>${escapeHtml(notice)}</strong></p>` : '';
   const wallRows = Array.isArray(walls)
     ? walls.map((wall) => `<tr>
         <td>${escapeHtml(wall.display_name)}</td>
@@ -126,16 +127,26 @@ function adminPage(result = null, error = null, walls = null) {
         <td>${escapeHtml(wall.discovered_by)}</td>
         <td>${escapeHtml(wall.post_count)}</td>
         <td>${escapeHtml(formatAdminDate(wall.created_at))}</td>
+        <td class="actions">
+          <button type="button" class="secondary" onclick="adminAction('clear','${escapeHtml(wall.id)}','${escapeHtml(wall.display_name)}')">Clear messages</button>
+          <button type="button" class="danger" onclick="adminAction('delete','${escapeHtml(wall.id)}','${escapeHtml(wall.display_name)}')">Delete Wall</button>
+        </td>
       </tr>`).join('')
     : '';
   const wallsHtml = Array.isArray(walls)
     ? `<hr><h2>All Walls <span class="count">(${walls.length})</span></h2>
        ${walls.length === 0
          ? '<p>No Walls have been created yet.</p>'
-         : `<div class="table-wrap"><table>
-              <thead><tr><th>Name</th><th>Location</th><th>Public ID</th><th>Status</th><th>Discovered by</th><th>Messages</th><th>Created</th></tr></thead>
+         : `<p><label><strong>Admin key for Wall actions</strong><br><input id="wall-action-key" type="password" autocomplete="current-password" placeholder="Required to clear or delete"></label></p>
+            <p class="help">Clear messages keeps the Wall and NFC tag working. Delete Wall permanently removes the Wall, tag association, visits and messages.</p>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Name</th><th>Location</th><th>Public ID</th><th>Status</th><th>Discovered by</th><th>Messages</th><th>Created</th><th>Actions</th></tr></thead>
               <tbody>${wallRows}</tbody>
-            </table></div>`}`
+            </table></div>
+            <form id="wall-action-form" method="post" class="hidden-form">
+              <input id="wall-action-admin-key" type="hidden" name="admin_key">
+              <input id="wall-action-confirmation" type="hidden" name="confirmation">
+            </form>`}`
     : '';
 
   return `<!doctype html>
@@ -145,11 +156,11 @@ function adminPage(result = null, error = null, walls = null) {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>SaidHere Admin</title>
   <style>
-    body{font-family:Arial,sans-serif;background:#f3efe4;color:#151515;margin:0;padding:28px}main{max-width:1100px;margin:auto}
+    body{font-family:Arial,sans-serif;background:#f3efe4;color:#151515;margin:0;padding:28px}main{max-width:1200px;margin:auto}
     input{padding:10px;border:1px solid #777;border-radius:8px;max-width:100%;width:420px}button{padding:11px 16px;border:0;border-radius:999px;background:#151515;color:#fff;font-weight:700;cursor:pointer}
-    form{background:rgba(255,255,255,.45);padding:18px;border-radius:14px;margin:14px 0 24px}.error{color:#9f1b1b}.table-wrap{overflow:auto}
+    form{background:rgba(255,255,255,.45);padding:18px;border-radius:14px;margin:14px 0 24px}.error{color:#9f1b1b}.notice{background:#dcebd7;padding:12px 14px;border-radius:10px}.table-wrap{overflow:auto}
     table{width:100%;border-collapse:collapse;background:rgba(255,255,255,.5)}th,td{text-align:left;padding:10px;border-bottom:1px solid #c9c2b5;white-space:nowrap}th{background:#e5dfd2}.count{font-weight:400;color:#6d685f}
-    code{font-size:12px}
+    code{font-size:12px}.actions{display:flex;gap:8px}.secondary{background:#5b584f}.danger{background:#9f1b1b}.help{color:#6d685f;font-size:14px}.hidden-form{display:none}
   </style>
 </head>
 <body>
@@ -157,6 +168,7 @@ function adminPage(result = null, error = null, walls = null) {
     <h1>SaidHere Admin</h1>
     <p>Create physical Walls and manage the places connected to SaidHere plaques.</p>
     ${errorHtml}
+    ${noticeHtml}
     <h2>Create Wall</h2>
     <form method="post" action="/admin/create">
       <p><label>Admin key<br><input name="admin_key" type="password" required autocomplete="current-password"></label></p>
@@ -172,6 +184,29 @@ function adminPage(result = null, error = null, walls = null) {
     ${resultHtml}
     ${wallsHtml}
   </main>
+  <script>
+    function adminAction(action, wallId, wallName) {
+      const keyInput = document.getElementById('wall-action-key');
+      const key = keyInput ? keyInput.value.trim() : '';
+      if (!key) {
+        alert('Enter the admin key above the Walls table first.');
+        keyInput?.focus();
+        return;
+      }
+      const requiredWord = action === 'delete' ? 'DELETE' : 'CLEAR';
+      const explanation = action === 'delete'
+        ? 'This permanently deletes the Wall, its NFC tag association, visits, messages and reports.'
+        : 'This permanently deletes every message, reply and report on the Wall. The Wall and NFC tag will remain active.';
+      const typed = prompt(`${explanation}\n\nWall: ${wallName}\n\nType ${requiredWord} to continue.`);
+      if (typed !== requiredWord) return;
+
+      const form = document.getElementById('wall-action-form');
+      document.getElementById('wall-action-admin-key').value = key;
+      document.getElementById('wall-action-confirmation').value = requiredWord;
+      form.action = `/admin/walls/${encodeURIComponent(wallId)}/${action}`;
+      form.submit();
+    }
+  </script>
 </body>
 </html>`;
 }
@@ -230,6 +265,35 @@ async function listWalls() {
   return result.rows;
 }
 
+async function clearWallMessages(wallId) {
+  const wallResult = await pool.query(
+    `select id, display_name from walls where id = $1 limit 1`,
+    [wallId],
+  );
+  if (wallResult.rowCount === 0) {
+    throw new Error('Wall not found.');
+  }
+  const deleted = await pool.query(
+    `delete from wall_posts where wall_id = $1 returning id`,
+    [wallId],
+  );
+  return {
+    displayName: wallResult.rows[0].display_name,
+    deletedCount: deleted.rowCount,
+  };
+}
+
+async function deleteWall(wallId) {
+  const result = await pool.query(
+    `delete from walls where id = $1 returning display_name`,
+    [wallId],
+  );
+  if (result.rowCount === 0) {
+    throw new Error('Wall not found.');
+  }
+  return result.rows[0].display_name;
+}
+
 async function discoveredWall(sessionId, wallId) {
   const result = await pool.query(
     `select w.id, w.slug, w.display_name, w.location_hint,
@@ -274,6 +338,44 @@ app.post('/admin/walls', adminLimiter, requireAdmin, async (_req, res) => {
   } catch (error) {
     console.error('[admin/walls]', error);
     return res.type('html').status(500).send(adminPage(null, error?.message || 'Could not load Walls.'));
+  }
+});
+
+app.post('/admin/walls/:wallId/clear', adminLimiter, requireAdmin, async (req, res) => {
+  if (cleanBody(req.body?.confirmation) !== 'CLEAR') {
+    return res.type('html').status(400).send(adminPage(null, 'Clear confirmation was not accepted.'));
+  }
+  try {
+    const result = await clearWallMessages(req.params.wallId);
+    const walls = await listWalls();
+    return res.type('html').send(adminPage(
+      null,
+      null,
+      walls,
+      `Cleared ${result.deletedCount} message${result.deletedCount === 1 ? '' : 's'} from ${result.displayName}. The Wall and NFC tag are still active.`,
+    ));
+  } catch (error) {
+    console.error('[admin/walls/clear]', error);
+    return res.type('html').status(400).send(adminPage(null, error?.message || 'Could not clear Wall messages.'));
+  }
+});
+
+app.post('/admin/walls/:wallId/delete', adminLimiter, requireAdmin, async (req, res) => {
+  if (cleanBody(req.body?.confirmation) !== 'DELETE') {
+    return res.type('html').status(400).send(adminPage(null, 'Delete confirmation was not accepted.'));
+  }
+  try {
+    const displayName = await deleteWall(req.params.wallId);
+    const walls = await listWalls();
+    return res.type('html').send(adminPage(
+      null,
+      null,
+      walls,
+      `Deleted ${displayName}. Its old NFC URL is now permanently invalid.`,
+    ));
+  } catch (error) {
+    console.error('[admin/walls/delete]', error);
+    return res.type('html').status(400).send(adminPage(null, error?.message || 'Could not delete Wall.'));
   }
 });
 
