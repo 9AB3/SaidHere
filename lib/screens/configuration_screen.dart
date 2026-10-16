@@ -10,6 +10,7 @@ class ConfigurationScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: WallBackground(
+        heavy: true,
         child: SafeArea(
           child: Center(
             child: ConstrainedBox(
@@ -22,14 +23,14 @@ class ConfigurationScreen extends StatelessWidget {
                     BrandMark(),
                     SizedBox(height: 32),
                     Text(
-                      'Backend not configured',
+                      'BACKEND NOT CONFIGURED',
                       style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20),
                     ),
                     SizedBox(height: 12),
                     Text(
-                      'Start the app with API_BASE_URL as a Dart define, pointing at the SaidHere Render web service. The README has the exact command.',
+                      'Start The Wall with API_BASE_URL as a Dart define pointing at the Render web service. The README has the exact command.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(height: 1.5),
+                      style: TextStyle(height: 1.5, fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
