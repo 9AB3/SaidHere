@@ -71,7 +71,7 @@ class _SaidHereAppState extends State<SaidHereApp> {
   Widget build(BuildContext context) {
     if (!AppConfig.isConfigured) {
       return MaterialApp(
-        title: 'SaidHere',
+        title: 'The Wall',
         debugShowCheckedModeBanner: false,
         theme: SaidHereTheme.light,
         home: const ConfigurationScreen(),
@@ -79,7 +79,7 @@ class _SaidHereAppState extends State<SaidHereApp> {
     }
 
     return MaterialApp.router(
-      title: 'SaidHere',
+      title: 'The Wall',
       debugShowCheckedModeBanner: false,
       theme: SaidHereTheme.light,
       routerConfig: _router!,
