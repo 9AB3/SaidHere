@@ -10,35 +10,19 @@ const runtimePath = path.join(serverRoot, 'src', 'index.runtime.js');
 let source = fs.readFileSync(sourcePath, 'utf8');
 
 // Keep the normal Helmet policy everywhere except the browser admin page.
+// Admin actions below are plain HTML forms and do not depend on JavaScript.
 const helmetNeedle = 'app.use(helmet());';
-const helmetReplacement = `const standardHelmet = helmet();
+if (source.includes(helmetNeedle)) {
+  const helmetReplacement = `const standardHelmet = helmet();
 const adminHelmet = helmet({ contentSecurityPolicy: false });
 app.use((req, res, next) => {
   const middleware = req.path.startsWith('/admin') ? adminHelmet : standardHelmet;
   return middleware(req, res, next);
 });`;
-
-if (!source.includes(helmetNeedle)) {
-  throw new Error('Could not find the Helmet middleware line to patch.');
+  source = source.replace(helmetNeedle, helmetReplacement);
 }
-source = source.replace(helmetNeedle, helmetReplacement);
 
-// Put a newly-created/replaced NFC URL above the forms so it is immediately visible.
-const topNeedle = '    ${errorHtml}\\n    ${noticeHtml}\\n    <h2>Create Wall</h2>';
-const topReplacement = '    ${resultHtml}\\n    ${errorHtml}\\n    ${noticeHtml}\\n    <h2>Create Wall</h2>';
-if (!source.includes(topNeedle)) {
-  throw new Error('Could not find the admin result placement marker.');
-}
-source = source.replace(topNeedle, topReplacement);
-
-const oldResultNeedle = '    ${resultHtml}\\n    ${wallsHtml}';
-if (!source.includes(oldResultNeedle)) {
-  throw new Error('Could not find the old admin result position.');
-}
-source = source.replace(oldResultNeedle, '    ${wallsHtml}');
-
-// Replace JavaScript-driven Wall buttons with plain HTML forms. This deliberately
-// works even if JavaScript is disabled or blocked by a browser/security policy.
+// Replace JavaScript-driven Wall buttons with plain HTML forms.
 const wallRowsStart = source.indexOf('  const wallRows = Array.isArray(walls)');
 const wallsHtmlStart = source.indexOf('  const wallsHtml = Array.isArray(walls)', wallRowsStart);
 if (wallRowsStart < 0 || wallsHtmlStart < 0) {
@@ -73,32 +57,33 @@ const replacementWallRows = `  const wallRows = Array.isArray(walls)
 
 source = source.slice(0, wallRowsStart) + replacementWallRows + source.slice(wallsHtmlStart);
 
-// Remove the now-unneeded inline JavaScript without a regex so this is safe on
-// current Render/GitHub Node runtimes.
+// Remove the obsolete inline script without using a regular expression.
 const scriptStart = source.indexOf('  <script>');
 if (scriptStart >= 0) {
   const scriptEndTag = '</script>';
   const scriptEnd = source.indexOf(scriptEndTag, scriptStart);
-  if (scriptEnd < 0) {
-    throw new Error('Found admin script start but not its closing tag.');
+  if (scriptEnd >= 0) {
+    source = source.slice(0, scriptStart) + source.slice(scriptEnd + scriptEndTag.length);
   }
-  let afterScript = scriptEnd + scriptEndTag.length;
-  if (source.startsWith('\r\n', afterScript)) afterScript += 2;
-  else if (source.startsWith('\n', afterScript)) afterScript += 1;
-  source = source.slice(0, scriptStart) + source.slice(afterScript);
 }
 
-// Replace the obsolete global admin-key prompt with instructions for the row forms.
-source = source.replace(
-  '<p><label><strong>Admin key for Wall actions</strong><br><input id="wall-action-key" type="password" autocomplete="current-password" placeholder="Required for Wall changes"></label></p>',
-  '<p class="help"><strong>Wall actions:</strong> enter the admin key in that Wall’s row, edit the name/location directly if needed, then press the required action.</p>',
-);
+// Replace the obsolete global admin-key prompt with row instructions when present.
+const oldKeyPrompt = '<p><label><strong>Admin key for Wall actions</strong><br><input id="wall-action-key" type="password" autocomplete="current-password" placeholder="Required for Wall changes"></label></p>';
+if (source.includes(oldKeyPrompt)) {
+  source = source.replace(
+    oldKeyPrompt,
+    '<p class="help"><strong>Wall actions:</strong> enter the admin key in that Wall’s row, edit the name/location directly if needed, then press the required action.</p>',
+  );
+}
 
 // Make the per-row controls usable without affecting the create/view forms.
-source = source.replace(
-  '.nfc-url{overflow-wrap:anywhere;white-space:normal}',
-  '.nfc-url{overflow-wrap:anywhere;white-space:normal}.row-actions{background:none;padding:0;margin:0;display:flex;gap:7px;align-items:center}.row-actions input{width:150px}.actions{min-width:760px}',
-);
+const styleNeedle = '.nfc-url{overflow-wrap:anywhere;white-space:normal}';
+if (source.includes(styleNeedle)) {
+  source = source.replace(
+    styleNeedle,
+    '.nfc-url{overflow-wrap:anywhere;white-space:normal}.row-actions{background:none;padding:0;margin:0;display:flex;gap:7px;align-items:center}.row-actions input{width:150px}.actions{min-width:760px}',
+  );
+}
 
 fs.writeFileSync(runtimePath, source, 'utf8');
-console.log('Prepared SaidHere runtime with no-JavaScript admin actions and prominent NFC result.');
+console.log('Prepared SaidHere runtime with no-JavaScript admin actions.');
