@@ -18,7 +18,7 @@ Future<void> main() async {
   if (AppConfig.isConfigured) {
     await Supabase.initialize(
       url: AppConfig.supabaseUrl,
-      anonKey: AppConfig.supabaseAnonKey,
+      publishableKey: AppConfig.supabaseAnonKey,
     );
   }
 
@@ -44,7 +44,7 @@ class _SaidHereAppState extends State<SaidHereApp> {
 
       _router = GoRouter(
         routes: [
-          GoRoute(path: '/', builder: (_, __) => const HomeScreen()),
+          GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
           GoRoute(
             path: '/t/:token',
             builder: (_, state) => TagEntryScreen(
@@ -63,7 +63,7 @@ class _SaidHereAppState extends State<SaidHereApp> {
           ),
           GoRoute(
             path: '/found',
-            builder: (_, __) => DiscoveredWallsScreen(service: service),
+            builder: (_, _) => DiscoveredWallsScreen(service: service),
           ),
         ],
         errorBuilder: (_, state) => Scaffold(
