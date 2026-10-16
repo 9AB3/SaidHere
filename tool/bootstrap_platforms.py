@@ -20,7 +20,8 @@ def run(*args: str) -> None:
 def patch_android(host: str) -> None:
     manifest = ROOT / 'android/app/src/main/AndroidManifest.xml'
     text = manifest.read_text(encoding='utf-8')
-    text = text.replace('android:label="said_here"', 'android:label="SaidHere"')
+    text = text.replace('android:label="said_here"', 'android:label="The Wall"')
+    text = text.replace('android:label="SaidHere"', 'android:label="The Wall"')
     marker = 'android:name="io.flutter.embedding.android.NormalTheme"'
     if 'flutter_deeplinking_enabled' not in text and marker in text:
         meta_end = text.find('/>', text.find(marker)) + 2
@@ -36,8 +37,8 @@ def patch_ios(host: str) -> None:
     with plist_path.open('rb') as handle:
         info = plistlib.load(handle)
     info['FlutterDeepLinkingEnabled'] = True
-    info['CFBundleDisplayName'] = 'SaidHere'
-    info['CFBundleName'] = 'SaidHere'
+    info['CFBundleDisplayName'] = 'The Wall'
+    info['CFBundleName'] = 'The Wall'
     info['CFBundleURLTypes'] = [{'CFBundleURLName': 'com.9ab3.saidhere', 'CFBundleURLSchemes': ['saidhere']}]
     with plist_path.open('wb') as handle:
         plistlib.dump(info, handle, sort_keys=False)
@@ -95,7 +96,7 @@ def main() -> None:
     patch_ios(args.host)
     write_domain_templates(args.host)
     run('python3', 'tool/generate_brand_assets.py')
-    print(f'SaidHere platform configuration ready for {args.host}')
+    print(f'The Wall platform configuration ready for {args.host}')
     print(f'iOS bundle identifier: {IOS_BUNDLE_ID}')
 
 
