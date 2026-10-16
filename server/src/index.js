@@ -4,7 +4,7 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 
-import { issueAnonymousSession, hashToken, requireSession } from './auth.js';
+import { issueAnonymousSession, hashToken, makeToken, requireSession } from './auth.js';
 import { pool } from './db.js';
 
 const app = express();
@@ -13,6 +13,7 @@ const port = Number(process.env.PORT || 10000);
 app.set('trust proxy', 1);
 app.use(helmet());
 app.use(express.json({ limit: '32kb' }));
+app.use(express.urlencoded({ extended: false, limit: '16kb' }));
 
 const allowedOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
@@ -41,6 +42,13 @@ const sessionLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const adminLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 60,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+});
+
 function cleanBody(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -55,6 +63,115 @@ function wallJson(row) {
     last_visited_at: row.last_visited_at || null,
     write_access_until: row.write_access_until || null,
   };
+}
+
+function safeEqual(left, right) {
+  const a = Buffer.from(left || '', 'utf8');
+  const b = Buffer.from(right || '', 'utf8');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function suppliedAdminKey(req) {
+  const headerKey = cleanBody(req.get('x-admin-key'));
+  const auth = cleanBody(req.get('authorization'));
+  if (headerKey) return headerKey;
+  if (auth.toLowerCase().startsWith('bearer ')) return auth.slice(7).trim();
+  return cleanBody(req.body?.admin_key);
+}
+
+function requireAdmin(req, res, next) {
+  const configuredKey = process.env.ADMIN_KEY || '';
+  if (!configuredKey) {
+    return res.status(503).json({ error: 'Admin access is not configured.' });
+  }
+  if (!safeEqual(suppliedAdminKey(req), configuredKey)) {
+    return res.status(401).json({ error: 'Invalid admin key.' });
+  }
+  return next();
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function adminPage(result = null, error = null) {
+  const resultHtml = result
+    ? `<hr><h2>Wall created</h2>
+       <p><strong>Name:</strong> ${escapeHtml(result.display_name)}</p>
+       <p><strong>Public Wall ID:</strong> ${escapeHtml(result.slug)}</p>
+       <p><strong>NFC URL:</strong></p>
+       <p><a href="${escapeHtml(result.nfc_url)}">${escapeHtml(result.nfc_url)}</a></p>
+       <p>Write that exact URL to the NFC tag. Test it before permanently write-locking the tag.</p>`
+    : '';
+  const errorHtml = error ? `<p><strong>Error:</strong> ${escapeHtml(error)}</p>` : '';
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SaidHere Admin</title>
+</head>
+<body>
+  <main>
+    <h1>SaidHere Admin</h1>
+    <p>Create a physical Wall and generate the secret URL to program into its NFC tag.</p>
+    ${errorHtml}
+    <form method="post" action="/admin/create">
+      <p><label>Admin key<br><input name="admin_key" type="password" required autocomplete="current-password" size="50"></label></p>
+      <p><label>Wall name<br><input name="display_name" required maxlength="80" placeholder="The Royal Hotel — Men's Bathroom" size="50"></label></p>
+      <p><label>Location hint<br><input name="location_hint" maxlength="120" placeholder="Singleton NSW" size="50"></label></p>
+      <button type="submit">Create Wall</button>
+    </form>
+    ${resultHtml}
+  </main>
+</body>
+</html>`;
+}
+
+async function createWall(displayName, locationHint) {
+  if (!displayName || displayName.length > 80) {
+    throw new Error('Wall name must be between 1 and 80 characters.');
+  }
+  if (locationHint.length > 120) {
+    throw new Error('Location hint must be 120 characters or fewer.');
+  }
+
+  const slug = crypto.randomBytes(5).toString('hex').toUpperCase();
+  const tagToken = makeToken(36);
+  const tagHash = hashToken(tagToken);
+  const appBase = (process.env.PUBLIC_APP_URL || 'https://saidhere.app').replace(/\/$/, '');
+
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const wallResult = await client.query(
+      `insert into walls (slug, display_name, location_hint)
+       values ($1, $2, $3)
+       returning id, slug, display_name, location_hint`,
+      [slug, displayName, locationHint],
+    );
+    await client.query(
+      `insert into wall_tags (wall_id, token_hash) values ($1, $2)`,
+      [wallResult.rows[0].id, tagHash],
+    );
+    await client.query('commit');
+
+    return {
+      ...wallResult.rows[0],
+      nfc_url: `${appBase}/t/${tagToken}`,
+    };
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 async function discoveredWall(sessionId, wallId) {
@@ -75,6 +192,51 @@ app.get('/health', async (_req, res, next) => {
     res.json({ ok: true, service: 'saidhere-api' });
   } catch (error) {
     next(error);
+  }
+});
+
+app.get('/admin', (_req, res) => {
+  res.type('html').send(adminPage());
+});
+
+app.post('/admin/create', adminLimiter, requireAdmin, async (req, res) => {
+  const displayName = cleanBody(req.body?.display_name);
+  const locationHint = cleanBody(req.body?.location_hint);
+  try {
+    const wall = await createWall(displayName, locationHint);
+    return res.type('html').status(201).send(adminPage(wall));
+  } catch (error) {
+    return res.type('html').status(400).send(adminPage(null, error.message));
+  }
+});
+
+app.post('/api/admin/walls', adminLimiter, requireAdmin, async (req, res, next) => {
+  try {
+    const wall = await createWall(
+      cleanBody(req.body?.display_name),
+      cleanBody(req.body?.location_hint),
+    );
+    return res.status(201).json(wall);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.get('/api/admin/walls', adminLimiter, requireAdmin, async (_req, res, next) => {
+  try {
+    const result = await pool.query(
+      `select w.id, w.slug, w.display_name, w.location_hint, w.active, w.created_at,
+              count(distinct v.session_id)::int as discovered_by,
+              count(distinct p.id)::int as post_count
+         from walls w
+         left join wall_visits v on v.wall_id = w.id
+         left join wall_posts p on p.wall_id = w.id and p.hidden_at is null
+        group by w.id
+        order by w.created_at desc`,
+    );
+    return res.json(result.rows);
+  } catch (error) {
+    return next(error);
   }
 });
 
