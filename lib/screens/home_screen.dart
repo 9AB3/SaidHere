@@ -23,7 +23,7 @@ class HomeScreen extends StatelessWidget {
               const Icon(Icons.nfc, size: 52, color: SaidHereTheme.ink),
               const SizedBox(height: 14),
               const Text(
-                'Tap a SaidHere plaque',
+                'How to tap a plaque',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
               ),
@@ -98,7 +98,7 @@ class HomeScreen extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Tap a SaidHere plaque',
+                                      'How to tap a SaidHere plaque',
                                       style: TextStyle(
                                         color: SaidHereTheme.paper,
                                         fontWeight: FontWeight.w900,
@@ -106,7 +106,7 @@ class HomeScreen extends StatelessWidget {
                                     ),
                                     SizedBox(height: 3),
                                     Text(
-                                      'That is how you discover a Wall.',
+                                      'Use NFC to discover the Wall at that place.',
                                       style: TextStyle(
                                         color: Color(0xFFD7D0C1),
                                         fontSize: 12,
@@ -137,8 +137,7 @@ class HomeScreen extends StatelessWidget {
                     if (AppConfig.demoTagToken.isNotEmpty) ...[
                       const SizedBox(height: 10),
                       TextButton(
-                        onPressed: () =>
-                            context.push('/t/${AppConfig.demoTagToken}'),
+                        onPressed: () => context.push('/t/${AppConfig.demoTagToken}'),
                         child: const Text('Open demo Wall'),
                       ),
                     ],
