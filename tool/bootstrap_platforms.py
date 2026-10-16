@@ -9,6 +9,8 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+APPLE_TEAM_ID = '7MB2M6PX4Y'
+IOS_BUNDLE_ID = 'com.9ab3.saidhere'
 
 
 def run(*args: str) -> None:
@@ -33,7 +35,7 @@ def patch_ios(host: str) -> None:
     with plist_path.open('rb') as handle:
         info = plistlib.load(handle)
     info['FlutterDeepLinkingEnabled'] = True
-    info['CFBundleURLTypes'] = [{'CFBundleURLName': 'app.saidhere', 'CFBundleURLSchemes': ['saidhere']}]
+    info['CFBundleURLTypes'] = [{'CFBundleURLName': 'com.9ab3.saidhere', 'CFBundleURLSchemes': ['saidhere']}]
     with plist_path.open('wb') as handle:
         plistlib.dump(info, handle, sort_keys=False)
 
@@ -43,6 +45,9 @@ def patch_ios(host: str) -> None:
 
     project = ROOT / 'ios/Runner.xcodeproj/project.pbxproj'
     text = project.read_text(encoding='utf-8')
+    # Flutter's generated bundle prefix varies with project name. Normalize Runner and
+    # RunnerTests to a stable App ID that we register in Apple Developer.
+    text = text.replace('app.saidhere.saidHere', IOS_BUNDLE_ID)
     if 'CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;' not in text:
         text = text.replace('CODE_SIGN_STYLE = Automatic;', 'CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;\n\t\t\t\tCODE_SIGN_STYLE = Automatic;')
     project.write_text(text, encoding='utf-8')
@@ -51,7 +56,7 @@ def patch_ios(host: str) -> None:
 def write_domain_templates(host: str) -> None:
     well_known = ROOT / 'web/.well-known'
     well_known.mkdir(parents=True, exist_ok=True)
-    (well_known / 'apple-app-site-association').write_text('''{\n  "applinks": {\n    "details": [\n      {\n        "appIDs": ["YOUR_APPLE_TEAM_ID.app.saidhere.saidHere"],\n        "components": [\n          { "/": "/t/*" },\n          { "/": "/w/*" }\n        ]\n      }\n    ]\n  }\n}\n''', encoding='utf-8')
+    (well_known / 'apple-app-site-association').write_text(f'''{{\n  "applinks": {{\n    "details": [\n      {{\n        "appIDs": ["{APPLE_TEAM_ID}.{IOS_BUNDLE_ID}"],\n        "components": [\n          {{ "/": "/t/*" }},\n          {{ "/": "/w/*" }}\n        ]\n      }}\n    ]\n  }}\n}}\n''', encoding='utf-8')
     (well_known / 'assetlinks.json').write_text('''[\n  {\n    "relation": ["delegate_permission/common.handle_all_urls"],\n    "target": {\n      "namespace": "android_app",\n      "package_name": "app.saidhere.said_here",\n      "sha256_cert_fingerprints": ["YOUR_ANDROID_SHA256_FINGERPRINT"]\n    }\n  }\n]\n''', encoding='utf-8')
 
 
@@ -74,6 +79,7 @@ def main() -> None:
     patch_ios(args.host)
     write_domain_templates(args.host)
     print(f'SaidHere platform configuration ready for {args.host}')
+    print(f'iOS bundle identifier: {IOS_BUNDLE_ID}')
 
 
 if __name__ == '__main__':
