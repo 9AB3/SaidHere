@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'config/app_config.dart';
 import 'screens/configuration_screen.dart';
@@ -12,16 +11,8 @@ import 'services/local_history_service.dart';
 import 'services/said_here_service.dart';
 import 'theme/app_theme.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
-  if (AppConfig.isConfigured) {
-    await Supabase.initialize(
-      url: AppConfig.supabaseUrl,
-      publishableKey: AppConfig.supabaseAnonKey,
-    );
-  }
-
   runApp(const SaidHereApp());
 }
 
@@ -39,7 +30,7 @@ class _SaidHereAppState extends State<SaidHereApp> {
   void initState() {
     super.initState();
     if (AppConfig.isConfigured) {
-      final service = SaidHereService(Supabase.instance.client);
+      final service = SaidHereService();
       final history = LocalHistoryService();
 
       _router = GoRouter(
