@@ -27,7 +27,7 @@ class ConfigurationScreen extends StatelessWidget {
                     ),
                     SizedBox(height: 12),
                     Text(
-                      'Start the app with SUPABASE_URL and SUPABASE_ANON_KEY as Dart defines. The README has the exact command.',
+                      'Start the app with API_BASE_URL as a Dart define, pointing at the SaidHere Render web service. The README has the exact command.',
                       textAlign: TextAlign.center,
                       style: TextStyle(height: 1.5),
                     ),
