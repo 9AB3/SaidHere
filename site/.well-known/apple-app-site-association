@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["7MB2M6PX4Y.com.9ab3.saidhere"],
+        "components": [
+          { "/": "/t/*" },
+          { "/": "/w/*" }
+        ]
+      }
+    ]
+  }
+}
