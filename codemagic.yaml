@@ -34,3 +34,52 @@ workflows:
     artifacts:
       - build/web/**
       - build/app/outputs/flutter-apk/*.apk
+
+  saidhere-ios:
+    name: SaidHere iOS TestFlight
+    max_build_duration: 60
+    integrations:
+      app_store_connect: Codemagic
+    environment:
+      flutter: stable
+      xcode: latest
+      vars:
+        APP_HOST: saidhere.app
+        API_BASE_URL: https://saidhere-api-9ab3.onrender.com
+      ios_signing:
+        provisioning_profiles:
+          - profile: saidhere_app_store
+            environment_variable: SAIDHERE_PROFILE
+    scripts:
+      - name: Generate SaidHere iOS project
+        script: |
+          set -euo pipefail
+          python3 tool/bootstrap_platforms.py --host "$APP_HOST"
+          flutter pub get
+          grep -q 'com.9ab3.saidhere' ios/Runner.xcodeproj/project.pbxproj
+          grep -q 'applinks:saidhere.app' ios/Runner/Runner.entitlements
+      - name: Configure iOS signing
+        script: |
+          set -euo pipefail
+          test -n "${SAIDHERE_PROFILE:-}" && test -f "$SAIDHERE_PROFILE"
+          xcode-project use-profiles --project ios/Runner.xcodeproj --profile "$SAIDHERE_PROFILE"
+          security cms -D -i "$SAIDHERE_PROFILE" > /tmp/saidhere-profile.plist
+          /usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' /tmp/saidhere-profile.plist
+          /usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.associated-domains' /tmp/saidhere-profile.plist | tee /tmp/saidhere-domains.txt
+          grep -q 'saidhere.app' /tmp/saidhere-domains.txt || { echo 'FAIL: provisioning profile is missing Associated Domains for saidhere.app'; exit 1; }
+      - name: Analyze
+        script: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Build signed IPA
+        script: |
+          set -euo pipefail
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist \
+            --dart-define=API_BASE_URL="$API_BASE_URL" \
+            --dart-define=APP_HOST="$APP_HOST"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
