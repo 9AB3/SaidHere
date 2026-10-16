@@ -1,57 +1,99 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:convert';
 
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../config/app_config.dart';
 import '../models/wall.dart';
 import '../models/wall_post.dart';
 
 class SaidHereService {
-  SaidHereService(this._client);
+  SaidHereService({http.Client? client}) : _http = client ?? http.Client();
 
-  final SupabaseClient _client;
+  static const _sessionKey = 'saidhere_api_session';
+  final http.Client _http;
+  Future<String>? _sessionFuture;
 
   Future<void> ensureAnonymousSession() async {
-    if (_client.auth.currentSession != null) return;
-    await _client.auth.signInAnonymously();
+    await _sessionToken();
+  }
+
+  Future<String> _sessionToken() {
+    return _sessionFuture ??= _loadOrCreateSession();
+  }
+
+  Future<String> _loadOrCreateSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getString(_sessionKey);
+    if (existing != null && existing.isNotEmpty) return existing;
+
+    final response = await _http.post(
+      _uri('/api/session'),
+      headers: const {'content-type': 'application/json'},
+      body: '{}',
+    );
+    final data = _decode(response);
+    final token = (data['token'] ?? '').toString();
+    if (token.isEmpty) {
+      throw const SaidHereException('Could not start an anonymous session.');
+    }
+    await prefs.setString(_sessionKey, token);
+    return token;
+  }
+
+  Uri _uri(String path) => Uri.parse('${AppConfig.apiBaseUrl}$path');
+
+  Future<Map<String, String>> _headers() async => {
+        'content-type': 'application/json',
+        'authorization': 'Bearer ${await _sessionToken()}',
+      };
+
+  dynamic _decode(http.Response response) {
+    dynamic data;
+    if (response.body.isNotEmpty) {
+      try {
+        data = jsonDecode(response.body);
+      } catch (_) {
+        data = null;
+      }
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final message = data is Map<String, dynamic>
+          ? (data['error'] ?? 'Request failed.').toString()
+          : 'Request failed (${response.statusCode}).';
+      throw SaidHereException(message);
+    }
+    return data;
   }
 
   Future<Wall> claimWallVisit(String tagToken) async {
-    await ensureAnonymousSession();
-    final response = await _client.rpc(
-      'claim_wall_visit',
-      params: {'p_tag_token': tagToken},
+    final response = await _http.post(
+      _uri('/api/tags/open'),
+      headers: await _headers(),
+      body: jsonEncode({'token': tagToken}),
     );
-
-    if (response is! List || response.isEmpty) {
-      throw const SaidHereException('This plaque is not active.');
-    }
-
-    return Wall.fromMap(Map<String, dynamic>.from(response.first as Map));
+    final data = _decode(response);
+    return Wall.fromMap(Map<String, dynamic>.from(data as Map));
   }
 
   Future<Wall> getWallBySlug(String slug) async {
-    await ensureAnonymousSession();
-    final response = await _client.rpc(
-      'get_discovered_wall',
-      params: {'p_slug': slug},
+    final response = await _http.get(
+      _uri('/api/walls/${Uri.encodeComponent(slug)}'),
+      headers: await _headers(),
     );
-
-    if (response is! List || response.isEmpty) {
-      throw const SaidHereException(
-        'You have not discovered this Wall yet. Tap its plaque in person first.',
-      );
-    }
-
-    return Wall.fromMap(Map<String, dynamic>.from(response.first as Map));
+    final data = _decode(response);
+    return Wall.fromMap(Map<String, dynamic>.from(data as Map));
   }
 
   Future<List<WallPost>> getPosts(String wallId) async {
-    await ensureAnonymousSession();
-    final data = await _client
-        .from('visible_wall_posts')
-        .select()
-        .eq('wall_id', wallId)
-        .order('created_at', ascending: true);
-
-    return (data as List<dynamic>)
+    final response = await _http.get(
+      _uri('/api/walls/${Uri.encodeComponent(wallId)}/posts'),
+      headers: await _headers(),
+    );
+    final data = _decode(response);
+    if (data is! List) return [];
+    return data
         .map((item) => WallPost.fromMap(Map<String, dynamic>.from(item as Map)))
         .toList(growable: false);
   }
@@ -61,36 +103,35 @@ class SaidHereService {
     required String body,
     String? parentId,
   }) async {
-    await ensureAnonymousSession();
-    final response = await _client.rpc(
-      'create_wall_post',
-      params: {
-        'p_wall_id': wallId,
-        'p_body': body.trim(),
-        'p_parent_id': parentId,
-      },
+    final response = await _http.post(
+      _uri('/api/walls/${Uri.encodeComponent(wallId)}/posts'),
+      headers: await _headers(),
+      body: jsonEncode({
+        'body': body.trim(),
+        'parent_id': parentId,
+      }),
     );
-
-    if (response is! List || response.isEmpty) {
-      throw const SaidHereException('Could not write on this Wall.');
-    }
-
-    return WallPost.fromMap(
-      Map<String, dynamic>.from(response.first as Map),
-    );
+    final data = _decode(response);
+    return WallPost.fromMap(Map<String, dynamic>.from(data as Map));
   }
 
   Future<void> reportPost(String postId) async {
-    await ensureAnonymousSession();
-    await _client.rpc('report_wall_post', params: {'p_post_id': postId});
+    final response = await _http.post(
+      _uri('/api/posts/${Uri.encodeComponent(postId)}/report'),
+      headers: await _headers(),
+      body: '{}',
+    );
+    _decode(response);
   }
 
   Future<List<Wall>> getMyWalls() async {
-    await ensureAnonymousSession();
-    final response = await _client.rpc('get_my_walls');
-    if (response is! List) return [];
-
-    return response
+    final response = await _http.get(
+      _uri('/api/walls'),
+      headers: await _headers(),
+    );
+    final data = _decode(response);
+    if (data is! List) return [];
+    return data
         .map((item) => Wall.fromMap(Map<String, dynamic>.from(item as Map)))
         .toList(growable: false);
   }
