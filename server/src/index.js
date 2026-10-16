@@ -100,16 +100,43 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
-function adminPage(result = null, error = null) {
+function formatAdminDate(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('en-AU');
+}
+
+function adminPage(result = null, error = null, walls = null) {
   const resultHtml = result
     ? `<hr><h2>Wall created</h2>
        <p><strong>Name:</strong> ${escapeHtml(result.display_name)}</p>
        <p><strong>Public Wall ID:</strong> ${escapeHtml(result.slug)}</p>
        <p><strong>NFC URL:</strong></p>
        <p><a href="${escapeHtml(result.nfc_url)}">${escapeHtml(result.nfc_url)}</a></p>
+       <p><strong>Save this NFC URL now.</strong> The raw tag token is intentionally not stored and cannot be shown again later.</p>
        <p>Write that exact URL to the NFC tag. Test it before permanently write-locking the tag.</p>`
     : '';
-  const errorHtml = error ? `<p><strong>Error:</strong> ${escapeHtml(error)}</p>` : '';
+  const errorHtml = error ? `<p class="error"><strong>Error:</strong> ${escapeHtml(error)}</p>` : '';
+  const wallRows = Array.isArray(walls)
+    ? walls.map((wall) => `<tr>
+        <td>${escapeHtml(wall.display_name)}</td>
+        <td>${escapeHtml(wall.location_hint || '—')}</td>
+        <td><code>${escapeHtml(wall.slug)}</code></td>
+        <td>${wall.active ? 'Active' : 'Inactive'}</td>
+        <td>${escapeHtml(wall.discovered_by)}</td>
+        <td>${escapeHtml(wall.post_count)}</td>
+        <td>${escapeHtml(formatAdminDate(wall.created_at))}</td>
+      </tr>`).join('')
+    : '';
+  const wallsHtml = Array.isArray(walls)
+    ? `<hr><h2>All Walls <span class="count">(${walls.length})</span></h2>
+       ${walls.length === 0
+         ? '<p>No Walls have been created yet.</p>'
+         : `<div class="table-wrap"><table>
+              <thead><tr><th>Name</th><th>Location</th><th>Public ID</th><th>Status</th><th>Discovered by</th><th>Messages</th><th>Created</th></tr></thead>
+              <tbody>${wallRows}</tbody>
+            </table></div>`}`
+    : '';
 
   return `<!doctype html>
 <html lang="en">
@@ -117,19 +144,33 @@ function adminPage(result = null, error = null) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>SaidHere Admin</title>
+  <style>
+    body{font-family:Arial,sans-serif;background:#f3efe4;color:#151515;margin:0;padding:28px}main{max-width:1100px;margin:auto}
+    input{padding:10px;border:1px solid #777;border-radius:8px;max-width:100%;width:420px}button{padding:11px 16px;border:0;border-radius:999px;background:#151515;color:#fff;font-weight:700;cursor:pointer}
+    form{background:rgba(255,255,255,.45);padding:18px;border-radius:14px;margin:14px 0 24px}.error{color:#9f1b1b}.table-wrap{overflow:auto}
+    table{width:100%;border-collapse:collapse;background:rgba(255,255,255,.5)}th,td{text-align:left;padding:10px;border-bottom:1px solid #c9c2b5;white-space:nowrap}th{background:#e5dfd2}.count{font-weight:400;color:#6d685f}
+    code{font-size:12px}
+  </style>
 </head>
 <body>
   <main>
     <h1>SaidHere Admin</h1>
-    <p>Create a physical Wall and generate the secret URL to program into its NFC tag.</p>
+    <p>Create physical Walls and manage the places connected to SaidHere plaques.</p>
     ${errorHtml}
+    <h2>Create Wall</h2>
     <form method="post" action="/admin/create">
-      <p><label>Admin key<br><input name="admin_key" type="password" required autocomplete="current-password" size="50"></label></p>
-      <p><label>Wall name<br><input name="display_name" required maxlength="80" placeholder="The Royal Hotel — Men's Bathroom" size="50"></label></p>
-      <p><label>Location hint<br><input name="location_hint" maxlength="120" placeholder="Singleton NSW" size="50"></label></p>
+      <p><label>Admin key<br><input name="admin_key" type="password" required autocomplete="current-password"></label></p>
+      <p><label>Wall name<br><input name="display_name" required maxlength="80" placeholder="The Royal Hotel — Men's Bathroom"></label></p>
+      <p><label>Location hint<br><input name="location_hint" maxlength="120" placeholder="Singleton NSW"></label></p>
       <button type="submit">Create Wall</button>
     </form>
+    <h2>View Walls</h2>
+    <form method="post" action="/admin/walls">
+      <p><label>Admin key<br><input name="admin_key" type="password" required autocomplete="current-password"></label></p>
+      <button type="submit">View all Walls</button>
+    </form>
     ${resultHtml}
+    ${wallsHtml}
   </main>
 </body>
 </html>`;
@@ -175,6 +216,20 @@ async function createWall(displayName, locationHint) {
   }
 }
 
+async function listWalls() {
+  const result = await pool.query(
+    `select w.id, w.slug, w.display_name, w.location_hint, w.active, w.created_at,
+            count(distinct v.session_id)::int as discovered_by,
+            count(distinct p.id)::int as post_count
+       from walls w
+       left join wall_visits v on v.wall_id = w.id
+       left join wall_posts p on p.wall_id = w.id and p.hidden_at is null
+      group by w.id
+      order by w.created_at desc`,
+  );
+  return result.rows;
+}
+
 async function discoveredWall(sessionId, wallId) {
   const result = await pool.query(
     `select w.id, w.slug, w.display_name, w.location_hint,
@@ -212,6 +267,16 @@ app.post('/admin/create', adminLimiter, requireAdmin, async (req, res) => {
   }
 });
 
+app.post('/admin/walls', adminLimiter, requireAdmin, async (_req, res) => {
+  try {
+    const walls = await listWalls();
+    return res.type('html').send(adminPage(null, null, walls));
+  } catch (error) {
+    console.error('[admin/walls]', error);
+    return res.type('html').status(500).send(adminPage(null, error?.message || 'Could not load Walls.'));
+  }
+});
+
 app.post('/api/admin/walls', adminLimiter, requireAdmin, async (req, res, next) => {
   try {
     const wall = await createWall(
@@ -226,17 +291,7 @@ app.post('/api/admin/walls', adminLimiter, requireAdmin, async (req, res, next) 
 
 app.get('/api/admin/walls', adminLimiter, requireAdmin, async (_req, res, next) => {
   try {
-    const result = await pool.query(
-      `select w.id, w.slug, w.display_name, w.location_hint, w.active, w.created_at,
-              count(distinct v.session_id)::int as discovered_by,
-              count(distinct p.id)::int as post_count
-         from walls w
-         left join wall_visits v on v.wall_id = w.id
-         left join wall_posts p on p.wall_id = w.id and p.hidden_at is null
-        group by w.id
-        order by w.created_at desc`,
-    );
-    return res.json(result.rows);
+    return res.json(await listWalls());
   } catch (error) {
     return next(error);
   }
