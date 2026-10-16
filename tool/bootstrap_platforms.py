@@ -94,6 +94,7 @@ def main() -> None:
     patch_android(args.host)
     patch_ios(args.host)
     write_domain_templates(args.host)
+    run('python3', 'tool/generate_brand_assets.py')
     print(f'SaidHere platform configuration ready for {args.host}')
     print(f'iOS bundle identifier: {IOS_BUNDLE_ID}')
 
