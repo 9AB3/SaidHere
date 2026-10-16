@@ -20,6 +20,7 @@ def run(*args: str) -> None:
 def patch_android(host: str) -> None:
     manifest = ROOT / 'android/app/src/main/AndroidManifest.xml'
     text = manifest.read_text(encoding='utf-8')
+    text = text.replace('android:label="said_here"', 'android:label="SaidHere"')
     marker = 'android:name="io.flutter.embedding.android.NormalTheme"'
     if 'flutter_deeplinking_enabled' not in text and marker in text:
         meta_end = text.find('/>', text.find(marker)) + 2
@@ -35,6 +36,8 @@ def patch_ios(host: str) -> None:
     with plist_path.open('rb') as handle:
         info = plistlib.load(handle)
     info['FlutterDeepLinkingEnabled'] = True
+    info['CFBundleDisplayName'] = 'SaidHere'
+    info['CFBundleName'] = 'SaidHere'
     info['CFBundleURLTypes'] = [{'CFBundleURLName': 'com.9ab3.saidhere', 'CFBundleURLSchemes': ['saidhere']}]
     with plist_path.open('wb') as handle:
         plistlib.dump(info, handle, sort_keys=False)
@@ -53,9 +56,6 @@ def patch_ios(host: str) -> None:
         )
     project.write_text(text, encoding='utf-8')
 
-    # Explicitly wire the entitlements file into every Flutter build configuration.
-    # This survives Codemagic's xcode-project use-profiles step and guarantees the
-    # signed archive requests Associated Domains.
     for name in ('Debug', 'Profile', 'Release'):
         xcconfig = ROOT / f'ios/Flutter/{name}.xcconfig'
         if not xcconfig.exists():
