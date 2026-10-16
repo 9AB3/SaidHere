@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: saidhere-api-9ab3
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm run migrate && npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: saidhere-db-9ab3
+          property: connectionString
+      - key: PUBLIC_APP_URL
+        value: https://saidhere.app
+      - key: CORS_ORIGIN
+        value: https://saidhere.app,https://www.saidhere.app
+
+databases:
+  - name: saidhere-db-9ab3
+    plan: free
+    region: singapore
+    databaseName: saidhere
+    user: saidhere
+    ipAllowList: []
