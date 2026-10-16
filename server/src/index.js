@@ -128,8 +128,8 @@ function adminPage(result = null, error = null, walls = null, notice = null) {
         <td>${escapeHtml(wall.post_count)}</td>
         <td>${escapeHtml(formatAdminDate(wall.created_at))}</td>
         <td class="actions">
-          <button type="button" class="secondary" onclick="adminAction('clear','${escapeHtml(wall.id)}','${escapeHtml(wall.display_name)}')">Clear messages</button>
-          <button type="button" class="danger" onclick="adminAction('delete','${escapeHtml(wall.id)}','${escapeHtml(wall.display_name)}')">Delete Wall</button>
+          <button type="button" class="secondary" onclick="adminAction('clear','${escapeHtml(wall.id)}')">Clear messages</button>
+          <button type="button" class="danger" onclick="adminAction('delete','${escapeHtml(wall.id)}')">Delete Wall</button>
         </td>
       </tr>`).join('')
     : '';
@@ -185,25 +185,25 @@ function adminPage(result = null, error = null, walls = null, notice = null) {
     ${wallsHtml}
   </main>
   <script>
-    function adminAction(action, wallId, wallName) {
+    function adminAction(action, wallId) {
       const keyInput = document.getElementById('wall-action-key');
       const key = keyInput ? keyInput.value.trim() : '';
       if (!key) {
         alert('Enter the admin key above the Walls table first.');
-        keyInput?.focus();
+        if (keyInput) keyInput.focus();
         return;
       }
       const requiredWord = action === 'delete' ? 'DELETE' : 'CLEAR';
       const explanation = action === 'delete'
         ? 'This permanently deletes the Wall, its NFC tag association, visits, messages and reports.'
         : 'This permanently deletes every message, reply and report on the Wall. The Wall and NFC tag will remain active.';
-      const typed = prompt(`${explanation}\n\nWall: ${wallName}\n\nType ${requiredWord} to continue.`);
+      const typed = prompt(explanation + '\n\nWall ID: ' + wallId + '\n\nType ' + requiredWord + ' to continue.');
       if (typed !== requiredWord) return;
 
       const form = document.getElementById('wall-action-form');
       document.getElementById('wall-action-admin-key').value = key;
       document.getElementById('wall-action-confirmation').value = requiredWord;
-      form.action = `/admin/walls/${encodeURIComponent(wallId)}/${action}`;
+      form.action = '/admin/walls/' + encodeURIComponent(wallId) + '/' + action;
       form.submit();
     }
   </script>
