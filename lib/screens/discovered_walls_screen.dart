@@ -56,7 +56,7 @@ class _DiscoveredWallsScreenState extends State<DiscoveredWallsScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.canPop() ? context.pop() : context.go('/'),
         ),
-        title: const Text("Walls you've found"),
+        title: const Text("WALLS YOU'VE FOUND"),
         actions: [
           IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
         ],
@@ -83,9 +83,9 @@ class _DiscoveredWallsScreenState extends State<DiscoveredWallsScreen> {
                     Padding(
                       padding: EdgeInsets.all(30),
                       child: Text(
-                        "You haven't found a Wall yet.\n\nTap a SaidHere NFC plaque when you see one.",
+                        "YOU HAVEN'T FOUND A WALL YET.\n\nTap a THE WALL NFC plaque when you see one.",
                         textAlign: TextAlign.center,
-                        style: TextStyle(height: 1.5, fontWeight: FontWeight.w700),
+                        style: TextStyle(height: 1.5, fontWeight: FontWeight.w900),
                       ),
                     ),
                   ],
@@ -99,14 +99,14 @@ class _DiscoveredWallsScreenState extends State<DiscoveredWallsScreen> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
                 itemCount: walls.length + (result.fromCache ? 1 : 0),
-                separatorBuilder: (_, _) => const SizedBox(height: 8),
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   if (result.fromCache && index == 0) {
                     return Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: SaidHereTheme.fadedYellow.withValues(alpha: .22),
-                        borderRadius: BorderRadius.circular(12),
+                        color: SaidHereTheme.fadedYellow.withValues(alpha: .32),
+                        border: Border.all(color: SaidHereTheme.ink.withValues(alpha: .35)),
                       ),
                       child: const Row(
                         children: [
@@ -114,8 +114,8 @@ class _DiscoveredWallsScreenState extends State<DiscoveredWallsScreen> {
                           SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'Showing saved Wall history. Pull down to reconnect.',
-                              style: TextStyle(fontWeight: FontWeight.w700),
+                              'SHOWING SAVED WALL HISTORY. PULL DOWN TO RECONNECT.',
+                              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
                             ),
                           ),
                         ],
@@ -125,26 +125,50 @@ class _DiscoveredWallsScreenState extends State<DiscoveredWallsScreen> {
                   final wallIndex = result.fromCache ? index - 1 : index;
                   final wall = walls[wallIndex];
                   final visited = wall.lastVisitedAt;
-                  return Card(
-                    color: Colors.white.withValues(alpha: .32),
-                    elevation: 0,
-                    child: ListTile(
-                      onTap: () => context.push('/w/${wall.slug}'),
-                      leading: CircleAvatar(
-                        backgroundColor: SaidHereTheme.ink,
-                        foregroundColor: SaidHereTheme.paper,
-                        child: Text('${wallIndex + 1}'),
+                  final angle = ((wallIndex % 3) - 1) * .007;
+                  return Transform.rotate(
+                    angle: angle,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xE6D5C7B0),
+                        border: Border.all(
+                          color: SaidHereTheme.ink.withValues(alpha: .30),
+                          width: 1.2,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x33000000),
+                            offset: Offset(2, 3),
+                            blurRadius: 0,
+                          ),
+                        ],
                       ),
-                      title: Text(
-                        wall.displayName,
-                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      child: ListTile(
+                        onTap: () => context.push('/w/${wall.slug}'),
+                        leading: Container(
+                          width: 38,
+                          height: 38,
+                          alignment: Alignment.center,
+                          color: SaidHereTheme.ink,
+                          child: Text(
+                            '${wallIndex + 1}',
+                            style: const TextStyle(
+                              color: SaidHereTheme.paper,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          wall.displayName.toUpperCase(),
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                        subtitle: Text([
+                          if (wall.locationHint.isNotEmpty) wall.locationHint,
+                          if (visited != null)
+                            'LAST VISITED ${DateFormat('d MMM yyyy').format(visited).toUpperCase()}',
+                        ].join('\n')),
+                        trailing: const Icon(Icons.arrow_forward),
                       ),
-                      subtitle: Text([
-                        if (wall.locationHint.isNotEmpty) wall.locationHint,
-                        if (visited != null)
-                          'Last visited ${DateFormat('d MMM yyyy').format(visited)}',
-                      ].join('\n')),
-                      trailing: const Icon(Icons.chevron_right),
                     ),
                   );
                 },
@@ -184,7 +208,7 @@ class _ErrorState extends StatelessWidget {
             FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: const Text('Try again'),
+              label: const Text('TRY AGAIN'),
             ),
           ],
         ),
