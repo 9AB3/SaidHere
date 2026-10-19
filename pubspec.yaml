@@ -1,7 +1,7 @@
 name: said_here
 description: Location-bound anonymous conversations discovered through NFC.
 publish_to: 'none'
-version: 0.1.0+4
+version: 0.1.0+5
 
 environment:
   sdk: '>=3.12.0 <4.0.0'
@@ -23,4 +23,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - "lib/theme/Grungy Graffiti Wall_ The Wall.png"
+    - "lib/12CA723C-705E-4593-834A-72D72424FC4F.png"
+    - "lib/267ABF9F-A613-4DD2-B026-87B6C2B6AEBD.png"
