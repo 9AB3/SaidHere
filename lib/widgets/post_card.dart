@@ -24,80 +24,99 @@ class PostCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final seed = post.id.codeUnits.fold<int>(0, (a, b) => a + b);
     final rng = math.Random(seed);
-    final colors = [
-      const Color(0xFFCEC0A8),
-      const Color(0xFFC5B59B),
-      const Color(0xFFD5C7B0),
-      const Color(0xFFBFAE95),
+    final schemes = <({Color bg, Color fg, Color tape})>[
+      (bg: const Color(0xFFE9E1D2), fg: SaidHereTheme.ink, tape: const Color(0x77C5AA7B)),
+      (bg: const Color(0xFFCDBB98), fg: SaidHereTheme.ink, tape: const Color(0x66796149)),
+      (bg: const Color(0xFF1D1B18), fg: const Color(0xFFF0E6D5), tape: const Color(0x668C7C67)),
+      (bg: const Color(0xFFDED0B8), fg: SaidHereTheme.ink, tape: const Color(0x778D7653)),
     ];
+    final scheme = schemes[seed % schemes.length];
 
-    final angle = (rng.nextDouble() - .5) * .045;
-    final left = depth == 0 ? 6.0 : 24.0;
+    final angle = (rng.nextDouble() - .5) * .035;
+    final left = depth == 0 ? 8.0 : 28.0;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(left, 7, 7, 7),
+      padding: EdgeInsets.fromLTRB(left, 8, 8, 8),
       child: Transform.rotate(
         angle: angle,
         child: Container(
           decoration: BoxDecoration(
-            color: colors[seed % colors.length].withValues(alpha: .91),
-            border: Border.all(color: SaidHereTheme.ink.withValues(alpha: .26), width: 1.2),
+            color: scheme.bg,
+            border: Border.all(color: SaidHereTheme.ink.withValues(alpha: .24), width: 1.1),
             boxShadow: const [
               BoxShadow(color: Color(0x33000000), offset: Offset(2, 3), blurRadius: 0),
             ],
           ),
-          child: InkWell(
-            onLongPress: onReport,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 12, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    post.body,
-                    style: TextStyle(
-                      color: SaidHereTheme.ink.withValues(alpha: .96),
-                      fontSize: depth == 0 ? 17 : 15,
-                      height: 1.32,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -.15,
-                    ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              if (seed.isEven)
+                Positioned(
+                  top: -7,
+                  left: 42,
+                  right: 42,
+                  child: Transform.rotate(
+                    angle: (rng.nextDouble() - .5) * .05,
+                    child: Container(height: 15, color: scheme.tape),
                   ),
-                  const SizedBox(height: 10),
-                  Container(height: 1, color: SaidHereTheme.ink.withValues(alpha: .18)),
-                  const SizedBox(height: 5),
-                  Row(
+                ),
+              InkWell(
+                onLongPress: onReport,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(17, 17, 12, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        DateFormat('d MMM yyyy').format(post.createdAt).toUpperCase(),
+                        post.body,
                         style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: SaidHereTheme.ink.withValues(alpha: .6),
+                          color: scheme.fg.withValues(alpha: .97),
+                          fontSize: depth == 0 ? 17 : 15,
+                          height: 1.34,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -.15,
                         ),
                       ),
-                      const Spacer(),
-                      if (depth == 0 && onReply != null)
-                        TextButton.icon(
-                          onPressed: onReply,
-                          icon: const Icon(Icons.subdirectory_arrow_right, size: 16),
-                          label: const Text('REPLY'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: SaidHereTheme.ink.withValues(alpha: .76),
+                      const SizedBox(height: 11),
+                      Container(height: 1, color: scheme.fg.withValues(alpha: .16)),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Text(
+                            DateFormat('d MMM yyyy · HH:mm')
+                                .format(post.createdAt)
+                                .toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              color: scheme.fg.withValues(alpha: .60),
+                            ),
+                          ),
+                          const Spacer(),
+                          if (depth == 0 && onReply != null)
+                            TextButton.icon(
+                              onPressed: onReply,
+                              icon: const Icon(Icons.subdirectory_arrow_right, size: 15),
+                              label: const Text('REPLY'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: scheme.fg.withValues(alpha: .76),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                          IconButton(
+                            tooltip: 'Report',
+                            onPressed: onReport,
+                            icon: const Icon(Icons.more_horiz, size: 18),
+                            color: scheme.fg.withValues(alpha: .72),
                             visualDensity: VisualDensity.compact,
                           ),
-                        ),
-                      IconButton(
-                        tooltip: 'Report',
-                        onPressed: onReport,
-                        icon: const Icon(Icons.more_horiz, size: 18),
-                        visualDensity: VisualDensity.compact,
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
