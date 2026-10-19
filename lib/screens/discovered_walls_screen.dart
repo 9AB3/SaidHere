@@ -102,57 +102,35 @@ class _DiscoveredWallsScreenState extends State<DiscoveredWallsScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 26),
                     if (result.fromCache) ...[
-                      Transform.rotate(
-                        angle: .007,
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFD5C28E).withValues(alpha: .94),
-                            border: Border.all(
-                              color: SaidHereTheme.ink.withValues(alpha: .28),
-                            ),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x33000000),
-                                offset: Offset(2, 3),
-                                blurRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.cloud_off_outlined),
-                              SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'SHOWING SAVED HISTORY. PULL DOWN TO RECONNECT.',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                      _IndustrialNotice(
+                        icon: Icons.cloud_off_outlined,
+                        text: 'SAVED HISTORY · PULL DOWN TO RECONNECT',
                       ),
                       const SizedBox(height: 18),
                     ],
                     if (walls.isEmpty)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(10, 65, 10, 40),
-                          child: _EmptyNote(),
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(14, 70, 14, 40),
+                        child: Text(
+                          "YOU HAVEN'T FOUND A WALL YET.\n\nTAP A PHYSICAL THE WALL PLAQUE WHEN YOU SEE ONE.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: SaidHereTheme.ink,
+                            fontSize: 17,
+                            height: 1.45,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: .2,
+                          ),
                         ),
                       )
                     else
                       ...List.generate(walls.length, (index) {
                         final wall = walls[index];
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 18),
-                          child: _WallLabel(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: _WallStencil(
                             wall: wall,
                             index: index,
                             onTap: () => context.push('/w/${wall.slug}'),
@@ -170,30 +148,34 @@ class _DiscoveredWallsScreenState extends State<DiscoveredWallsScreen> {
   }
 }
 
-class _EmptyNote extends StatelessWidget {
+class _IndustrialNotice extends StatelessWidget {
+  const _IndustrialNotice({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
   @override
   Widget build(BuildContext context) {
     return Transform.rotate(
-      angle: -.01,
-      child: SizedBox(
-        width: 330,
-        child: Stack(
+      angle: .004,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: SaidHereTheme.ink.withValues(alpha: .86),
+          border: Border.all(color: const Color(0xFF4D463D), width: 1.2),
+        ),
+        child: Row(
           children: [
-            Positioned.fill(
-              child: Image.asset(
-                UiAssets.noteWhite,
-                fit: BoxFit.fill,
-                filterQuality: FilterQuality.high,
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(34, 36, 34, 34),
+            Icon(icon, color: SaidHereTheme.paper, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
               child: Text(
-                "YOU HAVEN'T FOUND A WALL YET.\n\nTap a physical THE WALL plaque when you see one.",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  height: 1.45,
+                text,
+                style: const TextStyle(
+                  color: SaidHereTheme.paper,
+                  fontSize: 10,
                   fontWeight: FontWeight.w900,
+                  letterSpacing: .5,
                 ),
               ),
             ),
@@ -204,8 +186,8 @@ class _EmptyNote extends StatelessWidget {
   }
 }
 
-class _WallLabel extends StatelessWidget {
-  const _WallLabel({
+class _WallStencil extends StatelessWidget {
+  const _WallStencil({
     required this.wall,
     required this.index,
     required this.onTap,
@@ -218,115 +200,83 @@ class _WallLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visited = wall.lastVisitedAt;
-    final variant = index % 5;
-    final isBlack = variant == 3;
-    final paperAsset = isBlack
-        ? UiAssets.noteBlack
-        : (variant == 1 || variant == 4
-            ? UiAssets.noteBrown
-            : UiAssets.noteWhite);
-    final foreground = isBlack
-        ? const Color(0xFFF1E8D8)
-        : SaidHereTheme.ink;
-    final angle = ((index % 5) - 2) * .006;
+    final angle = ((index % 5) - 2) * .004;
+    final dark = index.isEven;
+    final background = dark
+        ? SaidHereTheme.ink.withValues(alpha: .88)
+        : const Color(0xFFE9DDC8).withValues(alpha: .78);
+    final foreground = dark ? SaidHereTheme.paper : SaidHereTheme.ink;
 
     return Transform.rotate(
       angle: angle,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned.fill(
-              child: Image.asset(
-                paperAsset,
-                fit: BoxFit.fill,
-                filterQuality: FilterQuality.high,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(18, 16, 16, 15),
+            decoration: BoxDecoration(
+              color: background,
+              border: Border.all(
+                color: foreground.withValues(alpha: .36),
+                width: 1.4,
               ),
-            ),
-            if (paperAsset == UiAssets.noteBrown)
-              Positioned(
-                top: -7,
-                left: 105,
-                child: Transform.rotate(
-                  angle: index.isEven ? -.04 : .035,
-                  child: Image.asset(
-                    UiAssets.tapeCreamSmall,
-                    width: 92,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                  ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x26000000),
+                  offset: Offset(2, 3),
+                  blurRadius: 1,
                 ),
-              ),
-            ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 132),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(28, 28, 24, 24),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: foreground.withValues(alpha: .62),
-                          width: 1.5,
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.location_on_outlined, color: foreground, size: 26),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        wall.displayName.toUpperCase(),
+                        style: TextStyle(
+                          color: foreground,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: .3,
                         ),
                       ),
-                      child: Icon(
-                        index.isEven ? Icons.location_city : Icons.park_outlined,
-                        color: foreground,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            wall.displayName.toUpperCase(),
-                            style: TextStyle(
-                              color: foreground,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -.2,
-                            ),
+                      if (wall.locationHint.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          wall.locationHint.toUpperCase(),
+                          style: TextStyle(
+                            color: foreground.withValues(alpha: .72),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: .5,
                           ),
-                          if (wall.locationHint.isNotEmpty) ...[
-                            const SizedBox(height: 3),
-                            Text(
-                              wall.locationHint,
-                              style: TextStyle(
-                                color: foreground.withValues(alpha: .82),
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                          if (visited != null) ...[
-                            const SizedBox(height: 9),
-                            Text(
-                              'FOUND ${DateFormat('d MMM yyyy · HH:mm').format(visited).toUpperCase()}',
-                              style: TextStyle(
-                                color: foreground.withValues(alpha: .64),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: .2,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.arrow_forward, color: foreground, size: 22),
-                  ],
+                        ),
+                      ],
+                      if (visited != null) ...[
+                        const SizedBox(height: 7),
+                        Text(
+                          'FOUND ${DateFormat('d MMM yyyy · HH:mm').format(visited).toUpperCase()}',
+                          style: TextStyle(
+                            color: foreground.withValues(alpha: .54),
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: .6,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
+                Icon(Icons.arrow_forward, color: foreground, size: 22),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
