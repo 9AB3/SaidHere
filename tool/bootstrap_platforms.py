@@ -40,6 +40,10 @@ def patch_ios(host: str) -> None:
     info['CFBundleDisplayName'] = 'The Wall'
     info['CFBundleName'] = 'The Wall'
     info['CFBundleURLTypes'] = [{'CFBundleURLName': 'com.9ab3.saidhere', 'CFBundleURLSchemes': ['saidhere']}]
+    # The app only uses exempt encryption provided by the operating system
+    # (for example normal HTTPS networking). Declaring this prevents App Store
+    # Connect from asking the export-compliance encryption questions on every build.
+    info['ITSAppUsesNonExemptEncryption'] = False
     with plist_path.open('wb') as handle:
         plistlib.dump(info, handle, sort_keys=False)
 
