@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 
 import '../config/app_config.dart';
 import '../theme/app_theme.dart';
-import '../widgets/brand_mark.dart';
 import '../widgets/wall_background.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -12,37 +11,64 @@ class HomeScreen extends StatelessWidget {
   void _showPlaqueInstructions(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: SaidHereTheme.paper,
-      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 10, 24, 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.nfc, size: 52, color: SaidHereTheme.ink),
-              const SizedBox(height: 14),
-              const Text(
-                'TAP THE PLAQUE',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+          child: Transform.rotate(
+            angle: -.008,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(22, 28, 22, 22),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE5D9C5),
+                border: Border.all(color: SaidHereTheme.ink.withValues(alpha: .34)),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x44000000), offset: Offset(3, 4), blurRadius: 0),
+                ],
               ),
-              const SizedBox(height: 10),
-              Text(
-                'Hold the top of your iPhone near The Wall plaque. When the NFC notification appears, tap it. That gives you 15 minutes to leave something on this wall.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  height: 1.45,
-                  color: SaidHereTheme.ink.withValues(alpha: .78),
-                  fontWeight: FontWeight.w700,
-                ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned(
+                    top: -38,
+                    left: 42,
+                    right: 42,
+                    child: Transform.rotate(
+                      angle: .02,
+                      child: Container(height: 28, color: const Color(0x77C7AF82)),
+                    ),
+                  ),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.nfc, size: 54, color: SaidHereTheme.ink),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'TAP THE PLAQUE',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Hold the top of your iPhone near the physical plaque. Tap the NFC notification when it appears. That unlocks writing on that Wall for 15 minutes.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          height: 1.45,
+                          color: SaidHereTheme.ink.withValues(alpha: .78),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      FilledButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('GOT IT'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('GOT IT'),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -57,86 +83,63 @@ class HomeScreen extends StatelessWidget {
         child: SafeArea(
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(22, 28, 22, 22),
+              constraints: const BoxConstraints(maxWidth: 540),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(30, 38, 26, 30),
                 child: Column(
                   children: [
-                    const Spacer(),
-                    const BrandMark(),
                     const SizedBox(height: 18),
+                    _WallPlaque(onTap: () => _showPlaqueInstructions(context)),
+                    const SizedBox(height: 32),
                     Transform.rotate(
-                      angle: .012,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        color: const Color(0xD9D8CCB6),
-                        child: const Text(
-                          'EVERY PLACE HAS SOMETHING TO SAY.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: .3,
-                          ),
+                      angle: -.014,
+                      child: const Text(
+                        'Every place has\nsomething to say.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 18,
+                          height: 1.25,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -.35,
                         ),
                       ),
                     ),
-                    const Spacer(),
-                    Material(
-                      color: SaidHereTheme.ink.withValues(alpha: .94),
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(3)),
-                        side: BorderSide(color: Color(0xFF514537), width: 2),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: () => _showPlaqueInstructions(context),
-                        child: const Padding(
-                          padding: EdgeInsets.all(17),
-                          child: Row(
-                            children: [
-                              Icon(Icons.nfc, color: SaidHereTheme.paper, size: 32),
-                              SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'HOW TO TAP THE WALL',
-                                      style: TextStyle(
-                                        color: SaidHereTheme.paper,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                    SizedBox(height: 3),
-                                    Text(
-                                      'Tap the physical plaque. Read it. Leave your mark.',
-                                      style: TextStyle(
-                                        color: Color(0xFFD4C7B1),
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
+                    const SizedBox(height: 38),
+                    Transform.rotate(
+                      angle: .008,
+                      child: Material(
+                        color: SaidHereTheme.ink,
+                        shape: const RoundedRectangleBorder(
+                          side: BorderSide(color: Color(0xFF655A4C), width: 2),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () => context.push('/found'),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.map_outlined, color: SaidHereTheme.paper, size: 25),
+                                SizedBox(width: 13),
+                                Text(
+                                  "WALLS YOU'VE FOUND",
+                                  style: TextStyle(
+                                    color: SaidHereTheme.paper,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: .2,
+                                  ),
                                 ),
-                              ),
-                              Icon(Icons.chevron_right, color: SaidHereTheme.paper),
-                            ],
+                                SizedBox(width: 10),
+                                Icon(Icons.arrow_forward, color: SaidHereTheme.paper, size: 20),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: () => context.push('/found'),
-                      icon: const Icon(Icons.history),
-                      label: const Text("WALLS YOU'VE FOUND"),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(50),
-                        backgroundColor: SaidHereTheme.paper.withValues(alpha: .58),
                       ),
                     ),
                     if (AppConfig.demoTagToken.isNotEmpty) ...[
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 16),
                       TextButton(
                         onPressed: () => context.push('/t/${AppConfig.demoTagToken}'),
                         child: const Text('OPEN DEMO WALL'),
@@ -148,6 +151,96 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _WallPlaque extends StatelessWidget {
+  const _WallPlaque({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.rotate(
+      angle: -.006,
+      child: Material(
+        color: const Color(0xFF151515),
+        elevation: 8,
+        shadowColor: Colors.black54,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFF3B3732), width: 3),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            width: 286,
+            child: Stack(
+              children: [
+                const Positioned(top: 12, left: 12, child: _Screw()),
+                const Positioned(top: 12, right: 12, child: _Screw()),
+                const Positioned(bottom: 12, left: 12, child: _Screw()),
+                const Positioned(bottom: 12, right: 12, child: _Screw()),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(32, 30, 32, 28),
+                  child: Column(
+                    children: [
+                      Transform.rotate(
+                        angle: -.025,
+                        child: const Text(
+                          'THE\nWALL',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFFF1E8D8),
+                            fontSize: 52,
+                            height: .80,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -3,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      const Icon(Icons.nfc, color: Color(0xFFF1E8D8), size: 56),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'TAP HERE',
+                        style: TextStyle(
+                          color: Color(0xFFF1E8D8),
+                          fontSize: 23,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Screw extends StatelessWidget {
+  const _Screw();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 16,
+      height: 16,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: Color(0xFF746B5E),
+        boxShadow: [BoxShadow(color: Colors.black87, offset: Offset(1, 1), blurRadius: 1)],
+      ),
+      child: const Center(
+        child: SizedBox(width: 9, child: Divider(color: Color(0xFF282521), thickness: 1.5)),
       ),
     );
   }
