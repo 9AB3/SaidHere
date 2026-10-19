@@ -57,17 +57,14 @@ class _DiscoveredWallsScreenState extends State<DiscoveredWallsScreen> {
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, size: 30),
+        leading: _NavDisc(
+          icon: Icons.arrow_back,
           onPressed: () => context.canPop() ? context.pop() : context.go('/'),
         ),
         title: const SizedBox.shrink(),
         actions: [
-          IconButton(
-            onPressed: _refresh,
-            icon: const Icon(Icons.refresh, size: 28),
-          ),
-          const SizedBox(width: 6),
+          _NavDisc(icon: Icons.refresh, onPressed: _refresh),
+          const SizedBox(width: 10),
         ],
       ),
       body: WallBackground(
@@ -102,13 +99,13 @@ class _DiscoveredWallsScreenState extends State<DiscoveredWallsScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 30),
                     if (result.fromCache) ...[
-                      _IndustrialNotice(
+                      const _IndustrialNotice(
                         icon: Icons.cloud_off_outlined,
                         text: 'SAVED HISTORY · PULL DOWN TO RECONNECT',
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 22),
                     ],
                     if (walls.isEmpty)
                       const Padding(
@@ -129,7 +126,7 @@ class _DiscoveredWallsScreenState extends State<DiscoveredWallsScreen> {
                       ...List.generate(walls.length, (index) {
                         final wall = walls[index];
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.only(bottom: 24),
                           child: _WallStencil(
                             wall: wall,
                             index: index,
@@ -141,6 +138,32 @@ class _DiscoveredWallsScreenState extends State<DiscoveredWallsScreen> {
                 ),
               );
             },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavDisc extends StatelessWidget {
+  const _NavDisc({required this.icon, required this.onPressed});
+
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Material(
+        color: SaidHereTheme.ink.withValues(alpha: .80),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onPressed,
+          child: SizedBox(
+            width: 38,
+            height: 38,
+            child: Icon(icon, color: SaidHereTheme.paper, size: 22),
           ),
         ),
       ),
@@ -201,38 +224,37 @@ class _WallStencil extends StatelessWidget {
   Widget build(BuildContext context) {
     final visited = wall.lastVisitedAt;
     final angle = ((index % 5) - 2) * .004;
-    final dark = index.isEven;
-    final background = dark
-        ? SaidHereTheme.ink.withValues(alpha: .88)
-        : const Color(0xFFE9DDC8).withValues(alpha: .78);
-    final foreground = dark ? SaidHereTheme.paper : SaidHereTheme.ink;
+    final marker = index % 4 == 3
+        ? const Color(0xFF6F332D)
+        : SaidHereTheme.ink;
 
     return Transform.rotate(
       angle: angle,
+      alignment: Alignment.centerLeft,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(18, 16, 16, 15),
-            decoration: BoxDecoration(
-              color: background,
-              border: Border.all(
-                color: foreground.withValues(alpha: .36),
-                width: 1.4,
-              ),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x26000000),
-                  offset: Offset(2, 3),
-                  blurRadius: 1,
-                ),
-              ],
-            ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 10, 4, 10),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Icon(Icons.location_on_outlined, color: foreground, size: 26),
+                Container(
+                  width: 4,
+                  height: 76,
+                  decoration: BoxDecoration(
+                    color: marker.withValues(alpha: .72),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
                 const SizedBox(width: 14),
+                Icon(
+                  Icons.location_on_outlined,
+                  color: marker.withValues(alpha: .78),
+                  size: 25,
+                ),
+                const SizedBox(width: 13),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,10 +262,16 @@ class _WallStencil extends StatelessWidget {
                       Text(
                         wall.displayName.toUpperCase(),
                         style: TextStyle(
-                          color: foreground,
+                          color: marker.withValues(alpha: .92),
+                          fontFamily: 'Chalkboard SE',
+                          fontFamilyFallback: const [
+                            'Marker Felt',
+                            'Noteworthy',
+                            'sans-serif',
+                          ],
                           fontSize: 19,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: .3,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: .1,
                         ),
                       ),
                       if (wall.locationHint.isNotEmpty) ...[
@@ -251,10 +279,10 @@ class _WallStencil extends StatelessWidget {
                         Text(
                           wall.locationHint.toUpperCase(),
                           style: TextStyle(
-                            color: foreground.withValues(alpha: .72),
-                            fontSize: 11,
+                            color: marker.withValues(alpha: .62),
+                            fontSize: 10.5,
                             fontWeight: FontWeight.w800,
-                            letterSpacing: .5,
+                            letterSpacing: .6,
                           ),
                         ),
                       ],
@@ -263,17 +291,27 @@ class _WallStencil extends StatelessWidget {
                         Text(
                           'FOUND ${DateFormat('d MMM yyyy · HH:mm').format(visited).toUpperCase()}',
                           style: TextStyle(
-                            color: foreground.withValues(alpha: .54),
-                            fontSize: 9.5,
+                            color: marker.withValues(alpha: .43),
+                            fontSize: 9.2,
                             fontWeight: FontWeight.w800,
-                            letterSpacing: .6,
+                            letterSpacing: .7,
                           ),
                         ),
                       ],
+                      const SizedBox(height: 9),
+                      Container(
+                        width: 145 + (index % 4) * 26,
+                        height: 1.5,
+                        color: marker.withValues(alpha: .16),
+                      ),
                     ],
                   ),
                 ),
-                Icon(Icons.arrow_forward, color: foreground, size: 22),
+                Icon(
+                  Icons.arrow_forward,
+                  color: marker.withValues(alpha: .72),
+                  size: 22,
+                ),
               ],
             ),
           ),
