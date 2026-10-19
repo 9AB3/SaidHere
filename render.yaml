@@ -38,6 +38,12 @@ services:
         value: no-referrer
     routes:
       - type: rewrite
+        source: /admin
+        destination: /admin/index.html
+      - type: rewrite
+        source: /admin/*
+        destination: /admin/index.html
+      - type: rewrite
         source: /t/*
         destination: /index.html
       - type: rewrite
