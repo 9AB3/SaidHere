@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../config/ui_assets.dart';
 import '../models/wall_post.dart';
 import '../theme/app_theme.dart';
 
@@ -24,90 +25,112 @@ class PostCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final seed = post.id.codeUnits.fold<int>(0, (a, b) => a + b);
     final rng = math.Random(seed);
-    final schemes = <({Color bg, Color fg, Color tape})>[
-      (bg: const Color(0xFFE9E1D2), fg: SaidHereTheme.ink, tape: const Color(0x77C5AA7B)),
-      (bg: const Color(0xFFCDBB98), fg: SaidHereTheme.ink, tape: const Color(0x66796149)),
-      (bg: const Color(0xFF1D1B18), fg: const Color(0xFFF0E6D5), tape: const Color(0x668C7C67)),
-      (bg: const Color(0xFFDED0B8), fg: SaidHereTheme.ink, tape: const Color(0x778D7653)),
-    ];
-    final scheme = schemes[seed % schemes.length];
+    final variant = seed % 7;
+
+    final String paperAsset;
+    final Color foreground;
+    final String? tapeAsset;
+
+    if (variant == 4) {
+      paperAsset = UiAssets.noteBlack;
+      foreground = const Color(0xFFF2E8D7);
+      tapeAsset = UiAssets.tapeCreamSmall;
+    } else if (variant == 2 || variant == 5) {
+      paperAsset = UiAssets.noteBrown;
+      foreground = SaidHereTheme.ink;
+      tapeAsset = variant == 5 ? UiAssets.tapeWhite : UiAssets.tapeCreamSmall;
+    } else {
+      paperAsset = UiAssets.noteWhite;
+      foreground = SaidHereTheme.ink;
+      tapeAsset = null;
+    }
 
     final angle = (rng.nextDouble() - .5) * .035;
-    final left = depth == 0 ? 8.0 : 28.0;
+    final left = depth == 0 ? 8.0 : 30.0;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(left, 8, 8, 8),
+      padding: EdgeInsets.fromLTRB(left, 9, 8, 9),
       child: Transform.rotate(
         angle: angle,
-        child: Container(
-          decoration: BoxDecoration(
-            color: scheme.bg,
-            border: Border.all(color: SaidHereTheme.ink.withValues(alpha: .24), width: 1.1),
-            boxShadow: const [
-              BoxShadow(color: Color(0x33000000), offset: Offset(2, 3), blurRadius: 0),
-            ],
-          ),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              if (seed.isEven)
-                Positioned(
-                  top: -7,
-                  left: 42,
-                  right: 42,
-                  child: Transform.rotate(
-                    angle: (rng.nextDouble() - .5) * .05,
-                    child: Container(height: 15, color: scheme.tape),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              child: Image.asset(
+                paperAsset,
+                fit: BoxFit.fill,
+                filterQuality: FilterQuality.high,
+              ),
+            ),
+            if (tapeAsset != null)
+              Positioned(
+                top: -8,
+                left: 64 + (seed % 42).toDouble(),
+                child: Transform.rotate(
+                  angle: (rng.nextDouble() - .5) * .08,
+                  child: Image.asset(
+                    tapeAsset,
+                    width: 82,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
                   ),
                 ),
-              InkWell(
-                onLongPress: onReport,
+              ),
+            GestureDetector(
+              onLongPress: onReport,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 118),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(17, 17, 12, 10),
+                  padding: const EdgeInsets.fromLTRB(22, 24, 18, 17),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         post.body,
                         style: TextStyle(
-                          color: scheme.fg.withValues(alpha: .97),
+                          color: foreground.withValues(alpha: .97),
                           fontSize: depth == 0 ? 17 : 15,
                           height: 1.34,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -.15,
                         ),
                       ),
-                      const SizedBox(height: 11),
-                      Container(height: 1, color: scheme.fg.withValues(alpha: .16)),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 13),
+                      Container(
+                        height: 1,
+                        color: foreground.withValues(alpha: .16),
+                      ),
+                      const SizedBox(height: 5),
                       Row(
                         children: [
-                          Text(
-                            DateFormat('d MMM yyyy · HH:mm')
-                                .format(post.createdAt)
-                                .toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w700,
-                              color: scheme.fg.withValues(alpha: .60),
+                          Expanded(
+                            child: Text(
+                              DateFormat('d MMM yyyy · HH:mm')
+                                  .format(post.createdAt)
+                                  .toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: .3,
+                                color: foreground.withValues(alpha: .60),
+                              ),
                             ),
                           ),
-                          const Spacer(),
                           if (depth == 0 && onReply != null)
-                            TextButton.icon(
+                            TextButton(
                               onPressed: onReply,
-                              icon: const Icon(Icons.subdirectory_arrow_right, size: 15),
-                              label: const Text('REPLY'),
                               style: TextButton.styleFrom(
-                                foregroundColor: scheme.fg.withValues(alpha: .76),
+                                foregroundColor: foreground.withValues(alpha: .78),
                                 visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
                               ),
+                              child: const Text('REPLY'),
                             ),
                           IconButton(
                             tooltip: 'Report',
                             onPressed: onReport,
                             icon: const Icon(Icons.more_horiz, size: 18),
-                            color: scheme.fg.withValues(alpha: .72),
+                            color: foreground.withValues(alpha: .72),
                             visualDensity: VisualDensity.compact,
                           ),
                         ],
@@ -116,8 +139,8 @@ class PostCard extends StatelessWidget {
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
