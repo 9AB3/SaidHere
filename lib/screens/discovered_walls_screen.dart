@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../config/ui_assets.dart';
 import '../models/wall.dart';
 import '../services/local_history_service.dart';
 import '../services/said_here_service.dart';
@@ -51,111 +52,152 @@ class _DiscoveredWallsScreenState extends State<DiscoveredWallsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, size: 30),
           onPressed: () => context.canPop() ? context.pop() : context.go('/'),
         ),
         title: const SizedBox.shrink(),
         actions: [
-          IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
+          IconButton(
+            onPressed: _refresh,
+            icon: const Icon(Icons.refresh, size: 28),
+          ),
+          const SizedBox(width: 6),
         ],
       ),
       body: WallBackground(
-        child: FutureBuilder<_WallsResult>(
-          future: _future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return _ErrorState(message: snapshot.error.toString(), onRetry: _refresh);
-            }
-            final result = snapshot.data ?? const _WallsResult([]);
-            final walls = result.walls;
+        child: SafeArea(
+          child: FutureBuilder<_WallsResult>(
+            future: _future,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return _ErrorState(message: snapshot.error.toString(), onRetry: _refresh);
+              }
+              final result = snapshot.data ?? const _WallsResult([]);
+              final walls = result.walls;
 
-            return RefreshIndicator(
-              onRefresh: _refresh,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(22, 14, 22, 34),
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Transform.rotate(
-                      angle: -.018,
-                      child: Container(
-                        padding: const EdgeInsets.fromLTRB(18, 12, 20, 12),
-                        decoration: BoxDecoration(
-                          color: SaidHereTheme.ink,
-                          border: Border.all(color: const Color(0xFF554B40), width: 2),
-                          boxShadow: const [
-                            BoxShadow(color: Color(0x44000000), offset: Offset(3, 4), blurRadius: 0),
-                          ],
+              return RefreshIndicator(
+                onRefresh: _refresh,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(22, 58, 22, 34),
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Transform.rotate(
+                        angle: -.012,
+                        child: Image.asset(
+                          UiAssets.wallsFoundHeader,
+                          width: 360,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
                         ),
-                        child: const Text(
-                          "WALLS YOU'VE FOUND",
-                          style: TextStyle(
-                            color: SaidHereTheme.paper,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: .2,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    if (result.fromCache) ...[
+                      Transform.rotate(
+                        angle: .007,
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD5C28E).withValues(alpha: .94),
+                            border: Border.all(
+                              color: SaidHereTheme.ink.withValues(alpha: .28),
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x33000000),
+                                offset: Offset(2, 3),
+                                blurRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.cloud_off_outlined),
+                              SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'SHOWING SAVED HISTORY. PULL DOWN TO RECONNECT.',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  if (result.fromCache) ...[
-                    Transform.rotate(
-                      angle: .007,
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFD5C28E),
-                          border: Border.all(color: SaidHereTheme.ink.withValues(alpha: .35)),
+                      const SizedBox(height: 18),
+                    ],
+                    if (walls.isEmpty)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(10, 65, 10, 40),
+                          child: _EmptyNote(),
                         ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.cloud_off_outlined),
-                            SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'SHOWING SAVED HISTORY. PULL DOWN TO RECONNECT.',
-                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
+                      )
+                    else
+                      ...List.generate(walls.length, (index) {
+                        final wall = walls[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 18),
+                          child: _WallLabel(
+                            wall: wall,
+                            index: index,
+                            onTap: () => context.push('/w/${wall.slug}'),
+                          ),
+                        );
+                      }),
                   ],
-                  if (walls.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(20, 90, 20, 40),
-                      child: Text(
-                        "YOU HAVEN'T FOUND A WALL YET.\n\nTap a physical THE WALL plaque when you see one.",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(height: 1.5, fontWeight: FontWeight.w900),
-                      ),
-                    )
-                  else
-                    ...List.generate(walls.length, (index) {
-                      final wall = walls[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 18),
-                        child: _WallLabel(
-                          wall: wall,
-                          index: index,
-                          onTap: () => context.push('/w/${wall.slug}'),
-                        ),
-                      );
-                    }),
-                ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyNote extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Transform.rotate(
+      angle: -.01,
+      child: SizedBox(
+        width: 330,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Image.asset(
+                UiAssets.noteWhite,
+                fit: BoxFit.fill,
+                filterQuality: FilterQuality.high,
               ),
-            );
-          },
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(34, 36, 34, 34),
+              child: Text(
+                "YOU HAVEN'T FOUND A WALL YET.\n\nTap a physical THE WALL plaque when you see one.",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  height: 1.45,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -163,7 +205,11 @@ class _DiscoveredWallsScreenState extends State<DiscoveredWallsScreen> {
 }
 
 class _WallLabel extends StatelessWidget {
-  const _WallLabel({required this.wall, required this.index, required this.onTap});
+  const _WallLabel({
+    required this.wall,
+    required this.index,
+    required this.onTap,
+  });
 
   final Wall wall;
   final int index;
@@ -172,65 +218,79 @@ class _WallLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visited = wall.lastVisitedAt;
-    final schemes = <({Color bg, Color fg, Color tape})>[
-      (bg: const Color(0xFFE7DCC9), fg: SaidHereTheme.ink, tape: const Color(0x77C9B184)),
-      (bg: const Color(0xFF1C1B18), fg: const Color(0xFFE9DFCC), tape: const Color(0x668F806C)),
-      (bg: const Color(0xFF9D3D31), fg: const Color(0xFFF1E2CF), tape: const Color(0x668B755C)),
-      (bg: const Color(0xFFC9B88F), fg: SaidHereTheme.ink, tape: const Color(0x668C7655)),
-    ];
-    final scheme = schemes[index % schemes.length];
+    final variant = index % 5;
+    final isBlack = variant == 3;
+    final paperAsset = isBlack
+        ? UiAssets.noteBlack
+        : (variant == 1 || variant == 4
+            ? UiAssets.noteBrown
+            : UiAssets.noteWhite);
+    final foreground = isBlack
+        ? const Color(0xFFF1E8D8)
+        : SaidHereTheme.ink;
     final angle = ((index % 5) - 2) * .006;
 
     return Transform.rotate(
       angle: angle,
-      child: Material(
-        color: scheme.bg,
-        elevation: 5,
-        shadowColor: Colors.black38,
-        shape: RoundedRectangleBorder(
-          side: BorderSide(color: SaidHereTheme.ink.withValues(alpha: .32), width: 1.2),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              child: Image.asset(
+                paperAsset,
+                fit: BoxFit.fill,
+                filterQuality: FilterQuality.high,
+              ),
+            ),
+            if (paperAsset == UiAssets.noteBrown)
               Positioned(
-                top: -2,
-                left: 54,
-                right: 54,
+                top: -7,
+                left: 105,
                 child: Transform.rotate(
-                  angle: index.isEven ? -.025 : .02,
-                  child: Container(height: 18, color: scheme.tape),
+                  angle: index.isEven ? -.04 : .035,
+                  child: Image.asset(
+                    UiAssets.tapeCreamSmall,
+                    width: 92,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                  ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 22, 16, 18),
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 132),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(28, 28, 24, 24),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Container(
-                      width: 46,
-                      height: 46,
+                      width: 48,
+                      height: 48,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        border: Border.all(color: scheme.fg.withValues(alpha: .7), width: 1.5),
+                        border: Border.all(
+                          color: foreground.withValues(alpha: .62),
+                          width: 1.5,
+                        ),
                       ),
                       child: Icon(
                         index.isEven ? Icons.location_city : Icons.park_outlined,
-                        color: scheme.fg,
+                        color: foreground,
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
                             wall.displayName.toUpperCase(),
                             style: TextStyle(
-                              color: scheme.fg,
+                              color: foreground,
                               fontSize: 18,
                               fontWeight: FontWeight.w900,
                               letterSpacing: -.2,
@@ -241,7 +301,7 @@ class _WallLabel extends StatelessWidget {
                             Text(
                               wall.locationHint,
                               style: TextStyle(
-                                color: scheme.fg.withValues(alpha: .82),
+                                color: foreground.withValues(alpha: .82),
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -251,21 +311,22 @@ class _WallLabel extends StatelessWidget {
                             Text(
                               'FOUND ${DateFormat('d MMM yyyy · HH:mm').format(visited).toUpperCase()}',
                               style: TextStyle(
-                                color: scheme.fg.withValues(alpha: .72),
+                                color: foreground.withValues(alpha: .64),
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
+                                letterSpacing: .2,
                               ),
                             ),
                           ],
                         ],
                       ),
                     ),
-                    Icon(Icons.arrow_forward, color: scheme.fg, size: 20),
+                    Icon(Icons.arrow_forward, color: foreground, size: 22),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
