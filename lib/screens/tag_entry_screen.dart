@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../services/local_history_service.dart';
 import '../services/said_here_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/brand_mark.dart';
 import '../widgets/wall_background.dart';
 
 class TagEntryScreen extends StatefulWidget {
@@ -65,31 +64,58 @@ class _TagEntryScreenState extends State<TagEntryScreen> {
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(26),
+              padding: const EdgeInsets.all(28),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 500),
+                constraints: const BoxConstraints(maxWidth: 460),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const BrandMark(),
-                    const SizedBox(height: 26),
+                    Transform.rotate(
+                      angle: -.006,
+                      child: Container(
+                        width: 230,
+                        padding: const EdgeInsets.fromLTRB(26, 24, 26, 22),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF151515),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF514A40), width: 3),
+                          boxShadow: const [
+                            BoxShadow(color: Color(0x66000000), offset: Offset(4, 5), blurRadius: 2),
+                          ],
+                        ),
+                        child: const Column(
+                          children: [
+                            Text(
+                              'THE\nWALL',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Color(0xFFF1E8D8),
+                                fontSize: 42,
+                                height: .82,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -2.5,
+                              ),
+                            ),
+                            SizedBox(height: 18),
+                            Icon(Icons.nfc, color: Color(0xFFF1E8D8), size: 46),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
                     Transform.rotate(
                       angle: .006,
                       child: Container(
                         width: double.infinity,
                         padding: const EdgeInsets.fromLTRB(22, 24, 22, 22),
                         decoration: BoxDecoration(
-                          color: const Color(0xE8D8CCB6),
+                          color: const Color(0xFFE5D9C5),
                           border: Border.all(
-                            color: SaidHereTheme.ink.withValues(alpha: .65),
-                            width: 1.5,
+                            color: SaidHereTheme.ink.withValues(alpha: .45),
+                            width: 1.3,
                           ),
                           boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x44000000),
-                              offset: Offset(4, 5),
-                              blurRadius: 0,
-                            ),
+                            BoxShadow(color: Color(0x44000000), offset: Offset(3, 4), blurRadius: 0),
                           ],
                         ),
                         child: _error == null
