@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build native app branding from the uploaded The Wall artwork without external dependencies."""
+"""Build native app branding from the uploaded The Wall plaque without external dependencies."""
 from __future__ import annotations
 
 import struct
@@ -7,8 +7,9 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / 'lib/theme/Grungy Graffiti Wall_ The Wall.png'
+SOURCE = ROOT / 'lib/267ABF9F-A613-4DD2-B026-87B6C2B6AEBD.png'
 PNG_SIGNATURE = b'\x89PNG\r\n\x1a\n'
+DOOR = (203, 190, 166)
 
 
 def paeth(a: int, b: int, c: int) -> int:
@@ -167,13 +168,6 @@ def resize_cover(
         crop_x = 0
         crop_y = (source_height - crop_height) // 2
 
-    # Tighten the crop slightly so THE WALL remains legible at icon sizes.
-    if target_width == target_height:
-        tightened = int(min(crop_width, crop_height) * 0.92)
-        crop_x += (crop_width - tightened) // 2
-        crop_y += (crop_height - tightened) // 2
-        crop_width = crop_height = tightened
-
     result = bytearray(target_width * target_height * 4)
     for y in range(target_height):
         sy = crop_y + min(crop_height - 1, int((y + 0.5) * crop_height / target_height))
@@ -182,6 +176,18 @@ def resize_cover(
             source_index = (sy * source_width + sx) * 4
             target_index = (y * target_width + x) * 4
             result[target_index:target_index + 4] = source[source_index:source_index + 4]
+    return result
+
+
+def flatten_alpha(pixels: bytearray) -> bytearray:
+    result = bytearray(len(pixels))
+    for i in range(0, len(pixels), 4):
+        alpha = pixels[i + 3] / 255.0
+        inv = 1.0 - alpha
+        result[i] = int(round(pixels[i] * alpha + DOOR[0] * inv))
+        result[i + 1] = int(round(pixels[i + 1] * alpha + DOOR[1] * inv))
+        result[i + 2] = int(round(pixels[i + 2] * alpha + DOOR[2] * inv))
+        result[i + 3] = 255
     return result
 
 
@@ -195,14 +201,14 @@ def replace_pngs(folder: Path, source_width: int, source_height: int, source: by
             continue
         width, height = size
         pixels = resize_cover(source, source_width, source_height, width, height)
-        write_png(path, width, height, pixels)
+        write_png(path, width, height, flatten_alpha(pixels))
         count += 1
     return count
 
 
 def main() -> None:
     if not SOURCE.exists():
-        raise RuntimeError(f'Missing The Wall artwork: {SOURCE}')
+        raise RuntimeError(f'Missing The Wall plaque artwork: {SOURCE}')
 
     source_width, source_height, source = read_png(SOURCE)
     count = 0
@@ -221,7 +227,7 @@ def main() -> None:
     for folder in (ROOT / 'android/app/src/main/res').glob('mipmap-*'):
         count += replace_pngs(folder, source_width, source_height, source)
 
-    print(f'Replaced {count} generated placeholder PNGs with The Wall artwork')
+    print(f'Replaced {count} generated placeholder PNGs with The Wall plaque artwork')
 
 
 if __name__ == '__main__':
