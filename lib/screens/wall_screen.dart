@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../config/ui_assets.dart';
 import '../models/wall.dart';
 import '../models/wall_post.dart';
 import '../services/said_here_service.dart';
@@ -120,10 +121,14 @@ class _WallScreenState extends State<WallScreen> {
     final canWrite = wall?.canWriteNow == true;
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
         leading: IconButton(
           onPressed: _goBack,
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, size: 30),
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -154,85 +159,60 @@ class _WallScreenState extends State<WallScreen> {
             ],
             icon: const Icon(Icons.more_vert),
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: WallBackground(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-                ? _WallError(message: _error!, onRetry: _load)
-                : Column(
-                    children: [
-                      if (canWrite)
-                        Transform.rotate(
-                          angle: -.004,
-                          child: Container(
-                            width: double.infinity,
-                            margin: const EdgeInsets.fromLTRB(16, 5, 16, 10),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF9D3028),
-                              border: Border.all(color: const Color(0xFF76221D), width: 1.5),
-                              boxShadow: const [
-                                BoxShadow(color: Color(0x33000000), offset: Offset(2, 3), blurRadius: 0),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.lock_open, size: 16, color: Color(0xFFF2E5D2)),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    "YOU'RE HERE — WRITING UNLOCKED · $_writeRemaining",
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: Color(0xFFF2E5D2),
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: .2,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.only(top: kToolbarHeight - 4),
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? _WallError(message: _error!, onRetry: _load)
+                    : Column(
+                        children: [
+                          if (canWrite)
+                            _WriteAccessTape(remaining: _writeRemaining),
+                          if (_years.length > 1)
+                            SizedBox(
+                              height: 44,
+                              child: ListView(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                scrollDirection: Axis.horizontal,
+                                children: [
+                                  _YearChip(
+                                    label: 'ALL',
+                                    selected: _year == null,
+                                    onTap: () => setState(() => _year = null),
+                                  ),
+                                  ..._years.map(
+                                    (year) => _YearChip(
+                                      label: '$year',
+                                      selected: _year == year,
+                                      onTap: () => setState(() => _year = year),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
+                            ),
+                          Expanded(child: _buildPosts(canWrite)),
+                          SafeArea(
+                            top: false,
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
+                              child: _WriteBar(
+                                canWrite: canWrite,
+                                onPressed: canWrite
+                                    ? () => _openComposer()
+                                    : _showLocationLimit,
+                              ),
                             ),
                           ),
-                        ),
-                      if (_years.length > 1)
-                        SizedBox(
-                          height: 44,
-                          child: ListView(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            scrollDirection: Axis.horizontal,
-                            children: [
-                              _YearChip(
-                                label: 'ALL',
-                                selected: _year == null,
-                                onTap: () => setState(() => _year = null),
-                              ),
-                              ..._years.map(
-                                (year) => _YearChip(
-                                  label: '$year',
-                                  selected: _year == year,
-                                  onTap: () => setState(() => _year = year),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      Expanded(child: _buildPosts(canWrite)),
-                      SafeArea(
-                        top: false,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 8, 14, 13),
-                          child: _WriteBar(
-                            canWrite: canWrite,
-                            onPressed: canWrite ? () => _openComposer() : _showLocationLimit,
-                          ),
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
+          ),
+        ),
       ),
     );
   }
@@ -242,21 +222,27 @@ class _WallScreenState extends State<WallScreen> {
     if (posts.isEmpty) {
       return Center(
         child: Transform.rotate(
-          angle: -.012,
-          child: Container(
-            margin: const EdgeInsets.all(30),
-            padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8DDCC),
-              border: Border.all(color: SaidHereTheme.ink.withValues(alpha: .25)),
-              boxShadow: const [
-                BoxShadow(color: Color(0x33000000), offset: Offset(2, 3), blurRadius: 0),
+          angle: -.01,
+          child: SizedBox(
+            width: 330,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Image.asset(
+                    UiAssets.noteWhite,
+                    fit: BoxFit.fill,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(34, 36, 34, 34),
+                  child: Text(
+                    'Nothing has been written here yet.\nBe the first person to leave something behind.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(height: 1.5, fontWeight: FontWeight.w800),
+                  ),
+                ),
               ],
-            ),
-            child: const Text(
-              'Nothing has been written here yet.\nBe the first person to leave something behind.',
-              textAlign: TextAlign.center,
-              style: TextStyle(height: 1.5, fontWeight: FontWeight.w800),
             ),
           ),
         ),
@@ -326,30 +312,34 @@ class _WallScreenState extends State<WallScreen> {
             MediaQuery.viewInsetsOf(sheetContext).bottom + 14,
           ),
           child: Transform.rotate(
-            angle: .004,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8DDCC),
-                border: Border.all(color: SaidHereTheme.ink.withValues(alpha: .30)),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x44000000), offset: Offset(3, 4), blurRadius: 0),
-                ],
-              ),
-              child: _Composer(
-                controller: controller,
-                parent: parent,
-                onPost: () async {
-                  final body = controller.text.trim();
-                  if (body.isEmpty) return;
-                  await widget.service.createPost(
-                    wallId: wall.id,
-                    body: body,
-                    parentId: parent?.id,
-                  );
-                  if (sheetContext.mounted) Navigator.pop(sheetContext, true);
-                },
-              ),
+            angle: .003,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Image.asset(
+                    UiAssets.noteWhite,
+                    fit: BoxFit.fill,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 25, 24, 24),
+                  child: _Composer(
+                    controller: controller,
+                    parent: parent,
+                    onPost: () async {
+                      final body = controller.text.trim();
+                      if (body.isEmpty) return;
+                      await widget.service.createPost(
+                        wallId: wall.id,
+                        body: body,
+                        parentId: parent?.id,
+                      );
+                      if (sheetContext.mounted) Navigator.pop(sheetContext, true);
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -417,6 +407,61 @@ class _WallScreenState extends State<WallScreen> {
   }
 }
 
+class _WriteAccessTape extends StatelessWidget {
+  const _WriteAccessTape({required this.remaining});
+
+  final String remaining;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.rotate(
+      angle: -.006,
+      child: Container(
+        height: 48,
+        margin: const EdgeInsets.fromLTRB(18, 2, 18, 8),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              UiAssets.tapeRed,
+              fit: BoxFit.fill,
+              filterQuality: FilterQuality.high,
+            ),
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.edit_outlined,
+                      size: 16,
+                      color: Color(0xFFF2E5D2),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        "YOU'RE HERE · WRITING UNLOCKED · $remaining",
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFFF2E5D2),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: .15,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _WriteBar extends StatelessWidget {
   const _WriteBar({required this.canWrite, required this.onPressed});
 
@@ -425,54 +470,68 @@ class _WriteBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!canWrite) {
+      return GestureDetector(
+        onTap: onPressed,
+        behavior: HitTestBehavior.opaque,
+        child: Image.asset(
+          UiAssets.lockedWritePanel,
+          width: double.infinity,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+        ),
+      );
+    }
+
     return Transform.rotate(
       angle: -.004,
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFFE7DCCC),
-          border: Border.all(color: SaidHereTheme.ink.withValues(alpha: .28)),
-          boxShadow: const [
-            BoxShadow(color: Color(0x33000000), offset: Offset(2, 3), blurRadius: 0),
-          ],
-        ),
-        child: Row(
+      child: GestureDetector(
+        onTap: onPressed,
+        behavior: HitTestBehavior.opaque,
+        child: Stack(
           children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 15, 12, 15),
-                child: Text(
-                  canWrite ? 'LEAVE YOUR MARK…' : 'TAP THE PLAQUE TO WRITE',
-                  style: TextStyle(
-                    color: SaidHereTheme.ink.withValues(alpha: .65),
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+            Positioned.fill(
+              child: Image.asset(
+                UiAssets.noteWhite,
+                fit: BoxFit.fill,
+                filterQuality: FilterQuality.high,
               ),
             ),
-            InkWell(
-              onTap: onPressed,
-              child: Container(
-                color: SaidHereTheme.ink,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                child: Row(
-                  children: [
-                    Icon(
-                      canWrite ? Icons.edit : Icons.lock_outline,
-                      color: SaidHereTheme.paper,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 7),
-                    Text(
-                      canWrite ? 'WRITE IT' : 'LOCKED',
-                      style: const TextStyle(
-                        color: SaidHereTheme.paper,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(22, 18, 16, 18),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'LEAVE YOUR MARK…',
+                      style: TextStyle(
+                        color: SaidHereTheme.ink.withValues(alpha: .72),
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.arrow_forward, color: SaidHereTheme.paper, size: 18),
-                  ],
-                ),
+                  ),
+                  Container(
+                    color: SaidHereTheme.ink,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                    child: const Row(
+                      children: [
+                        Text(
+                          'WRITE IT',
+                          style: TextStyle(
+                            color: SaidHereTheme.paper,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        SizedBox(width: 5),
+                        Icon(
+                          Icons.arrow_forward,
+                          color: SaidHereTheme.paper,
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
