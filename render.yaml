@@ -21,12 +21,6 @@ services:
         value: https://saidhere.app,https://www.saidhere.app,https://saidhere-api-9ab3.onrender.com
       - key: ADMIN_KEY
         generateValue: true
-      - key: ADMIN_USERNAME
-        value: admin
-      - key: ADMIN_PASSWORD
-        sync: false
-      - key: ADMIN_SESSION_SECRET
-        generateValue: true
 
   - type: web
     name: saidhere-web-9ab3
