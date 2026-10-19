@@ -6,15 +6,53 @@ import argparse
 import plistlib
 import shutil
 import subprocess
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 APPLE_TEAM_ID = '7MB2M6PX4Y'
 IOS_BUNDLE_ID = 'com.9ab3.saidhere'
 
+SAFE_UI_ASSETS = (
+    'walls_found_header.png',
+    'note_white_blank.png',
+    'note_brown_blank.png',
+    'note_black_blank.png',
+    'tape_cream_small.png',
+    'tape_cream_wide.png',
+    'tape_black.png',
+    'tape_red.png',
+    'tape_white.png',
+    'locked_write_panel.png',
+    'composer_write_it.png',
+)
+
 
 def run(*args: str) -> None:
     subprocess.run(args, cwd=ROOT, check=True)
+
+
+def extract_ui_assets() -> None:
+    """Extract only reusable/generic art from the uploaded UI asset ZIP.
+
+    Assets containing baked wall names, dates or countdown values are deliberately
+    not extracted so dynamic app data can never be replaced by stale artwork text.
+    """
+    archive = ROOT / 'the_wall_ui_assets.zip'
+    destination = ROOT / 'lib/assets/ui'
+    if not archive.exists():
+        raise RuntimeError(f'Missing UI asset archive: {archive}')
+
+    destination.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(archive) as bundle:
+        names = set(bundle.namelist())
+        for filename in SAFE_UI_ASSETS:
+            member = f'the_wall_ui_assets/{filename}'
+            if member not in names:
+                raise RuntimeError(f'Missing UI asset in ZIP: {member}')
+            (destination / filename).write_bytes(bundle.read(member))
+
+    print(f'Extracted {len(SAFE_UI_ASSETS)} safe reusable UI assets')
 
 
 def patch_android(host: str) -> None:
@@ -85,6 +123,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('--host', default='saidhere.app')
     args = parser.parse_args()
+
+    extract_ui_assets()
 
     needed = [name for name in ('android', 'ios', 'web') if not (ROOT / name).exists()]
     if needed:
