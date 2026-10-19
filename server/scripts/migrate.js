@@ -20,7 +20,7 @@ try {
        values ('admin', 'Administrator', $1, 'owner', true, true)`,
       [passwordHash],
     );
-    console.log('Created default admin user: admin / password');
+    console.log('Created the default Owner admin account.');
   }
 
   await pool.query(`delete from admin_sessions where expires_at <= now()`);
