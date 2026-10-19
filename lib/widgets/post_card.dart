@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/wall_post.dart';
-import '../theme/app_theme.dart';
 
 class PostCard extends StatelessWidget {
   const PostCard({
