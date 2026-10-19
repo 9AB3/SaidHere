@@ -24,19 +24,33 @@ class PostCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final seed = post.id.codeUnits.fold<int>(0, (a, b) => a + b);
     final rng = math.Random(seed);
-    final angle = (rng.nextDouble() - .5) * .022;
-
-    final colors = <Color>[
-      const Color(0xFF1B1713),
-      const Color(0xFF24201B),
-      const Color(0xFF6E2E28),
-      const Color(0xFF303A39),
-    ];
-    final marker = colors[seed % colors.length];
     final isReply = depth > 0;
+    final angle = (rng.nextDouble() - .5) * .030;
+
+    // Mostly black marker, with occasional faded red / blue-grey marks.
+    final markerColors = <Color>[
+      const Color(0xFF171411),
+      const Color(0xFF211D19),
+      const Color(0xFF211D19),
+      const Color(0xFF6F332D),
+      const Color(0xFF242B2A),
+      const Color(0xFF171411),
+    ];
+    final marker = markerColors[seed % markerColors.length];
+
+    final markerFamilies = <String>[
+      'Marker Felt',
+      'Chalkboard SE',
+      'Noteworthy',
+    ];
+    final markerFamily = markerFamilies[seed % markerFamilies.length];
+
+    final messageSize = isReply
+        ? 16.0 + (seed % 2)
+        : 19.0 + ((seed % 3) * .45);
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(isReply ? 46 : 22, 14, 18, 14),
+      padding: EdgeInsets.fromLTRB(isReply ? 52 : 30, 15, 24, 15),
       child: Transform.rotate(
         angle: angle,
         alignment: Alignment.centerLeft,
@@ -45,50 +59,72 @@ class PostCard extends StatelessWidget {
           children: [
             if (isReply)
               Positioned(
-                left: -19,
+                left: -23,
                 top: 4,
-                bottom: 4,
+                bottom: 8,
                 child: Transform.rotate(
-                  angle: -.018,
+                  angle: -.014,
                   child: Container(
-                    width: 3,
+                    width: 3.2,
                     decoration: BoxDecoration(
-                      color: marker.withValues(alpha: .55),
-                      borderRadius: BorderRadius.circular(4),
+                      color: marker.withValues(alpha: .48),
+                      borderRadius: BorderRadius.circular(5),
                     ),
                   ),
                 ),
               ),
-            Container(
-              padding: const EdgeInsets.fromLTRB(8, 6, 4, 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1E8D8).withValues(alpha: .075),
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: GestureDetector(
-                onLongPress: onReport,
-                behavior: HitTestBehavior.opaque,
+            GestureDetector(
+              onLongPress: onReport,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(2, 2, 2, 2),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      post.body,
-                      style: TextStyle(
-                        color: marker.withValues(alpha: .96),
-                        fontSize: isReply ? 16 : 19,
-                        height: 1.27,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: isReply ? -.20 : -.35,
-                        shadows: [
-                          Shadow(
-                            color: marker.withValues(alpha: .14),
-                            offset: const Offset(.7, .7),
-                            blurRadius: .4,
+                    Stack(
+                      children: [
+                        // Tiny offset duplicate gives the writing a little ink bleed
+                        // without putting a card behind it.
+                        Transform.translate(
+                          offset: const Offset(.65, .55),
+                          child: Text(
+                            post.body,
+                            style: TextStyle(
+                              color: marker.withValues(alpha: .14),
+                              fontFamily: markerFamily,
+                              fontFamilyFallback: const [
+                                'Marker Felt',
+                                'Chalkboard SE',
+                                'Noteworthy',
+                                'sans-serif',
+                              ],
+                              fontSize: messageSize,
+                              height: 1.20,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: isReply ? .05 : -.08,
+                            ),
                           ),
-                        ],
-                      ),
+                        ),
+                        Text(
+                          post.body,
+                          style: TextStyle(
+                            color: marker.withValues(alpha: .90),
+                            fontFamily: markerFamily,
+                            fontFamilyFallback: const [
+                              'Marker Felt',
+                              'Chalkboard SE',
+                              'Noteworthy',
+                              'sans-serif',
+                            ],
+                            fontSize: messageSize,
+                            height: 1.20,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: isReply ? .05 : -.08,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 9),
                     Row(
                       children: [
                         Expanded(
@@ -97,10 +133,10 @@ class PostCard extends StatelessWidget {
                                 .format(post.createdAt)
                                 .toUpperCase(),
                             style: TextStyle(
-                              color: marker.withValues(alpha: .52),
-                              fontSize: 9.5,
+                              color: marker.withValues(alpha: .43),
+                              fontSize: 9.2,
                               fontWeight: FontWeight.w800,
-                              letterSpacing: .55,
+                              letterSpacing: .7,
                             ),
                           ),
                         ),
@@ -108,32 +144,37 @@ class PostCard extends StatelessWidget {
                           TextButton(
                             onPressed: onReply,
                             style: TextButton.styleFrom(
-                              foregroundColor: marker.withValues(alpha: .70),
-                              padding: const EdgeInsets.symmetric(horizontal: 7),
+                              foregroundColor: marker.withValues(alpha: .62),
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
                               visualDensity: VisualDensity.compact,
-                              minimumSize: const Size(0, 30),
+                              minimumSize: const Size(0, 28),
                             ),
                             child: const Text(
                               'REPLY',
-                              style: TextStyle(fontWeight: FontWeight.w900),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: .7,
+                              ),
                             ),
                           ),
                         IconButton(
                           tooltip: 'Report',
                           onPressed: onReport,
-                          icon: const Icon(Icons.more_horiz, size: 20),
-                          color: marker.withValues(alpha: .68),
+                          icon: const Icon(Icons.more_horiz, size: 19),
+                          color: marker.withValues(alpha: .58),
                           visualDensity: VisualDensity.compact,
                         ),
                       ],
                     ),
                     if (!isReply)
                       Transform.rotate(
-                        angle: (rng.nextDouble() - .5) * .025,
+                        angle: (rng.nextDouble() - .5) * .035,
                         child: Container(
-                          margin: const EdgeInsets.only(top: 2, right: 42),
-                          height: 1.4,
-                          color: marker.withValues(alpha: .18),
+                          width: 88 + (seed % 76).toDouble(),
+                          height: 1.6,
+                          margin: const EdgeInsets.only(top: 1),
+                          color: marker.withValues(alpha: .17),
                         ),
                       ),
                   ],
