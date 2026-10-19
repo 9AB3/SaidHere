@@ -125,9 +125,9 @@ class _WallScreenState extends State<WallScreen> {
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
+        leading: _NavDisc(
+          icon: Icons.arrow_back,
           onPressed: _goBack,
-          icon: const Icon(Icons.arrow_back, size: 30),
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,9 +161,10 @@ class _WallScreenState extends State<WallScreen> {
               PopupMenuItem(value: true, child: Text('Newest first')),
               PopupMenuItem(value: false, child: Text('Oldest first')),
             ],
-            icon: const Icon(Icons.more_vert),
+            padding: EdgeInsets.zero,
+            icon: const _NavDiscVisual(icon: Icons.more_vert),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 10),
         ],
       ),
       body: WallBackground(
@@ -413,6 +414,51 @@ class _WallScreenState extends State<WallScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _NavDisc extends StatelessWidget {
+  const _NavDisc({required this.icon, required this.onPressed});
+
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Material(
+        color: SaidHereTheme.ink.withValues(alpha: .80),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onPressed,
+          child: SizedBox(
+            width: 38,
+            height: 38,
+            child: Icon(icon, color: SaidHereTheme.paper, size: 22),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavDiscVisual extends StatelessWidget {
+  const _NavDiscVisual({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: SaidHereTheme.ink.withValues(alpha: .80),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, color: SaidHereTheme.paper, size: 22),
     );
   }
 }
