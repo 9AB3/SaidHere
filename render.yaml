@@ -1,65 +1,69 @@
-services:
-  - type: web
-    name: saidhere-api-9ab3
-    runtime: node
-    plan: free
-    region: singapore
-    rootDir: server
-    buildCommand: >-
-      npm install &&
-      rm -rf public &&
-      cp -R ../site public &&
-      cp "../lib/theme/Grungy Graffiti Wall_ The Wall.png" public/the-wall.png
-    startCommand: npm run migrate && npm start
-    healthCheckPath: /health
-    domains:
-      - saidhere.app
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: saidhere-db-9ab3
-          property: connectionString
-      - key: PUBLIC_APP_URL
-        value: https://saidhere.app
-      - key: CORS_ORIGIN
-        value: https://saidhere.app,https://www.saidhere.app,https://saidhere-api-9ab3.onrender.com
-      - key: ADMIN_KEY
-        generateValue: true
+projects:
+  - name: The Wall
+    environments:
+      - name: Production
+        services:
+          - type: web
+            name: saidhere-api-9ab3
+            runtime: node
+            plan: free
+            region: singapore
+            rootDir: server
+            buildCommand: >-
+              npm install &&
+              rm -rf public &&
+              cp -R ../site public &&
+              cp "../lib/theme/Grungy Graffiti Wall_ The Wall.png" public/the-wall.png
+            startCommand: npm run migrate && npm start
+            healthCheckPath: /health
+            domains:
+              - saidhere.app
+            envVars:
+              - key: NODE_ENV
+                value: production
+              - key: DATABASE_URL
+                fromDatabase:
+                  name: saidhere-db-9ab3
+                  property: connectionString
+              - key: PUBLIC_APP_URL
+                value: https://saidhere.app
+              - key: CORS_ORIGIN
+                value: https://saidhere.app,https://www.saidhere.app,https://saidhere-api-9ab3.onrender.com
+              - key: ADMIN_KEY
+                generateValue: true
 
-  # Kept temporarily as an unbranded fallback while the custom domain is moved.
-  # saidhere.app is no longer attached to this service.
-  - type: web
-    name: saidhere-web-9ab3
-    runtime: static
-    buildCommand: cp "lib/theme/Grungy Graffiti Wall_ The Wall.png" site/the-wall.png
-    staticPublishPath: ./site
-    headers:
-      - path: /.well-known/apple-app-site-association
-        name: Content-Type
-        value: application/json
-      - path: /*
-        name: Referrer-Policy
-        value: no-referrer
-    routes:
-      - type: rewrite
-        source: /admin
-        destination: /admin/index.html
-      - type: rewrite
-        source: /admin/*
-        destination: /admin/index.html
-      - type: rewrite
-        source: /t/*
-        destination: /index.html
-      - type: rewrite
-        source: /w/*
-        destination: /index.html
+          # Kept temporarily as an unbranded fallback while the custom domain is moved.
+          # saidhere.app is no longer attached to this service.
+          - type: web
+            name: saidhere-web-9ab3
+            runtime: static
+            buildCommand: cp "lib/theme/Grungy Graffiti Wall_ The Wall.png" site/the-wall.png
+            staticPublishPath: ./site
+            headers:
+              - path: /.well-known/apple-app-site-association
+                name: Content-Type
+                value: application/json
+              - path: /*
+                name: Referrer-Policy
+                value: no-referrer
+            routes:
+              - type: rewrite
+                source: /admin
+                destination: /admin/index.html
+              - type: rewrite
+                source: /admin/*
+                destination: /admin/index.html
+              - type: rewrite
+                source: /t/*
+                destination: /index.html
+              - type: rewrite
+                source: /w/*
+                destination: /index.html
 
-databases:
-  - name: saidhere-db-9ab3
-    plan: free
-    region: singapore
-    databaseName: saidhere
-    user: saidhere
-    ipAllowList: []
+        databases:
+          - name: saidhere-db-9ab3
+            plan: free
+            region: singapore
+            databaseName: saidhere
+            user: saidhere
+            ipAllowList: []
