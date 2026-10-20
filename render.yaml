@@ -16,8 +16,6 @@ projects:
               cp "../lib/theme/Grungy Graffiti Wall_ The Wall.png" public/the-wall.png
             startCommand: npm run migrate && npm start
             healthCheckPath: /health
-            domains:
-              - saidhere.app
             envVars:
               - key: NODE_ENV
                 value: production
