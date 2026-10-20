@@ -13,7 +13,9 @@ projects:
               npm install &&
               rm -rf public &&
               cp -R ../site public &&
-              cp "../lib/theme/Grungy Graffiti Wall_ The Wall.png" public/the-wall.png
+              cp "../lib/theme/Grungy Graffiti Wall_ The Wall.png" public/the-wall.png &&
+              cp "../lib/267ABF9F-A613-4DD2-B026-87B6C2B6AEBD.png" public/plaque.png &&
+              cp "../lib/12CA723C-705E-4593-834A-72D72424FC4F.png" public/wall-background.png
             startCommand: npm run migrate && npm start
             healthCheckPath: /health
             domains:
