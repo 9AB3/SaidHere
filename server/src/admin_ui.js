@@ -11,6 +11,9 @@
     const match = text(node).replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
     return match ? Number(match[0]) : 0;
   };
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[char]));
 
   function installStyles() {
     if ($('#admin-v2-styles')) return;
@@ -143,7 +146,7 @@
     const chip = $('.account > span');
     if (chip) {
       const parts = text(chip).split('·').map((part) => part.trim());
-      chip.innerHTML = `<strong>${parts[0] || 'Admin'}</strong><small>${parts[1] || ''}</small>`;
+      chip.innerHTML = `<strong>${escapeHtml(parts[0] || 'Admin')}</strong><small>${escapeHtml(parts[1] || '')}</small>`;
       chip.classList.add('account-chip');
     }
   }
@@ -170,7 +173,7 @@
     const head = document.createElement('div');
     head.className = 'admin-modal-head';
     const titleWrap = document.createElement('div');
-    titleWrap.innerHTML = `<h2>${title}</h2>${description ? `<p>${description}</p>` : ''}`;
+    titleWrap.innerHTML = `<h2>${escapeHtml(title)}</h2>${description ? `<p>${escapeHtml(description)}</p>` : ''}`;
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'admin-modal-close';
@@ -222,7 +225,7 @@
   function makeStat(label, value) {
     const item = document.createElement('div');
     item.className = 'overview-stat';
-    item.innerHTML = `<strong>${value}</strong><span>${label}</span>`;
+    item.innerHTML = `<strong>${value}</strong><span>${escapeHtml(label)}</span>`;
     return item;
   }
 
@@ -300,7 +303,7 @@
     search.placeholder = searchText;
     const filter = document.createElement('select');
     filter.className = `admin-control ${container.includes('user') ? 'user-filter' : 'wall-filter'}`;
-    filter.innerHTML = statusOptions.map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+    filter.innerHTML = statusOptions.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join('');
     const count = document.createElement('div');
     count.className = container.includes('user') ? 'user-result-count' : 'wall-result-count';
     const empty = document.createElement('div');
@@ -339,8 +342,8 @@
 
     const cards = $$('.wall-card');
     const stats = wallStats(cards);
-    const wallSection = cards[0]?.closest('section') || $$('section').find((section) => text($('h2', section)).startsWith('Walls'));
-    const oldHeading = $('h2', wallSection);
+    const wallSection = cards[0]?.closest('section') || $$('section').find((section) => text($('h2', section)).startsWith('Walls')) || null;
+    const oldHeading = wallSection ? $('h2', wallSection) : null;
     oldHeading?.classList.add('wall-original-heading');
 
     const overview = document.createElement('section');
@@ -358,9 +361,9 @@
     statsRow.className = 'overview-stats';
     statsRow.append(makeStat('Walls', stats.total), makeStat('Active', stats.active), makeStat('Messages', stats.messages), makeStat('Visitors', stats.visitors));
     overview.append(heading, statsRow);
-    wallSection?.parentNode?.insertBefore(overview, wallSection);
+    if (wallSection?.parentNode) wallSection.parentNode.insertBefore(overview, wallSection);
 
-    const grid = $('.wall-grid', wallSection);
+    const grid = wallSection ? $('.wall-grid', wallSection) : null;
     if (!grid || !cards.length) return;
     grid.classList.add('wall-list');
     const rows = cards.map(makeWallRow);
@@ -507,7 +510,7 @@
       const details = text(cells[4]);
       const item = document.createElement('article');
       item.className = 'audit-item';
-      item.innerHTML = `<div class="audit-dot"></div><div class="audit-main"><div class="audit-top"><strong>${prettyAction(actionRaw)}</strong><time>${when}</time></div><div class="audit-sub"><span>${user}</span>${wall && wall !== '—' ? `<span>· ${wall}</span>` : ''}</div>${details && details !== '{}' ? `<details class="audit-details-toggle"><summary>Details</summary><pre>${details}</pre></details>` : ''}</div>`;
+      item.innerHTML = `<div class="audit-dot"></div><div class="audit-main"><div class="audit-top"><strong>${escapeHtml(prettyAction(actionRaw))}</strong><time>${escapeHtml(when)}</time></div><div class="audit-sub"><span>${escapeHtml(user)}</span>${wall && wall !== '—' ? `<span>· ${escapeHtml(wall)}</span>` : ''}</div>${details && details !== '{}' ? `<details class="audit-details-toggle"><summary>Details</summary><pre>${escapeHtml(details)}</pre></details>` : ''}</div>`;
       timeline.appendChild(item);
     });
     $('.table-wrap', panel)?.replaceWith(timeline);
