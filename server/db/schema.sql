@@ -56,7 +56,8 @@ create table if not exists admin_users (
   username text not null unique,
   display_name text not null default '',
   password_hash text not null,
-  role text not null default 'admin' check (role in ('owner', 'admin', 'moderator')),
+  role text not null default 'moderator' check (role in ('owner', 'moderator')),
+  wall_id uuid references walls(id) on delete set null,
   active boolean not null default true,
   must_change_password boolean not null default false,
   created_at timestamptz not null default now(),
@@ -92,6 +93,7 @@ create index if not exists idx_wall_posts_wall_created on wall_posts(wall_id, cr
 create index if not exists idx_wall_posts_author_recent on wall_posts(author_session_id, created_at desc);
 create index if not exists idx_wall_posts_parent on wall_posts(parent_id) where parent_id is not null;
 create index if not exists idx_post_reports_post on post_reports(post_id);
+create index if not exists idx_admin_users_wall on admin_users(wall_id) where role = 'moderator';
 create index if not exists idx_admin_sessions_token_hash on admin_sessions(token_hash);
 create index if not exists idx_admin_sessions_expiry on admin_sessions(expires_at);
 create index if not exists idx_admin_audit_created on admin_audit_log(created_at desc);
