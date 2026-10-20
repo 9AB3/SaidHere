@@ -1,7 +1,7 @@
 class AppConfig {
   static const apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://saidhere-api-9ab3.onrender.com',
+    defaultValue: 'https://saidhere.app',
   );
   static const appHost = String.fromEnvironment(
     'APP_HOST',
