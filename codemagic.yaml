@@ -6,7 +6,7 @@ workflows:
       flutter: stable
       vars:
         APP_HOST: saidhere.app
-        API_BASE_URL: https://saidhere-api-9ab3.onrender.com
+        API_BASE_URL: https://saidhere.app
     scripts:
       - name: Generate Flutter platform projects
         script: python3 tool/bootstrap_platforms.py --host "$APP_HOST"
@@ -45,7 +45,7 @@ workflows:
       xcode: latest
       vars:
         APP_HOST: saidhere.app
-        API_BASE_URL: https://saidhere-api-9ab3.onrender.com
+        API_BASE_URL: https://saidhere.app
       ios_signing:
         provisioning_profiles:
           - profile: saidhere_app_store
