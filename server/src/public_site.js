@@ -6,6 +6,8 @@ import express from 'express';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const publicRoot = path.resolve(here, '..', 'public');
 const indexPath = path.join(publicRoot, 'index.html');
+const CANONICAL_HOST = 'saidhere.app';
+const RENDER_HOST = 'saidhere-api-9ab3.onrender.com';
 
 function sendIndex(_req, res) {
   res.set('Cache-Control', 'no-cache');
@@ -22,9 +24,28 @@ function renderAppFallback(res, appHref) {
   return res.send(html);
 }
 
+export function mountCanonicalWebRedirect(app) {
+  app.use((req, res, next) => {
+    const host = String(req.hostname || '').toLowerCase();
+    const pathName = req.path || '/';
+    const keepLegacyHost = pathName === '/health' || pathName === '/api' || pathName.startsWith('/api/');
+    if (host === RENDER_HOST && !keepLegacyHost) {
+      return res.redirect(308, `https://${CANONICAL_HOST}${req.originalUrl}`);
+    }
+    return next();
+  });
+}
+
 export function mountPublicSite(app) {
   // Apple must be able to fetch this file directly over HTTPS with no redirect.
   app.get('/.well-known/apple-app-site-association', (_req, res) => {
+    res.type('application/json');
+    res.set('Cache-Control', 'public, max-age=3600');
+    return res.sendFile(path.join(publicRoot, '.well-known', 'apple-app-site-association'));
+  });
+
+  // Also support Apple's legacy root lookup location.
+  app.get('/apple-app-site-association', (_req, res) => {
     res.type('application/json');
     res.set('Cache-Control', 'public, max-age=3600');
     return res.sendFile(path.join(publicRoot, '.well-known', 'apple-app-site-association'));
