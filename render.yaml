@@ -5,9 +5,15 @@ services:
     plan: free
     region: singapore
     rootDir: server
-    buildCommand: npm install
+    buildCommand: >-
+      npm install &&
+      rm -rf public &&
+      cp -R ../site public &&
+      cp "../lib/theme/Grungy Graffiti Wall_ The Wall.png" public/the-wall.png
     startCommand: npm run migrate && npm start
     healthCheckPath: /health
+    domains:
+      - saidhere.app
     envVars:
       - key: NODE_ENV
         value: production
@@ -22,13 +28,13 @@ services:
       - key: ADMIN_KEY
         generateValue: true
 
+  # Kept temporarily as an unbranded fallback while the custom domain is moved.
+  # saidhere.app is no longer attached to this service.
   - type: web
     name: saidhere-web-9ab3
     runtime: static
     buildCommand: cp "lib/theme/Grungy Graffiti Wall_ The Wall.png" site/the-wall.png
     staticPublishPath: ./site
-    domains:
-      - saidhere.app
     headers:
       - path: /.well-known/apple-app-site-association
         name: Content-Type
