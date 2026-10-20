@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
@@ -9,6 +10,16 @@ const indexPath = path.join(publicRoot, 'index.html');
 function sendIndex(_req, res) {
   res.set('Cache-Control', 'no-cache');
   return res.sendFile(indexPath);
+}
+
+function renderAppFallback(res, appHref) {
+  const template = fs.readFileSync(indexPath, 'utf8');
+  const html = template
+    .replace('href="saidhere://"', `href="${appHref}"`)
+    .replace(/\n\s*<script>[\s\S]*?<\/script>\s*/i, '\n');
+  res.type('html');
+  res.set('Cache-Control', 'no-cache');
+  return res.send(html);
 }
 
 export function mountPublicSite(app) {
@@ -30,10 +41,17 @@ export function mountPublicSite(app) {
     return res.sendFile(path.join(publicRoot, 'support', 'index.html'));
   });
 
-  // NFC and Wall universal-link fallbacks. If iOS/Android opens the app these
-  // routes are not rendered; if a browser receives the URL, show the web fallback.
-  app.get('/t/:token', sendIndex);
-  app.get('/w/:slug', sendIndex);
+  // HTTPS plaque URLs are the iOS/Android app links. If the OS does not hand the
+  // request to the app, the browser fallback still gets an exact custom-scheme
+  // button without relying on inline JavaScript that security headers could block.
+  app.get('/t/:token', (req, res) => {
+    const token = encodeURIComponent(req.params.token || '');
+    return renderAppFallback(res, `saidhere://t/${token}`);
+  });
+  app.get('/w/:slug', (req, res) => {
+    const slug = encodeURIComponent(req.params.slug || '');
+    return renderAppFallback(res, `saidhere://w/${slug}`);
+  });
 
   // Images and any other public static assets used by the pages above.
   app.use(express.static(publicRoot, {
