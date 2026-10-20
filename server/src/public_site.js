@@ -28,7 +28,19 @@ export function mountCanonicalWebRedirect(app) {
   app.use((req, res, next) => {
     const host = String(req.hostname || '').toLowerCase();
     const pathName = req.path || '/';
-    const keepLegacyHost = pathName === '/health' || pathName === '/api' || pathName.startsWith('/api/');
+
+    // During the custom-domain cutover the old static saidhere.app service still
+    // forwards /admin to the Render service. Keep /admin on the Render hostname
+    // temporarily so that handoff cannot bounce straight back to saidhere.app and
+    // create an infinite redirect loop. Once saidhere.app is attached directly to
+    // this Node service, users will naturally remain on saidhere.app/admin.
+    const keepLegacyHost =
+      pathName === '/health' ||
+      pathName === '/api' ||
+      pathName.startsWith('/api/') ||
+      pathName === '/admin' ||
+      pathName.startsWith('/admin/');
+
     if (host === RENDER_HOST && !keepLegacyHost) {
       return res.redirect(308, `https://${CANONICAL_HOST}${req.originalUrl}`);
     }
