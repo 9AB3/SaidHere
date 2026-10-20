@@ -26,8 +26,7 @@
     if (brandTitle) brandTitle.textContent = 'The Wall';
     if (brandSub) brandSub.textContent = 'Admin console';
 
-    const account = $('.account');
-    const chip = account?.querySelector(':scope > span');
+    const chip = $('.account > span');
     if (chip) {
       const parts = text(chip).split('·').map((part) => part.trim());
       chip.innerHTML = `<strong>${parts[0] || 'Admin'}</strong><small>${parts[1] || ''}</small>`;
@@ -38,20 +37,6 @@
   function improveForms() {
     $$('input, select').forEach((field) => field.classList.add('admin-control'));
     $$('.panel').forEach((panel) => panel.classList.add('admin-panel'));
-  }
-
-  function upgradeCreatePanel(panel, label) {
-    if (!panel || panel.closest('details.admin-drawer')) return null;
-    const details = document.createElement('details');
-    details.className = 'admin-drawer';
-    const summary = document.createElement('summary');
-    summary.innerHTML = `<span class="summary-plus">+</span><span>${label}</span><span class="summary-chevron">⌄</span>`;
-    const body = document.createElement('div');
-    body.className = 'admin-drawer-body';
-    while (panel.firstChild) body.appendChild(panel.firstChild);
-    details.append(summary, body);
-    panel.replaceWith(details);
-    return details;
   }
 
   function wallStats(cards) {
@@ -86,6 +71,7 @@
     if (edit) {
       edit.className = 'button wall-manage';
       edit.textContent = 'Manage';
+      edit.setAttribute('aria-label', `Manage ${text($('h3', card))}`);
       primary.appendChild(edit);
     }
 
@@ -107,13 +93,18 @@
     return primary;
   }
 
-  function installCompactWallStyles() {
+  function installWallStyles() {
     if ($('#compact-wall-styles')) return;
     const style = document.createElement('style');
     style.id = 'compact-wall-styles';
     style.textContent = `
-      body[data-admin-page="/admin/walls"] .admin-overview,
-      body[data-admin-page="/admin"] .admin-overview{margin-bottom:12px}
+      .wall-create-panel{display:none!important;margin:0 0 12px!important}
+      .wall-create-panel.is-open{display:block!important}
+      .wall-create-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px}
+      .wall-create-top h2{margin:0!important}
+      .wall-create-close{border:0;background:transparent;color:var(--tw-muted);font-size:20px;cursor:pointer;padding:7px;line-height:1}
+      .wall-inventory{margin-top:18px}
+      .wall-inventory-kicker{display:block;margin:0 0 8px;font-size:9px;line-height:1;text-transform:uppercase;letter-spacing:1.6px;color:var(--tw-muted);font-weight:950}
       .wall-inventory-toolbar{display:grid;grid-template-columns:minmax(0,1fr) 150px auto;gap:8px;align-items:center;margin:0 0 9px}
       .wall-search{min-height:40px!important;padding:9px 12px!important;font-size:13px!important}
       .wall-filter{min-height:40px!important;padding:8px 10px!important;font-size:12px!important}
@@ -121,7 +112,7 @@
       .wall-grid.wall-list{display:flex!important;flex-direction:column!important;gap:5px!important}
       .wall-card.wall-row{padding:0!important;border-radius:9px!important;box-shadow:none!important;overflow:visible;background:#fffdf9!important;opacity:1!important}
       .wall-card.wall-row::before{width:3px;border-radius:9px 0 0 9px}
-      .wall-row-inner{display:grid;grid-template-columns:minmax(180px,1fr) 72px 72px auto auto;align-items:center;gap:10px;min-height:62px;padding:9px 10px 9px 14px}
+      .wall-row-inner{display:grid;grid-template-columns:minmax(180px,1fr) 72px 72px auto auto;align-items:center;gap:10px;min-height:58px;padding:8px 10px 8px 14px}
       .wall-row-identity{min-width:0}
       .wall-row-identity h3{margin:0 0 2px!important;font-size:15px!important;line-height:1.1!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       .wall-row-identity .location{font-size:10px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -138,7 +129,7 @@
       .wall-list-empty{display:none;padding:20px;text-align:center;color:var(--tw-muted);font-size:12px;background:#fffdf9;border:1px solid var(--tw-line);border-radius:9px}
       .wall-list-empty.is-visible{display:block}
       .wall-list-head{display:grid;grid-template-columns:minmax(180px,1fr) 72px 72px auto auto;gap:10px;padding:0 10px 5px 14px;color:var(--tw-muted);font-size:7px;text-transform:uppercase;letter-spacing:.75px;font-weight:950}
-      .wall-list-head span:nth-child(4){padding-left:2px}
+      .wall-original-heading{display:none!important}
       @media(max-width:700px){
         .overview-stats{grid-template-columns:repeat(4,minmax(0,1fr))!important}
         .overview-stat{padding:8px 7px!important}
@@ -146,16 +137,13 @@
         .wall-inventory-toolbar{grid-template-columns:minmax(0,1fr) 108px;gap:6px}
         .wall-result-count{grid-column:1/-1;text-align:left;margin-top:-2px;font-size:9px}
         .wall-list-head{display:none}
-        .wall-row-inner{grid-template-columns:minmax(0,1fr) 44px 44px auto;gap:7px;min-height:58px;padding:8px 8px 8px 12px}
+        .wall-row-inner{grid-template-columns:minmax(0,1fr) 44px 44px auto;gap:7px;min-height:56px;padding:8px 8px 8px 12px}
         .wall-row-identity h3{font-size:14px!important}.wall-row-identity .location{font-size:9px!important}
         .wall-row-metric strong{font-size:12px}.wall-row-metric span{font-size:6px}
         .wall-row-status{display:none}
         .wall-row-actions .wall-manage{font-size:0!important;width:34px!important;padding:0!important}
         .wall-row-actions .wall-manage::after{content:'›';font-size:21px;line-height:1;font-weight:500}
         .wall-row-actions .more-menu>summary{width:30px!important;min-height:32px!important}
-      }
-      @media(max-width:390px){
-        .wall-row-inner{grid-template-columns:minmax(0,1fr) 39px 39px auto;gap:5px}
       }
     `;
     document.head.appendChild(style);
@@ -177,28 +165,21 @@
 
     const inner = document.createElement('div');
     inner.className = 'wall-row-inner';
-
     const identity = document.createElement('div');
     identity.className = 'wall-row-identity';
-    const title = document.createElement('h3');
-    title.textContent = name;
-    const loc = document.createElement('div');
-    loc.className = 'location';
-    loc.textContent = location || 'No location set';
-    identity.append(title, loc);
+    identity.innerHTML = `<h3></h3><div class="location"></div>`;
+    $('h3', identity).textContent = name;
+    $('.location', identity).textContent = location || 'No location set';
 
     const messageMetric = document.createElement('div');
     messageMetric.className = 'wall-row-metric';
     messageMetric.innerHTML = `<strong>${messages}</strong><span>Msgs</span>`;
-
     const visitorMetric = document.createElement('div');
     visitorMetric.className = 'wall-row-metric';
     visitorMetric.innerHTML = `<strong>${visitors}</strong><span>Visitors</span>`;
-
     const status = document.createElement('div');
     status.className = 'wall-row-status';
     status.innerHTML = `<span class="badge ${inactive ? 'inactive' : 'active'}">${inactive ? 'Inactive' : 'Active'}</span>`;
-
     const actionWrap = document.createElement('div');
     actionWrap.className = 'wall-row-actions';
     if (actions) actionWrap.appendChild(actions);
@@ -211,21 +192,17 @@
   function addWallFilters(grid, cards) {
     const toolbar = document.createElement('div');
     toolbar.className = 'wall-inventory-toolbar';
-
     const search = document.createElement('input');
     search.className = 'admin-control wall-search';
     search.type = 'search';
     search.placeholder = 'Search Walls or location';
     search.setAttribute('aria-label', 'Search Walls');
-
     const filter = document.createElement('select');
     filter.className = 'admin-control wall-filter';
     filter.setAttribute('aria-label', 'Filter Walls by status');
     filter.innerHTML = '<option value="all">All</option><option value="active">Active</option><option value="inactive">Inactive</option>';
-
     const count = document.createElement('div');
     count.className = 'wall-result-count';
-
     const empty = document.createElement('div');
     empty.className = 'wall-list-empty';
     empty.textContent = 'No Walls match this search.';
@@ -236,9 +213,7 @@
       const status = filter.value;
       let visible = 0;
       cards.forEach((card) => {
-        const matchesText = !q || card.dataset.search.includes(q);
-        const matchesStatus = status === 'all' || card.dataset.status === status;
-        const show = matchesText && matchesStatus;
+        const show = (!q || card.dataset.search.includes(q)) && (status === 'all' || card.dataset.status === status);
         card.hidden = !show;
         if (show) visible += 1;
       });
@@ -253,65 +228,109 @@
     return toolbar;
   }
 
+  function prepareCreatePanel(panel) {
+    if (!panel) return null;
+    panel.classList.add('wall-create-panel');
+    const heading = $('h2', panel);
+    if (heading) heading.textContent = 'Create Wall';
+
+    const top = document.createElement('div');
+    top.className = 'wall-create-top';
+    if (heading) {
+      heading.replaceWith(top);
+      top.appendChild(heading);
+    }
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'wall-create-close';
+    close.setAttribute('aria-label', 'Close New Wall form');
+    close.textContent = '×';
+    top.appendChild(close);
+    return { panel, close };
+  }
+
   function rebuildWalls() {
     if (path !== '/admin/walls' && path !== '/admin') return;
-    installCompactWallStyles();
+    installWallStyles();
 
     const panels = $$('.panel');
     const createPanel = panels.find((panel) => text($('h2', panel)) === 'Create a Wall');
-    const drawer = upgradeCreatePanel(createPanel, 'New Wall');
-    const originalCards = $$('.wall-card');
-    const stats = wallStats(originalCards);
+    const create = prepareCreatePanel(createPanel);
+    const cards = $$('.wall-card');
+    const stats = wallStats(cards);
 
     const overview = document.createElement('section');
     overview.className = 'admin-overview';
     const heading = document.createElement('div');
     heading.className = 'overview-heading';
     heading.innerHTML = '<div><span class="eyebrow">Overview</span><h2>Walls</h2></div>';
-
     const newButton = document.createElement('button');
     newButton.type = 'button';
     newButton.className = 'button overview-new';
     newButton.textContent = '+ New Wall';
-    newButton.addEventListener('click', () => {
-      if (!drawer) return;
-      drawer.open = true;
-      drawer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      window.setTimeout(() => $('input[name="display_name"]', drawer)?.focus(), 250);
-    });
     heading.appendChild(newButton);
-
     const statsRow = document.createElement('div');
     statsRow.className = 'overview-stats';
-    statsRow.append(
-      makeStat('Walls', stats.total),
-      makeStat('Active', stats.active),
-      makeStat('Messages', stats.messages),
-      makeStat('Visitors', stats.visitors),
-    );
+    statsRow.append(makeStat('Walls', stats.total), makeStat('Active', stats.active), makeStat('Messages', stats.messages), makeStat('Visitors', stats.visitors));
     overview.append(heading, statsRow);
 
-    const insertionPoint = drawer || $('.wall-grid')?.parentElement || $('.panel');
+    const insertionPoint = createPanel || $('.wall-grid')?.parentElement || $('.panel');
     if (insertionPoint) insertionPoint.parentNode.insertBefore(overview, insertionPoint);
 
-    const grid = $('.wall-grid');
-    if (!grid || !originalCards.length) return;
-    grid.classList.add('wall-list');
-    const rows = originalCards.map(makeWallRow);
+    const openCreate = () => {
+      if (!create) return;
+      create.panel.classList.add('is-open');
+      newButton.setAttribute('aria-expanded', 'true');
+      newButton.textContent = 'Close';
+      create.panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      window.setTimeout(() => $('input[name="display_name"]', create.panel)?.focus(), 200);
+    };
+    const closeCreate = () => {
+      if (!create) return;
+      create.panel.classList.remove('is-open');
+      newButton.setAttribute('aria-expanded', 'false');
+      newButton.textContent = '+ New Wall';
+    };
+    newButton.addEventListener('click', () => create?.panel.classList.contains('is-open') ? closeCreate() : openCreate());
+    create?.close.addEventListener('click', closeCreate);
 
+    const grid = $('.wall-grid');
+    const originalHeading = $$('section > h2').find((h) => text(h).startsWith('Walls'));
+    originalHeading?.classList.add('wall-original-heading');
+    if (!grid || !cards.length) return;
+
+    grid.classList.add('wall-list');
+    const rows = cards.map(makeWallRow);
+    const inventory = document.createElement('div');
+    inventory.className = 'wall-inventory';
+    const kicker = document.createElement('span');
+    kicker.className = 'wall-inventory-kicker';
+    kicker.textContent = 'Wall inventory';
+    const toolbar = addWallFilters(grid, rows);
     const listHead = document.createElement('div');
     listHead.className = 'wall-list-head';
     listHead.innerHTML = '<span>Wall</span><span>Messages</span><span>Visitors</span><span>Status</span><span></span>';
-    grid.before(listHead);
 
-    const toolbar = addWallFilters(grid, rows);
-    listHead.before(toolbar);
-
-    const wallSectionHeading = $$('section > h2').find((h) => text(h).startsWith('Walls'));
-    if (wallSectionHeading) {
-      wallSectionHeading.innerHTML = '<span class="eyebrow">Inventory</span><span>All Walls</span>';
-      wallSectionHeading.classList.add('section-heading');
+    const section = grid.parentElement;
+    if (section) {
+      section.insertBefore(inventory, grid);
+      inventory.append(kicker, toolbar, listHead);
     }
+
+    $$('details.more-menu').forEach((menu) => {
+      menu.addEventListener('toggle', () => {
+        if (!menu.open) return;
+        $$('details.more-menu').forEach((other) => { if (other !== menu) other.open = false; });
+      });
+    });
+  }
+
+  function prepareUserCreatePanel(panel) {
+    if (!panel) return null;
+    panel.classList.add('wall-create-panel');
+    const heading = $('h2', panel);
+    if (heading) heading.textContent = 'Create admin user';
+    return panel;
   }
 
   function buildUserCard(row) {
@@ -328,11 +347,7 @@
     identity.appendChild(role);
     const meta = document.createElement('div');
     meta.className = 'user-card-meta';
-    const status = document.createElement('div');
-    status.innerHTML = `<span class="meta-label">Status</span>${cells[2].innerHTML}`;
-    const login = document.createElement('div');
-    login.innerHTML = `<span class="meta-label">Last login</span><strong>${cells[3].innerHTML}</strong>`;
-    meta.append(status, login);
+    meta.innerHTML = `<div><span class="meta-label">Status</span>${cells[2].innerHTML}</div><div><span class="meta-label">Last login</span><strong>${cells[3].innerHTML}</strong></div>`;
     const actions = document.createElement('div');
     actions.className = 'user-card-actions';
     while (cells[4].firstChild) actions.appendChild(cells[4].firstChild);
@@ -344,7 +359,7 @@
     if (path !== '/admin/users') return;
     const panels = $$('.panel');
     const addPanel = panels.find((panel) => text($('h2', panel)) === 'Add admin user');
-    const drawer = upgradeCreatePanel(addPanel, 'Add admin user');
+    const createPanel = prepareUserCreatePanel(addPanel);
     const usersPanel = panels.find((panel) => text($('h2', panel)) === 'Admin users');
     const table = $('table', usersPanel);
     if (table) {
@@ -369,9 +384,11 @@
       button.className = 'button';
       button.textContent = '+ Add user';
       button.addEventListener('click', () => {
-        if (!drawer) return;
-        drawer.open = true;
-        drawer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (!createPanel) return;
+        const opening = !createPanel.classList.contains('is-open');
+        createPanel.classList.toggle('is-open', opening);
+        button.textContent = opening ? 'Close' : '+ Add user';
+        if (opening) createPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       });
       top.append(intro, button);
       header?.after(top);
