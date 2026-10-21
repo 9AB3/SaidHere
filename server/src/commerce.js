@@ -44,15 +44,17 @@ function stripeConfigured() {
   return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_WALL_PLAQUE);
 }
 
-async function stripePost(path, params) {
+async function stripePost(path, params, { idempotencyKey = '' } = {}) {
   const secret = process.env.STRIPE_SECRET_KEY || '';
   if (!secret) throw new Error('Stripe is not configured.');
+  const headers = {
+    authorization: `Bearer ${secret}`,
+    'content-type': 'application/x-www-form-urlencoded',
+  };
+  if (idempotencyKey) headers['idempotency-key'] = idempotencyKey;
   const response = await fetch(`https://api.stripe.com/v1${path}`, {
     method: 'POST',
-    headers: {
-      authorization: `Bearer ${secret}`,
-      'content-type': 'application/x-www-form-urlencoded',
-    },
+    headers,
     body: params,
   });
   const data = await response.json().catch(() => null);
@@ -222,6 +224,75 @@ async function markCheckoutExpired(session) {
   );
 }
 
+async function beginStripeEvent(event) {
+  const eventId = clean(event?.id);
+  if (!eventId) throw new Error('Stripe event ID is missing.');
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const lock = await client.query(
+      `select pg_try_advisory_xact_lock(hashtextextended($1, 0)) as locked`,
+      [eventId],
+    );
+    if (!lock.rows[0]?.locked) {
+      await client.query('rollback');
+      client.release();
+      return { busy: true };
+    }
+
+    const existing = await client.query(
+      `select processed_at from stripe_webhook_events where stripe_event_id = $1`,
+      [eventId],
+    );
+    if (existing.rowCount > 0 && existing.rows[0].processed_at) {
+      await client.query('commit');
+      client.release();
+      return { duplicate: true };
+    }
+    if (existing.rowCount === 0) {
+      await client.query(
+        `insert into stripe_webhook_events (stripe_event_id, event_type, stripe_object_id)
+         values ($1, $2, $3)`,
+        [eventId, clean(event.type), clean(event.data?.object?.id) || null],
+      );
+    }
+    return { client, eventId };
+  } catch (error) {
+    try { await client.query('rollback'); } catch (_) {}
+    client.release();
+    throw error;
+  }
+}
+
+async function finishStripeEvent(ledger, error = null) {
+  const client = ledger?.client;
+  if (!client) return;
+  ledger.client = null;
+  try {
+    if (error) {
+      await client.query(
+        `update stripe_webhook_events
+            set last_error = $2
+          where stripe_event_id = $1`,
+        [ledger.eventId, String(error?.message || error).slice(0, 1000)],
+      );
+    } else {
+      await client.query(
+        `update stripe_webhook_events
+            set processed_at = now(), last_error = null
+          where stripe_event_id = $1`,
+        [ledger.eventId],
+      );
+    }
+    await client.query('commit');
+  } catch (ledgerError) {
+    try { await client.query('rollback'); } catch (_) {}
+    throw ledgerError;
+  } finally {
+    client.release();
+  }
+}
+
 export function mountStripeWebhook(app) {
   app.post('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '256kb' }), async (req, res) => {
     const secret = process.env.STRIPE_WEBHOOK_SECRET || '';
@@ -235,17 +306,34 @@ export function mountStripeWebhook(app) {
     } catch (_) {
       return res.status(400).send('Invalid JSON.');
     }
+
+    let ledger = null;
     try {
+      ledger = await beginStripeEvent(event);
+      if (ledger.busy) {
+        return res.status(409).send('Stripe event is already being processed.');
+      }
+      if (ledger.duplicate) {
+        return res.status(200).json({ received: true, duplicate: true });
+      }
+
       if (event.type === 'checkout.session.completed') {
         const session = event.data?.object || {};
         if (session.payment_status === 'paid') await markCheckoutPaid(session);
       } else if (event.type === 'checkout.session.async_payment_succeeded') {
         await markCheckoutPaid(event.data?.object || {});
-      } else if (event.type === 'checkout.session.expired') {
+      } else if (event.type === 'checkout.session.async_payment_failed' || event.type === 'checkout.session.expired') {
         await markCheckoutExpired(event.data?.object || {});
       }
+
+      await finishStripeEvent(ledger);
       return res.status(200).json({ received: true });
     } catch (error) {
+      try {
+        await finishStripeEvent(ledger, error);
+      } catch (ledgerError) {
+        console.error('[stripe-webhook-ledger]', ledgerError);
+      }
       console.error('[stripe-webhook]', error);
       return res.status(500).send('Webhook processing failed.');
     }
@@ -300,7 +388,9 @@ async function createCheckout(email, quantity) {
       .map((value) => value.trim().toUpperCase())
       .filter(Boolean);
     countries.forEach((country, index) => params.set(`shipping_address_collection[allowed_countries][${index}]`, country));
-    const session = await stripePost('/checkout/sessions', params);
+    const session = await stripePost('/checkout/sessions', params, {
+      idempotencyKey: `wall-order-${order.id}`,
+    });
     await pool.query(
       `update commerce_orders set stripe_checkout_session_id = $2, updated_at = now() where id = $1`,
       [order.id, session.id],
@@ -315,7 +405,7 @@ async function createCheckout(email, quantity) {
 function shopPage({ error = '', cancelled = false } = {}) {
   const configured = stripeConfigured();
   const displayPrice = clean(process.env.WALL_PLAQUE_DISPLAY_PRICE) || 'Price shown securely at checkout';
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Buy The Wall plaque</title><style>*{box-sizing:border-box}body{margin:0;background:#d6cab4 url('/wall-background.png') center/cover fixed;color:#171411;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.shade{min-height:100vh;background:rgba(235,225,205,.72);padding:28px 16px}.card{max-width:520px;margin:3vh auto;background:rgba(252,248,240,.96);border:1px solid #c9bdab;border-radius:18px;padding:24px;box-shadow:0 18px 50px rgba(25,20,15,.18)}.plaque{display:block;width:min(290px,82%);margin:0 auto 22px;border-radius:20px}.eyebrow{text-align:center;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:950;color:#756d62}.card h1{text-align:center;font-size:34px;line-height:1;margin:8px 0}.lead{text-align:center;font-size:17px;line-height:1.5;color:#5f584f}.price{text-align:center;font-weight:900;margin:18px 0}.field{display:flex;flex-direction:column;gap:6px;margin:13px 0}.field label{font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:950}.field input,.field select{min-height:50px;padding:11px 12px;border:1px solid #9b8f7e;border-radius:9px;background:#fffdf8;font:inherit}.button{width:100%;min-height:52px;border:0;border-radius:9px;background:#171411;color:#fff;font-weight:950;letter-spacing:.8px;text-transform:uppercase}.error,.notice{padding:12px 14px;border-radius:9px;margin-bottom:12px;font-weight:750}.error{background:#f0d8d3}.notice{background:#f4e5bc}.help{color:#756d62;line-height:1.55;font-size:13px}</style></head><body><div class="shade"><main class="card"><img class="plaque" src="/plaque.png" alt="The Wall NFC plaque"><div class="eyebrow">Own the place</div><h1>Buy a Wall plaque</h1><p class="lead">A physical NFC plaque connected to its own anonymous Wall. The purchaser controls the Wall details and moderation.</p>${cancelled ? '<div class="notice">Checkout was cancelled. Nothing was charged.</div>' : ''}${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}<div class="price">${escapeHtml(displayPrice)}</div>${configured ? `<form method="post" action="/shop/checkout"><div class="field"><label>Purchase email</label><input name="email" type="email" autocomplete="email" required placeholder="you@example.com"></div><div class="field"><label>Quantity</label><select name="quantity"><option value="1">1 plaque</option><option value="2">2 plaques</option><option value="3">3 plaques</option><option value="4">4 plaques</option><option value="5">5 plaques</option></select></div><button class="button" type="submit">Continue to secure checkout</button></form>` : '<div class="notice">Online checkout is being configured. The purchase workflow is ready but Stripe keys and the plaque Price ID still need to be added to Render.</div>'}<p class="help">After payment, you activate your Wall owner account. Your Wall appears under <strong>My Walls</strong> when its physical plaque is assigned while your order is packed.</p></main></div></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Buy The Wall plaque</title><style>*{box-sizing:border-box}body{margin:0;background:#d6cab4 url('/wall-background.png') center/cover fixed;color:#171411;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.shade{min-height:100vh;background:rgba(235,225,205,.72);padding:28px 16px}.card{max-width:520px;margin:3vh auto;background:rgba(252,248,240,.96);border:1px solid #c9bdab;border-radius:18px;padding:24px;box-shadow:0 18px 50px rgba(25,20,15,.18)}.plaque{display:block;width:min(290px,82%);margin:0 auto 22px;border-radius:20px}.eyebrow{text-align:center;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:950;color:#756d62}.card h1{text-align:center;font-size:34px;line-height:1;margin:8px 0}.lead{text-align:center;font-size:17px;line-height:1.5;color:#5f584f}.price{text-align:center;font-weight:900;margin:18px 0}.field{display:flex;flex-direction:column;gap:6px;margin:13px 0}.field label{font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:950}.field input,.field select{min-height:50px;padding:11px 12px;border:1px solid #9b8f7e;border-radius:9px;background:#fffdf8;font:inherit}.button{width:100%;min-height:52px;border:0;border-radius:9px;background:#171411;color:#fff;font-weight:950;letter-spacing:.8px;text-transform:uppercase}.error,.notice{padding:12px 14px;border-radius:9px;margin-bottom:12px;font-weight:750}.error{background:#f0d8d3}.notice{background:#f4e5bc}.help{color:#756d62;line-height:1.55;font-size:13px}</style></head><body><div class="shade"><main class="card"><img class="plaque" src="/plaque.png" alt="The Wall NFC plaque"><div class="eyebrow">Own the place</div><h1>Buy a Wall plaque</h1><p class="lead">A physical NFC plaque connected to its own anonymous Wall. The purchaser controls the Wall details and moderation.</p>${cancelled ? '<div class="notice">Checkout was cancelled. Nothing was charged.</div>' : ''}${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}<div class="price">${escapeHtml(displayPrice)}</div>${configured ? `<form method="post" action="/shop/checkout"><div class="field"><label>Purchase email</label><input name="email" type="email" autocomplete="email" required placeholder="you@example.com"></div><div class="field"><label>Quantity</label><select name="quantity"><option value="1">1 plaque</option><option value="2">2 plaques</option><option value="3">3 plaques</option><option value="4">4 plaques</option><option value="5">5 plaques</option><option value="6">6 plaques</option><option value="7">7 plaques</option><option value="8">8 plaques</option><option value="9">9 plaques</option><option value="10">10 plaques</option></select></div><button class="button" type="submit">Continue to secure checkout</button></form>` : '<div class="notice">Online checkout is being configured. The purchase workflow is ready but Stripe keys and the plaque Price ID still need to be added to Render.</div>'}<p class="help">After payment, you activate your Wall owner account. Your Wall appears under <strong>My Walls</strong> when its physical plaque is assigned while your order is packed.</p></main></div></body></html>`;
 }
 
 function purchaseSuccessPage(order) {

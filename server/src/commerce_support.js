@@ -225,6 +225,7 @@ export async function reconcilePaidCheckout(session) {
       await client.query('commit');
       return;
     }
+    const wasAlreadyPaid = order.status === 'paid' || order.status === 'fulfilled';
     const customer = await ensureCustomer(client, email || order.purchaser_email, stripeCustomerId);
     const updated = await client.query(
       `update commerce_orders
@@ -257,7 +258,8 @@ export async function reconcilePaidCheckout(session) {
     );
     const paidOrder = updated.rows[0];
     let activationUrl = `${baseUrl()}/my-walls/login`;
-    if (!customer.password_hash) activationUrl = await issueClaimToken(client, customer.id, order.id);
+    const needsActivationEmail = !customer.password_hash && (!wasAlreadyPaid || !order.customer_confirmation_sent_at);
+    if (needsActivationEmail) activationUrl = await issueClaimToken(client, customer.id, order.id);
     notification = {
       ...paidOrder,
       customer_has_password: Boolean(customer.password_hash),
