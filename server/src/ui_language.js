@@ -5,7 +5,9 @@ function replaceWallTerms(value) {
     .replace(/\bPlaques\b/g, 'Walls')
     .replace(/\bplaques\b/g, 'Walls')
     .replace(/\bPlaque\b/g, 'Wall')
-    .replace(/\bplaque\b/g, 'Wall');
+    .replace(/\bplaque\b/g, 'Wall')
+    .replace(/\bWall Walls\b/g, 'Walls')
+    .replace(/\bWall Wall\b/g, 'Wall');
 }
 
 function replaceHtmlTextNodes(html) {
