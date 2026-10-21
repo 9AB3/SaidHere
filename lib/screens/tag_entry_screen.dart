@@ -70,7 +70,7 @@ class _TagEntryScreenState extends State<TagEntryScreen> {
         setState(() {
           _loading = false;
           _setupUrl = error.setupUrl;
-          _error = 'This is the first scan of this plaque. Set its Wall name and location to finish setup.';
+          _error = 'This is the first scan of this Wall. Set its name and location to finish setup.';
         });
         if (!_setupLaunchAttempted) {
           _setupLaunchAttempted = true;
