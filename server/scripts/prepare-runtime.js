@@ -11,6 +11,13 @@ const commerceRuntimePath = path.join(serverRoot, 'src', 'commerce.runtime.js');
 const customerSourcePath = path.join(serverRoot, 'src', 'customer_portal.js');
 const customerRuntimePath = path.join(serverRoot, 'src', 'customer_portal.runtime.js');
 
+function replaceFunction(source, startMarker, endMarker, replacement, label) {
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker, start + startMarker.length);
+  if (start < 0 || end < 0) throw new Error(`Could not find ${label} runtime markers.`);
+  return `${source.slice(0, start)}${replacement}\n\n${source.slice(end)}`;
+}
+
 // Stripe's newer Managed Payments mode does not support Checkout's normal
 // shipping_address_collection parameter. The Wall sells a physical plaque, so
 // its Checkout Session deliberately opts out of Managed Payments and keeps the
@@ -26,6 +33,44 @@ if (!commerceSource.includes("managed_payments[enabled]")) {
     `${checkoutModeMarker}\n    params.set('managed_payments[enabled]', 'false');`,
   );
 }
+
+// Keep payment reconciliation and emails in a focused support module. The
+// generated commerce runtime delegates paid checkouts to it so old/test orders
+// can repair missing customer links and new orders receive confirmations.
+const commerceDbImport = "import { pool } from './db.js';";
+const commerceSupportImport = "import { reconcilePaidCheckout, ensureOrderCustomerLink, manualClaimLinkForOrder } from './commerce_support.js';";
+if (!commerceSource.includes(commerceSupportImport)) {
+  if (!commerceSource.includes(commerceDbImport)) throw new Error('Could not find the commerce database import marker.');
+  commerceSource = commerceSource.replace(commerceDbImport, `${commerceDbImport}\n${commerceSupportImport}`);
+}
+
+commerceSource = replaceFunction(
+  commerceSource,
+  'async function markCheckoutPaid(session) {',
+  'async function markCheckoutExpired(session) {',
+  "async function markCheckoutPaid(session) {\n  return reconcilePaidCheckout(session);\n}",
+  'paid checkout',
+);
+
+const missingCustomerMarker = "    if (!order.customer_id) throw new Error('This paid order has no customer account attached.');";
+if (!commerceSource.includes(missingCustomerMarker)) throw new Error('Could not find the fulfilment customer marker.');
+commerceSource = commerceSource.replace(
+  missingCustomerMarker,
+  '    const orderCustomerId = await ensureOrderCustomerLink(client, order);',
+);
+
+const ownershipMarker = '[order.customer_id, wall.id, order.id, plaque.id],';
+if (!commerceSource.includes(ownershipMarker)) throw new Error('Could not find the fulfilment ownership marker.');
+commerceSource = commerceSource.replace(ownershipMarker, '[orderCustomerId, wall.id, order.id, plaque.id],');
+
+commerceSource = replaceFunction(
+  commerceSource,
+  'async function manualClaimLink(orderId) {',
+  'export function mountCommerce(app) {',
+  "async function manualClaimLink(orderId) {\n  return manualClaimLinkForOrder(orderId);\n}",
+  'manual claim link',
+);
+
 fs.writeFileSync(commerceRuntimePath, commerceSource, 'utf8');
 
 // The customer dashboard aggregates Wall activity but sorts by ownership date.
