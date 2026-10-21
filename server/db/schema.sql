@@ -137,6 +137,18 @@ create table if not exists commerce_orders (
   updated_at timestamptz not null default now()
 );
 
+-- Stripe retries webhook deliveries, sometimes more than once. This ledger lets
+-- the backend acknowledge duplicates without processing the same event twice.
+-- Only Stripe IDs/types are stored here; the full payment payload is not retained.
+create table if not exists stripe_webhook_events (
+  stripe_event_id text primary key,
+  event_type text not null,
+  stripe_object_id text,
+  received_at timestamptz not null default now(),
+  processed_at timestamptz,
+  last_error text
+);
+
 create table if not exists commerce_order_items (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null references commerce_orders(id) on delete cascade,
@@ -217,6 +229,8 @@ create index if not exists idx_customer_sessions_token_hash on customer_sessions
 create index if not exists idx_customer_sessions_expiry on customer_sessions(expires_at);
 create index if not exists idx_commerce_orders_customer on commerce_orders(customer_id, created_at desc);
 create index if not exists idx_commerce_orders_status on commerce_orders(status, created_at desc);
+create index if not exists idx_stripe_webhook_events_received on stripe_webhook_events(received_at desc);
+create index if not exists idx_stripe_webhook_events_unprocessed on stripe_webhook_events(received_at) where processed_at is null;
 create index if not exists idx_commerce_order_items_order on commerce_order_items(order_id, ordinal);
 create index if not exists idx_customer_claim_tokens_customer on customer_claim_tokens(customer_id, created_at desc);
 create index if not exists idx_customer_audit_customer on customer_audit_log(customer_id, created_at desc);
