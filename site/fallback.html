@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#171411">
+  <title>The Wall</title>
+  <style>
+    :root{--ink:#171411;--cream:#eee5d5;--muted:#756b5f;--line:rgba(238,229,213,.18)}*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#b7aa93}body{min-height:100svh;color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:linear-gradient(rgba(216,204,183,.08),rgba(216,204,183,.08)),url('/wall-background.png') center/cover fixed no-repeat}.page{min-height:100svh;display:flex;flex-direction:column;align-items:center;padding:max(22px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom))}.hero{width:min(100%,520px);flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px 0 22px}.plaque{display:block;width:min(76vw,330px);height:auto;filter:drop-shadow(0 14px 16px rgba(20,16,12,.24))}.tagline{margin:30px 0 0;max-width:360px;font-size:24px;line-height:1.06;font-weight:950;letter-spacing:-.6px}.eyebrow{margin:15px 0 0;font-size:11px;font-weight:900;letter-spacing:1.7px;text-transform:uppercase;color:#5e5549}.handoff{width:min(100%,520px);background:rgba(23,20,17,.96);color:var(--cream);padding:22px 20px 20px;box-shadow:0 10px 34px rgba(18,14,10,.25);border:1px solid rgba(255,255,255,.06)}.handoff h1{margin:0 0 8px;font-size:27px;line-height:1;font-weight:950;letter-spacing:-.7px;text-transform:uppercase}.handoff p{margin:0;color:#c9bead;font-size:14px;line-height:1.45;font-weight:600}.actions{display:grid;gap:10px;margin-top:18px}.button{min-height:54px;display:flex;align-items:center;justify-content:center;padding:13px 18px;border:1px solid var(--cream);text-decoration:none;font-size:13px;font-weight:950;letter-spacing:1px;text-transform:uppercase}.button.primary{background:var(--cream);color:var(--ink)}.button.secondary{background:transparent;color:var(--cream)}.hint{display:flex;gap:10px;align-items:flex-start;padding-top:16px;margin-top:17px;border-top:1px solid var(--line);color:#9f9587;font-size:11px;line-height:1.4;font-weight:700}.hint-mark{flex:0 0 24px;width:24px;height:24px;border:1px solid #70685e;border-radius:50%;display:grid;place-items:center;color:var(--cream);font-size:12px;font-weight:900}footer{width:min(100%,520px);display:flex;justify-content:center;gap:16px;padding:17px 0 0;font-size:11px;font-weight:800}footer a{color:#463f36;text-decoration:none}@media(min-width:700px){.page{padding-left:28px;padding-right:28px}.hero{padding-top:42px}.plaque{width:300px}.tagline{font-size:28px}.handoff{padding:26px}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <img class="plaque" src="/plaque.png" alt="The Wall — Tap Here plaque">
+      <p class="tagline">Every place has something to say.</p>
+      <p class="eyebrow">You found one</p>
+    </section>
+    <section class="handoff">
+      <h1>Open this Wall</h1>
+      <p>Read what people have left here. A physical plaque tap unlocks writing for 15 minutes.</p>
+      <div class="actions">
+        <a id="open-app" class="button primary" href="saidhere://">Open The Wall</a>
+        <a class="button secondary" href="https://apps.apple.com/app/id6823565189">Get the iPhone app</a>
+      </div>
+      <div class="hint"><span class="hint-mark">i</span><span>If The Wall is already installed, this plaque normally opens it automatically. If Safari opened instead, tap <strong>Open The Wall</strong>.</span></div>
+    </section>
+    <footer><a href="/privacy/">Privacy</a><a href="/support/">Support</a></footer>
+  </main>
+</body>
+</html>
