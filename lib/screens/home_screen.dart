@@ -46,13 +46,13 @@ class HomeScreen extends StatelessWidget {
                       const Icon(Icons.nfc, size: 52, color: SaidHereTheme.ink),
                       const SizedBox(height: 12),
                       const Text(
-                        'TAP THE PLAQUE',
+                        'TAP THE WALL',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900),
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Hold the top of your iPhone near the physical plaque. Tap the NFC notification when it appears. That unlocks writing on that Wall for 15 minutes.',
+                        'Hold the top of your iPhone near the physical Wall. Tap the NFC notification when it appears. That unlocks writing on that Wall for 15 minutes.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           height: 1.45,
@@ -92,7 +92,7 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(height: 28),
                     Semantics(
                       button: true,
-                      label: 'How to tap The Wall plaque',
+                      label: 'How to tap The Wall',
                       child: GestureDetector(
                         onTap: () => _showPlaqueInstructions(context),
                         child: const BrandMark(),
