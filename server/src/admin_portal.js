@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 
@@ -12,7 +13,7 @@ import { pool } from './db.js';
 
 const COOKIE_NAME = 'the_wall_admin';
 const DEFAULT_SESSION_HOURS = 12;
-const VALID_ROLES = new Set(['owner', 'admin', 'moderator']);
+const VALID_ROLES = new Set(['owner', 'moderator']);
 
 function cleanBody(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -38,6 +39,10 @@ function formatDate(value) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
+}
+
+function roleLabel(role) {
+  return role === 'owner' ? 'Main Admin' : 'Moderator';
 }
 
 function sessionHours() {
@@ -125,7 +130,7 @@ async function requireBrowserAdmin(req, res, next) {
           and s.expires_at > now()
           and u.active = true
       returning s.id as session_id, s.admin_user_id,
-                u.username, u.display_name, u.role, u.must_change_password`,
+                u.username, u.display_name, u.role, u.wall_id, u.must_change_password`,
       [tokenHash],
     );
     if (result.rowCount === 0) {
@@ -143,6 +148,7 @@ async function requireBrowserAdmin(req, res, next) {
         username: row.username,
         displayName: row.display_name,
         role: row.role,
+        wallId: row.wall_id,
         mustChangePassword: row.must_change_password,
       },
     };
@@ -167,18 +173,18 @@ function requireCsrf(req, res, next) {
 }
 
 function canManageWalls(user) {
-  return user?.role === 'owner' || user?.role === 'admin';
+  return user?.role === 'owner';
 }
 
 function canModerate(user) {
-  return user?.role === 'owner' || user?.role === 'admin' || user?.role === 'moderator';
+  return user?.role === 'owner' || user?.role === 'moderator';
 }
 
 function requireWallManager(req, res, next) {
   if (!canManageWalls(req.adminSession?.user)) {
     return res.status(403).type('html').send(messagePage({
-      title: 'Not permitted',
-      message: 'Your account can moderate Wall content but cannot change Wall configuration.',
+      title: 'Main Admin access required',
+      message: 'Moderators can review their assigned Wall and reported posts, but cannot change Wall configuration.',
       actionHref: '/admin/walls',
       actionLabel: 'Back to Walls',
     }));
@@ -187,17 +193,15 @@ function requireWallManager(req, res, next) {
 }
 
 function requireModerator(req, res, next) {
-  if (!canModerate(req.adminSession?.user)) {
-    return res.sendStatus(403);
-  }
+  if (!canModerate(req.adminSession?.user)) return res.sendStatus(403);
   return next();
 }
 
 function requireOwner(req, res, next) {
   if (req.adminSession?.user?.role !== 'owner') {
     return res.status(403).type('html').send(messagePage({
-      title: 'Owner access required',
-      message: 'Only an Owner can manage admin accounts and view the audit log.',
+      title: 'Main Admin access required',
+      message: 'Only the Main Admin can manage users and view the full audit log.',
       actionHref: '/admin/walls',
       actionLabel: 'Back to Walls',
     }));
@@ -217,15 +221,7 @@ async function writeAudit(user, action, {
       `insert into admin_audit_log
          (admin_user_id, username_snapshot, action, wall_id, wall_name, target_admin_user_id, details)
        values ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
-      [
-        user.id,
-        user.username,
-        action,
-        wallId,
-        wallName,
-        targetAdminUserId,
-        JSON.stringify(details),
-      ],
+      [user.id, user.username, action, wallId, wallName, targetAdminUserId, JSON.stringify(details)],
     );
   } catch (error) {
     console.error('[admin-audit]', error);
@@ -233,29 +229,27 @@ async function writeAudit(user, action, {
 }
 
 function validateWallFields(displayName, locationHint) {
-  if (!displayName || displayName.length > 80) {
-    throw new Error('Wall name must be between 1 and 80 characters.');
-  }
-  if (locationHint.length > 120) {
-    throw new Error('Location must be 120 characters or fewer.');
-  }
+  if (!displayName || displayName.length > 80) throw new Error('Wall name must be between 1 and 80 characters.');
+  if (locationHint.length > 120) throw new Error('Location must be 120 characters or fewer.');
 }
 
 function validateAdminFields(username, displayName, role) {
   if (!/^[a-z0-9._-]{3,50}$/.test(username)) {
     throw new Error('Username must be 3–50 characters using letters, numbers, dot, dash or underscore.');
   }
-  if (!displayName || displayName.length > 80) {
-    throw new Error('Display name must be between 1 and 80 characters.');
-  }
-  if (!VALID_ROLES.has(role)) {
-    throw new Error('Invalid admin role.');
-  }
+  if (!displayName || displayName.length > 80) throw new Error('Display name must be between 1 and 80 characters.');
+  if (!VALID_ROLES.has(role)) throw new Error('Invalid admin role.');
+}
+
+async function ensureWallExists(wallId) {
+  if (!wallId) throw new Error('Choose the Wall this Moderator owns.');
+  const result = await pool.query(`select id from walls where id = $1 limit 1`, [wallId]);
+  if (result.rowCount === 0) throw new Error('The selected Wall no longer exists.');
 }
 
 async function createWall(displayName, locationHint) {
   validateWallFields(displayName, locationHint);
-  const slug = cryptoRandomHex(5);
+  const slug = crypto.randomBytes(5).toString('hex').toUpperCase();
   const token = makeToken(36);
   const tokenHash = hashToken(token);
   const appBase = (process.env.PUBLIC_APP_URL || 'https://saidhere.app').replace(/\/$/, '');
@@ -282,11 +276,14 @@ async function createWall(displayName, locationHint) {
   }
 }
 
-function cryptoRandomHex(bytes) {
-  return Buffer.from(Array.from({ length: bytes }, () => Math.floor(Math.random() * 256))).toString('hex').toUpperCase();
-}
-
-async function listWalls() {
+async function listWalls(user) {
+  if (user.role === 'moderator' && !user.wallId) return [];
+  const params = [];
+  let where = '';
+  if (user.role === 'moderator') {
+    params.push(user.wallId);
+    where = 'where w.id = $1';
+  }
   const result = await pool.query(
     `select w.id, w.slug, w.display_name, w.location_hint, w.active, w.created_at,
             count(distinct v.session_id)::int as discovered_by,
@@ -294,8 +291,17 @@ async function listWalls() {
        from walls w
        left join wall_visits v on v.wall_id = w.id
        left join wall_posts p on p.wall_id = w.id and p.hidden_at is null
+       ${where}
       group by w.id
       order by w.created_at desc`,
+    params,
+  );
+  return result.rows;
+}
+
+async function listAllWalls() {
+  const result = await pool.query(
+    `select id, display_name, location_hint, active from walls order by display_name asc`,
   );
   return result.rows;
 }
@@ -313,6 +319,12 @@ async function getWall(wallId) {
     [wallId],
   );
   return result.rows[0] || null;
+}
+
+async function getWallForUser(user, wallId) {
+  if (user.role === 'owner') return getWall(wallId);
+  if (!user.wallId || String(user.wallId) !== String(wallId)) return null;
+  return getWall(wallId);
 }
 
 async function editWall(wallId, displayName, locationHint) {
@@ -379,11 +391,9 @@ async function deleteWall(wallId) {
 
 async function getAdminUserByUsername(username) {
   const result = await pool.query(
-    `select id, username, display_name, password_hash, role, active, must_change_password,
+    `select id, username, display_name, password_hash, role, wall_id, active, must_change_password,
             created_at, last_login_at
-       from admin_users
-      where username = $1
-      limit 1`,
+       from admin_users where username = $1 limit 1`,
     [username],
   );
   return result.rows[0] || null;
@@ -391,9 +401,11 @@ async function getAdminUserByUsername(username) {
 
 async function getAdminUser(userId) {
   const result = await pool.query(
-    `select id, username, display_name, role, active, must_change_password,
-            created_at, last_login_at
-       from admin_users where id = $1 limit 1`,
+    `select u.id, u.username, u.display_name, u.role, u.wall_id, u.active, u.must_change_password,
+            u.created_at, u.last_login_at, w.display_name as wall_name
+       from admin_users u
+       left join walls w on w.id = u.wall_id
+      where u.id = $1 limit 1`,
     [userId],
   );
   return result.rows[0] || null;
@@ -401,52 +413,51 @@ async function getAdminUser(userId) {
 
 async function listAdminUsers() {
   const result = await pool.query(
-    `select id, username, display_name, role, active, must_change_password,
-            created_at, last_login_at
-       from admin_users
-      order by case role when 'owner' then 1 when 'admin' then 2 else 3 end, username`,
+    `select u.id, u.username, u.display_name, u.role, u.wall_id, u.active, u.must_change_password,
+            u.created_at, u.last_login_at, w.display_name as wall_name
+       from admin_users u
+       left join walls w on w.id = u.wall_id
+      order by case u.role when 'owner' then 1 else 2 end, u.username`,
   );
   return result.rows;
 }
 
-async function createAdminUser({ username, displayName, password, role }) {
+async function createAdminUser({ username, displayName, password, wallId }) {
   const normalized = normalizeAdminUsername(username);
-  validateAdminFields(normalized, displayName, role);
+  validateAdminFields(normalized, displayName, 'moderator');
   validateAdminPassword(password);
+  await ensureWallExists(wallId);
   const passwordHash = hashAdminPassword(password);
   const result = await pool.query(
     `insert into admin_users
-       (username, display_name, password_hash, role, active, must_change_password)
-     values ($1, $2, $3, $4, true, true)
-     returning id, username, display_name, role, active`,
-    [normalized, displayName, passwordHash, role],
+       (username, display_name, password_hash, role, wall_id, active, must_change_password)
+     values ($1, $2, $3, 'moderator', $4, true, true)
+     returning id, username, display_name, role, wall_id, active`,
+    [normalized, displayName, passwordHash, wallId],
   );
   return result.rows[0];
 }
 
 async function activeOwnerCount() {
-  const result = await pool.query(
-    `select count(*)::int as count from admin_users where role = 'owner' and active = true`,
-  );
+  const result = await pool.query(`select count(*)::int as count from admin_users where role = 'owner' and active = true`);
   return result.rows[0].count;
 }
 
-async function updateAdminUser(target, { displayName, role, active }, currentUserId) {
+async function updateAdminUser(target, { displayName, active, wallId }, currentUserId) {
+  const role = target.role === 'owner' ? 'owner' : 'moderator';
   validateAdminFields(target.username, displayName, role);
-  if (target.id === currentUserId && (!active || role !== 'owner')) {
-    throw new Error('You cannot deactivate or demote the Owner account you are currently using.');
+  if (target.id === currentUserId && !active) throw new Error('You cannot deactivate the Main Admin account you are currently using.');
+  if (role === 'owner' && target.active && !active && await activeOwnerCount() <= 1) {
+    throw new Error('At least one active Main Admin account is required.');
   }
-  if (target.role === 'owner' && target.active && (!active || role !== 'owner')) {
-    if (await activeOwnerCount() <= 1) {
-      throw new Error('At least one active Owner account is required.');
-    }
-  }
+  const assignedWallId = role === 'moderator' ? wallId : null;
+  if (role === 'moderator') await ensureWallExists(assignedWallId);
   const result = await pool.query(
     `update admin_users
-        set display_name = $2, role = $3, active = $4, updated_at = now()
+        set display_name = $2, role = $3, wall_id = $4, active = $5, updated_at = now()
       where id = $1
-      returning id, username, display_name, role, active, must_change_password`,
-    [target.id, displayName, role, active],
+      returning id, username, display_name, role, wall_id, active, must_change_password`,
+    [target.id, displayName, role, assignedWallId, active],
   );
   if (!active) await pool.query(`delete from admin_sessions where admin_user_id = $1`, [target.id]);
   return result.rows[0];
@@ -462,10 +473,7 @@ async function setAdminPassword(userId, password, { mustChange = false, keepSess
     [userId, passwordHash, mustChange],
   );
   if (keepSessionId) {
-    await pool.query(
-      `delete from admin_sessions where admin_user_id = $1 and id <> $2`,
-      [userId, keepSessionId],
-    );
+    await pool.query(`delete from admin_sessions where admin_user_id = $1 and id <> $2`, [userId, keepSessionId]);
   } else {
     await pool.query(`delete from admin_sessions where admin_user_id = $1`, [userId]);
   }
@@ -474,24 +482,102 @@ async function setAdminPassword(userId, password, { mustChange = false, keepSess
 async function listAuditLog() {
   const result = await pool.query(
     `select id, username_snapshot, action, wall_name, details, created_at
-       from admin_audit_log
-      order by created_at desc
-      limit 250`,
+       from admin_audit_log order by created_at desc limit 250`,
   );
   return result.rows;
+}
+
+async function listReportedPosts(user) {
+  if (user.role === 'moderator' && !user.wallId) return [];
+  const params = [];
+  let where = '';
+  if (user.role === 'moderator') {
+    params.push(user.wallId);
+    where = 'where p.wall_id = $1';
+  }
+  const result = await pool.query(
+    `select p.id, p.wall_id, p.parent_id, p.body, p.created_at, p.hidden_at,
+            w.display_name as wall_name, w.location_hint,
+            count(r.id)::int as report_count,
+            max(r.created_at) as last_reported_at
+       from post_reports r
+       join wall_posts p on p.id = r.post_id
+       join walls w on w.id = p.wall_id
+       ${where}
+      group by p.id, w.id
+      order by max(r.created_at) desc`,
+    params,
+  );
+  return result.rows;
+}
+
+async function getReportedPostForUser(client, user, postId) {
+  const params = [postId];
+  let access = '';
+  if (user.role === 'moderator') {
+    if (!user.wallId) return null;
+    params.push(user.wallId);
+    access = 'and p.wall_id = $2';
+  }
+  const result = await client.query(
+    `select p.id, p.wall_id, p.body, p.hidden_at, w.display_name as wall_name,
+            count(r.id)::int as report_count
+       from wall_posts p
+       join walls w on w.id = p.wall_id
+       join post_reports r on r.post_id = p.id
+      where p.id = $1 ${access}
+      group by p.id, w.id`,
+    params,
+  );
+  return result.rows[0] || null;
+}
+
+async function removeReportedPost(user, postId) {
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const post = await getReportedPostForUser(client, user, postId);
+    if (!post) throw new Error('Reported post not found or not assigned to you.');
+    await client.query(`delete from wall_posts where id = $1`, [postId]);
+    await client.query('commit');
+    return post;
+  } catch (error) {
+    try { await client.query('rollback'); } catch (_) {}
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function keepReportedPost(user, postId) {
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const post = await getReportedPostForUser(client, user, postId);
+    if (!post) throw new Error('Reported post not found or not assigned to you.');
+    await client.query(`update wall_posts set hidden_at = null where id = $1`, [postId]);
+    await client.query(`delete from post_reports where post_id = $1`, [postId]);
+    await client.query('commit');
+    return post;
+  } catch (error) {
+    try { await client.query('rollback'); } catch (_) {}
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 function navFor(user) {
   const ownerLinks = user.role === 'owner'
     ? '<a href="/admin/users">Users</a><a href="/admin/audit">Audit log</a>'
     : '';
-  return `<nav><a href="/admin/walls">Walls</a>${ownerLinks}<a href="/admin/account/password">Password</a></nav>`;
+  return `<nav><a href="/admin/walls">Walls</a><a href="/admin/reports">Reports</a>${ownerLinks}<a href="/admin/account/password">Password</a></nav>`;
 }
 
 function layout({ title, body }) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escapeHtml(title)} · The Wall Admin</title><style>
-:root{--ink:#181512;--paper:#eee4d3;--muted:#776e61;--line:#c9bda9;--red:#8d352d;--green:#496443;--bg:#d8ccb7}*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#d9cdb9,#bfb29b);color:var(--ink);font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:inherit}.shell{max-width:1180px;margin:0 auto;min-height:100vh;padding:24px}.topbar{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:16px}.brand{display:flex;align-items:center;gap:12px}.mark{width:46px;height:46px;background:var(--ink);color:var(--paper);display:grid;place-items:center;font-weight:1000;border-radius:7px;letter-spacing:-2px}.brand h1{font-size:22px;margin:0;font-weight:950}.brand small{display:block;color:var(--muted);font-weight:700}.account{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:800}.account form{margin:0}.link-button{border:0;background:transparent;text-decoration:underline;padding:4px;cursor:pointer;color:var(--ink)}nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}nav a{padding:8px 11px;background:rgba(246,239,226,.6);border:1px solid rgba(65,55,43,.18);text-decoration:none;font-size:12px;font-weight:900}.panel{background:rgba(246,239,226,.92);border:1px solid rgba(65,55,43,.22);box-shadow:0 10px 30px rgba(46,37,27,.12);padding:22px;margin-bottom:18px}.panel h2,.panel h3{margin-top:0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.field{display:flex;flex-direction:column;gap:7px}.field label{font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.7px}.field input,.field select{width:100%;border:1px solid #918575;background:#fffaf0;padding:12px 13px;font:inherit}.actions{display:flex;gap:9px;flex-wrap:wrap}.button,button.button{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--ink);background:var(--ink);color:var(--paper);padding:10px 14px;text-decoration:none;font-weight:900;font-size:12px;letter-spacing:.35px;cursor:pointer}.button.secondary{background:transparent;color:var(--ink)}.button.warn{background:var(--red);border-color:var(--red)}.button.good{background:var(--green);border-color:var(--green)}.wall-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.wall-card{background:rgba(245,237,223,.88);border-left:5px solid var(--ink);padding:18px;box-shadow:0 4px 13px rgba(35,28,20,.08)}.wall-card.inactive{opacity:.72;border-left-color:var(--red)}.wall-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.wall-card h3{font-size:20px;margin:0 0 4px;font-weight:950}.location{color:var(--muted);font-weight:750}.badge{font-size:10px;font-weight:950;letter-spacing:.6px;text-transform:uppercase;border:1px solid currentColor;padding:5px 7px}.badge.active{color:var(--green)}.badge.inactive{color:var(--red)}.meta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0}.metric{border-top:1px solid var(--line);padding-top:8px}.metric strong{display:block;font-size:17px}.metric span{font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:900;letter-spacing:.5px}.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--muted);overflow-wrap:anywhere}.notice,.error,.warning{padding:12px 14px;margin-bottom:16px;font-weight:800}.notice{background:#dce6d5;border-left:4px solid var(--green)}.error{background:#efd5d0;border-left:4px solid var(--red)}.warning{background:#f3dfae;border-left:4px solid #9a6a18}.danger-zone{border-left:5px solid var(--red)}.nfc{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;width:100%;padding:13px;background:#fffaf0;border:1px solid #968b7a;font-size:14px}.help{color:var(--muted);line-height:1.5}.login-shell{max-width:430px;margin:10vh auto;padding:20px}.login-title{text-align:center;margin-bottom:20px}.login-title .mark{margin:0 auto 12px;width:68px;height:68px;font-size:22px}.login-title h1{margin:0;font-size:30px;font-weight:1000}.login-title p{color:var(--muted)}.stack{display:flex;flex-direction:column;gap:14px}.full{width:100%}.back{display:inline-block;margin-bottom:14px;color:var(--muted);font-weight:800;text-decoration:none}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse;background:rgba(245,237,223,.7)}.table th,.table td{padding:11px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.table th{font-size:10px;text-transform:uppercase;letter-spacing:.6px}.role{font-size:10px;font-weight:950;text-transform:uppercase;letter-spacing:.5px}.audit-details{max-width:460px;white-space:normal;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;color:var(--muted)}
-@media(max-width:760px){.shell{padding:16px}.topbar{align-items:flex-start}.account{flex-direction:column;align-items:flex-end}.grid,.wall-grid{grid-template-columns:1fr}.meta{grid-template-columns:repeat(3,1fr)}.panel{padding:17px}.wall-card{padding:16px}.actions .button,.actions button.button{flex:1 1 44%}.table{min-width:760px}}
+:root{--ink:#181512;--paper:#eee4d3;--muted:#776e61;--line:#c9bda9;--red:#8d352d;--green:#496443;--bg:#d8ccb7}*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#d9cdb9,#bfb29b);color:var(--ink);font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:inherit}.shell{max-width:1180px;margin:0 auto;min-height:100vh;padding:24px}.topbar{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:16px}.brand{display:flex;align-items:center;gap:12px}.mark{width:46px;height:46px;background:var(--ink);color:var(--paper);display:grid;place-items:center;font-weight:1000;border-radius:7px;letter-spacing:-2px}.brand h1{font-size:22px;margin:0;font-weight:950}.brand small{display:block;color:var(--muted);font-weight:700}.account{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:800}.account form{margin:0}.link-button{border:0;background:transparent;text-decoration:underline;padding:4px;cursor:pointer;color:var(--ink)}nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}nav a{padding:8px 11px;background:rgba(246,239,226,.6);border:1px solid rgba(65,55,43,.18);text-decoration:none;font-size:12px;font-weight:900}.panel{background:rgba(246,239,226,.92);border:1px solid rgba(65,55,43,.22);box-shadow:0 10px 30px rgba(46,37,27,.12);padding:22px;margin-bottom:18px}.panel h2,.panel h3{margin-top:0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.field{display:flex;flex-direction:column;gap:7px}.field label{font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.7px}.field input,.field select{width:100%;border:1px solid #918575;background:#fffaf0;padding:12px 13px;font:inherit}.actions{display:flex;gap:9px;flex-wrap:wrap}.button,button.button{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--ink);background:var(--ink);color:var(--paper);padding:10px 14px;text-decoration:none;font-weight:900;font-size:12px;letter-spacing:.35px;cursor:pointer}.button.secondary{background:transparent;color:var(--ink)}.button.warn{background:var(--red);border-color:var(--red)}.button.good{background:var(--green);border-color:var(--green)}.wall-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.wall-card{background:rgba(245,237,223,.88);border-left:5px solid var(--ink);padding:18px;box-shadow:0 4px 13px rgba(35,28,20,.08)}.wall-card.inactive{opacity:.72;border-left-color:var(--red)}.wall-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.wall-card h3{font-size:20px;margin:0 0 4px;font-weight:950}.location{color:var(--muted);font-weight:750}.badge{font-size:10px;font-weight:950;letter-spacing:.6px;text-transform:uppercase;border:1px solid currentColor;padding:5px 7px}.badge.active{color:var(--green)}.badge.inactive{color:var(--red)}.meta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0}.metric{border-top:1px solid var(--line);padding-top:8px}.metric strong{display:block;font-size:17px}.metric span{font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:900;letter-spacing:.5px}.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--muted);overflow-wrap:anywhere}.notice,.error,.warning{padding:12px 14px;margin-bottom:16px;font-weight:800}.notice{background:#dce6d5;border-left:4px solid var(--green)}.error{background:#efd5d0;border-left:4px solid var(--red)}.warning{background:#f3dfae;border-left:4px solid #9a6a18}.danger-zone{border-left:5px solid var(--red)}.nfc{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;width:100%;padding:13px;background:#fffaf0;border:1px solid #968b7a;font-size:14px}.help{color:var(--muted);line-height:1.5}.login-shell{max-width:430px;margin:10vh auto;padding:20px}.login-title{text-align:center;margin-bottom:20px}.login-title .mark{margin:0 auto 12px;width:68px;height:68px;font-size:22px}.login-title h1{margin:0;font-size:30px;font-weight:1000}.login-title p{color:var(--muted)}.stack{display:flex;flex-direction:column;gap:14px}.full{width:100%}.back{display:inline-block;margin-bottom:14px;color:var(--muted);font-weight:800;text-decoration:none}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse;background:rgba(245,237,223,.7)}.table th,.table td{padding:11px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.table th{font-size:10px;text-transform:uppercase;letter-spacing:.6px}.role{font-size:10px;font-weight:950;text-transform:uppercase;letter-spacing:.5px}.audit-details{max-width:460px;white-space:normal;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;color:var(--muted)}.report-list{display:flex;flex-direction:column;gap:10px}.report-card{background:#fffaf0;border:1px solid var(--line);border-left:4px solid var(--red);padding:15px}.report-card.auto-hidden{opacity:.82}.report-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.report-wall{font-size:12px;font-weight:900}.report-count{font-size:10px;font-weight:950;color:var(--red);text-transform:uppercase}.report-body{margin:12px 0;font-size:16px;line-height:1.42;font-weight:700;white-space:pre-wrap}.report-meta{font-size:10px;color:var(--muted);margin-bottom:10px}.report-actions{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:760px){.shell{padding:16px}.topbar{align-items:flex-start}.account{flex-direction:column;align-items:flex-end}.grid,.wall-grid{grid-template-columns:1fr}.meta{grid-template-columns:repeat(3,1fr)}.panel{padding:17px}.wall-card{padding:16px}.actions .button,.actions button.button{flex:1 1 44%}.table{min-width:760px}.report-top{gap:8px}.report-body{font-size:15px}}
 </style></head><body>${body}</body></html>`;
 }
 
@@ -500,12 +586,12 @@ function withCsrf(html, csrf) {
 }
 
 function loginPage({ error = null, next = '/admin/walls' } = {}) {
-  const body = `<div class="login-shell"><div class="login-title"><div class="mark">TW</div><h1>The Wall Admin</h1><p>Manage Walls, NFC plaques and admin access.</p></div><div class="panel">${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}<form method="post" action="/admin/login" class="stack"><input type="hidden" name="next" value="${escapeHtml(next)}"><div class="field"><label>Username</label><input name="username" autocomplete="username" required autofocus></div><div class="field"><label>Password</label><input name="password" type="password" autocomplete="current-password" required></div><button class="button full" type="submit">Log in</button></form></div></div>`;
+  const body = `<div class="login-shell"><div class="login-title"><div class="mark">TW</div><h1>The Wall Admin</h1><p>Manage Walls, plaques and moderation.</p></div><div class="panel">${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}<form method="post" action="/admin/login" class="stack"><input type="hidden" name="next" value="${escapeHtml(next)}"><div class="field"><label>Username</label><input name="username" autocomplete="username" required autofocus></div><div class="field"><label>Password</label><input name="password" type="password" autocomplete="current-password" required></div><button class="button full" type="submit">Log in</button></form></div></div>`;
   return layout({ title: 'Login', body });
 }
 
 function shellBody({ user, csrf, content, title = 'Walls' }) {
-  const body = `<div class="shell"><div class="topbar"><div class="brand"><div class="mark">TW</div><div><h1>The Wall Admin</h1><small>Physical Wall management</small></div></div><div class="account"><span>${escapeHtml(user.displayName || user.username)} · ${escapeHtml(user.role)}</span><form method="post" action="/admin/logout"><input type="hidden" name="_csrf" value="__CSRF__"><button class="link-button" type="submit">Log out</button></form></div></div>${navFor(user)}${content}</div>`;
+  const body = `<div class="shell"><div class="topbar"><div class="brand"><div class="mark">TW</div><div><h1>The Wall Admin</h1><small>Physical Wall management</small></div></div><div class="account"><span>${escapeHtml(user.displayName || user.username)} · ${escapeHtml(roleLabel(user.role))}</span><form method="post" action="/admin/logout"><input type="hidden" name="_csrf" value="__CSRF__"><button class="link-button" type="submit">Log out</button></form></div></div>${navFor(user)}${content}</div>`;
   return withCsrf(layout({ title, body }), csrf);
 }
 
@@ -517,21 +603,23 @@ function messagePage({ title, message, actionHref, actionLabel }) {
 function dashboardPage({ walls, user, csrf, notice = null, error = null }) {
   const manager = canManageWalls(user);
   const cards = walls.length === 0
-    ? '<div class="panel"><p>No Walls have been created yet.</p></div>'
+    ? `<div class="panel"><p>${user.role === 'moderator' ? 'No Wall is assigned to this Moderator yet.' : 'No Walls have been created yet.'}</p></div>`
     : `<div class="wall-grid">${walls.map((wall) => {
       const managerActions = manager
-        ? `<a class="button secondary" href="/admin/walls/${encodeURIComponent(wall.id)}/edit">Edit</a><form method="post" action="/admin/walls/${encodeURIComponent(wall.id)}/status"><input type="hidden" name="_csrf" value="__CSRF__"><input type="hidden" name="active" value="${wall.active ? 'false' : 'true'}"><button class="button ${wall.active ? 'secondary' : 'good'}" type="submit">${wall.active ? 'Deactivate' : 'Reactivate'}</button></form><a class="button secondary" href="/admin/walls/${encodeURIComponent(wall.id)}/replace-nfc">Replace NFC</a>`
-        : '';
-      const deleteAction = manager ? `<a class="button warn" href="/admin/walls/${encodeURIComponent(wall.id)}/delete">Delete</a>` : '';
-      return `<article class="wall-card ${wall.active ? '' : 'inactive'}"><div class="wall-head"><div><h3>${escapeHtml(wall.display_name)}</h3><div class="location">${escapeHtml(wall.location_hint || 'No location set')}</div></div><span class="badge ${wall.active ? 'active' : 'inactive'}">${wall.active ? 'Active' : 'Inactive'}</span></div><div class="meta"><div class="metric"><strong>${escapeHtml(wall.post_count)}</strong><span>Messages</span></div><div class="metric"><strong>${escapeHtml(wall.discovered_by)}</strong><span>Visitors</span></div><div class="metric"><strong>${escapeHtml(formatDate(wall.created_at))}</strong><span>Created</span></div></div><div class="code">Public ID: ${escapeHtml(wall.slug)}</div><div class="actions" style="margin-top:15px">${managerActions}<a class="button secondary" href="/admin/walls/${encodeURIComponent(wall.id)}/clear">Clear messages</a>${deleteAction}</div></article>`;
+        ? `<a class="button secondary" href="/admin/walls/${encodeURIComponent(wall.id)}/edit">Edit</a><form method="post" action="/admin/walls/${encodeURIComponent(wall.id)}/status"><input type="hidden" name="_csrf" value="__CSRF__"><input type="hidden" name="active" value="${wall.active ? 'false' : 'true'}"><button class="button ${wall.active ? 'secondary' : 'good'}" type="submit">${wall.active ? 'Deactivate' : 'Reactivate'}</button></form><a class="button secondary" href="/admin/walls/${encodeURIComponent(wall.id)}/replace-nfc">Replace NFC</a><a class="button secondary" href="/admin/walls/${encodeURIComponent(wall.id)}/clear">Clear messages</a><a class="button warn" href="/admin/walls/${encodeURIComponent(wall.id)}/delete">Delete</a>`
+        : `<a class="button secondary" href="/admin/reports">Review reports</a>`;
+      return `<article class="wall-card ${wall.active ? '' : 'inactive'}"><div class="wall-head"><div><h3>${escapeHtml(wall.display_name)}</h3><div class="location">${escapeHtml(wall.location_hint || 'No location set')}</div></div><span class="badge ${wall.active ? 'active' : 'inactive'}">${wall.active ? 'Active' : 'Inactive'}</span></div><div class="meta"><div class="metric"><strong>${escapeHtml(wall.post_count)}</strong><span>Messages</span></div><div class="metric"><strong>${escapeHtml(wall.discovered_by)}</strong><span>Visitors</span></div><div class="metric"><strong>${escapeHtml(formatDate(wall.created_at))}</strong><span>Created</span></div></div><div class="code">Public ID: ${escapeHtml(wall.slug)}</div><div class="actions" style="margin-top:15px">${managerActions}</div></article>`;
     }).join('')}</div>`;
   const createPanel = manager
     ? `<section class="panel"><h2>Create a Wall</h2><p class="help">Create the place first, then program the one-time NFC URL that appears onto the physical plaque.</p><form method="post" action="/admin/walls/create"><input type="hidden" name="_csrf" value="__CSRF__"><div class="grid"><div class="field"><label>Wall name</label><input name="display_name" maxlength="80" required placeholder="9A Raworth"></div><div class="field"><label>Location</label><input name="location_hint" maxlength="120" placeholder="Singleton NSW"></div></div><div class="actions" style="margin-top:14px"><button class="button" type="submit">Create Wall + NFC URL</button></div></form></section>`
-    : `<div class="panel"><p class="help">Moderator access: you can review Walls and clear inappropriate messages, but Wall configuration is read-only.</p></div>`;
+    : '';
+  const moderatorNote = user.role === 'moderator'
+    ? `<div class="notice">Moderator access is limited to your assigned Wall. Use <a href="/admin/reports">Reports</a> to review reported posts.</div>`
+    : '';
   const changeWarning = user.mustChangePassword
     ? `<div class="warning">This account is still using a temporary password. <a href="/admin/account/password">Change it now</a>.</div>`
     : '';
-  const content = `${changeWarning}${notice ? `<div class="notice">${escapeHtml(notice)}</div>` : ''}${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}${createPanel}<section><h2>Walls <span style="color:var(--muted);font-weight:700">(${walls.length})</span></h2>${cards}</section>`;
+  const content = `${changeWarning}${moderatorNote}${notice ? `<div class="notice">${escapeHtml(notice)}</div>` : ''}${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}${createPanel}<section><h2>Walls <span style="color:var(--muted);font-weight:700">(${walls.length})</span></h2>${cards}</section>`;
   return shellBody({ user, csrf, content });
 }
 
@@ -560,20 +648,40 @@ function passwordPage({ user, csrf, notice = null, error = null }) {
   return shellBody({ user, csrf, content, title: 'Password' });
 }
 
-function usersPage({ users, user, csrf, notice = null, error = null }) {
-  const rows = users.map((item) => `<tr><td><strong>${escapeHtml(item.display_name)}</strong><div class="code">${escapeHtml(item.username)}</div></td><td><span class="role">${escapeHtml(item.role)}</span></td><td>${item.active ? '<span class="badge active">Active</span>' : '<span class="badge inactive">Inactive</span>'}${item.must_change_password ? '<div class="code">Temporary password</div>' : ''}</td><td>${escapeHtml(formatDate(item.last_login_at))}</td><td><a class="button secondary" href="/admin/users/${encodeURIComponent(item.id)}/edit">Edit</a> <a class="button secondary" href="/admin/users/${encodeURIComponent(item.id)}/password">Reset password</a></td></tr>`).join('');
-  const content = `${notice ? `<div class="notice">${escapeHtml(notice)}</div>` : ''}${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}<section class="panel"><h2>Add admin user</h2><form method="post" action="/admin/users/create" class="stack"><input type="hidden" name="_csrf" value="__CSRF__"><div class="grid"><div class="field"><label>Username</label><input name="username" maxlength="50" required placeholder="venue.manager"></div><div class="field"><label>Display name</label><input name="display_name" maxlength="80" required placeholder="Venue Manager"></div><div class="field"><label>Initial password</label><input name="password" type="password" minlength="8" required></div><div class="field"><label>Role</label><select name="role"><option value="admin">Admin</option><option value="moderator">Moderator</option><option value="owner">Owner</option></select></div></div><div><button class="button" type="submit">Create user</button></div></form></section><section class="panel"><h2>Admin users</h2><div class="table-wrap"><table class="table"><thead><tr><th>User</th><th>Role</th><th>Status</th><th>Last login</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div><p class="help"><strong>Owner:</strong> full access including users/audit. <strong>Admin:</strong> full Wall management. <strong>Moderator:</strong> can review Walls and clear messages only.</p></section>`;
+function wallOptions(walls, selectedId = null) {
+  if (!walls.length) return '<option value="" disabled selected>Create a Wall first</option>';
+  return walls.map((wall) => `<option value="${escapeHtml(wall.id)}" ${selectedId && String(selectedId) === String(wall.id) ? 'selected' : ''}>${escapeHtml(wall.display_name)}${wall.location_hint ? ` — ${escapeHtml(wall.location_hint)}` : ''}${wall.active ? '' : ' (Inactive)'}</option>`).join('');
+}
+
+function usersPage({ users, walls, user, csrf, notice = null, error = null }) {
+  const rows = users.map((item) => {
+    const wallLine = item.role === 'owner' ? 'All Walls' : (item.wall_name || 'No Wall assigned');
+    return `<tr><td><strong>${escapeHtml(item.display_name)}</strong><div class="code">${escapeHtml(item.username)}</div><div class="code">Wall: ${escapeHtml(wallLine)}</div></td><td><span class="role">${escapeHtml(roleLabel(item.role))}</span></td><td>${item.active ? '<span class="badge active">Active</span>' : '<span class="badge inactive">Inactive</span>'}${item.must_change_password ? '<div class="code">Temporary password</div>' : ''}</td><td>${escapeHtml(formatDate(item.last_login_at))}</td><td><a class="button secondary" href="/admin/users/${encodeURIComponent(item.id)}/edit">Edit</a> <a class="button secondary" href="/admin/users/${encodeURIComponent(item.id)}/password">Reset password</a></td></tr>`;
+  }).join('');
+  const content = `${notice ? `<div class="notice">${escapeHtml(notice)}</div>` : ''}${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}<section class="panel"><h2>Add admin user</h2><form method="post" action="/admin/users/create" class="stack"><input type="hidden" name="_csrf" value="__CSRF__"><div class="grid"><div class="field"><label>Username</label><input name="username" maxlength="50" required placeholder="venue.manager"></div><div class="field"><label>Display name</label><input name="display_name" maxlength="80" required placeholder="Venue Manager"></div><div class="field"><label>Initial password</label><input name="password" type="password" minlength="8" required></div><div class="field"><label>Assigned Wall</label><select name="wall_id" required>${wallOptions(walls)}</select></div></div><input type="hidden" name="role" value="moderator"><p class="help">New users are Moderators. They can only see the assigned Wall and review its reported posts.</p><div><button class="button" type="submit" ${walls.length ? '' : 'disabled'}>Create Moderator</button></div></form></section><section class="panel"><h2>Admin users</h2><div class="table-wrap"><table class="table"><thead><tr><th>User</th><th>Role</th><th>Status</th><th>Last login</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div><p class="help"><strong>Main Admin:</strong> full access to every Wall, user management, reports and audit. <strong>Moderator:</strong> assigned Wall only; can review reported posts and choose Remove or Keep.</p></section>`;
   return shellBody({ user, csrf, content, title: 'Users' });
 }
 
-function userEditPage({ target, user, csrf, error = null }) {
-  const content = `<a class="back" href="/admin/users">← Back to Users</a><section class="panel"><h2>Edit admin user</h2>${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}<form method="post" action="/admin/users/${encodeURIComponent(target.id)}/edit" class="stack"><input type="hidden" name="_csrf" value="__CSRF__"><div class="field"><label>Username</label><input value="${escapeHtml(target.username)}" disabled></div><div class="grid"><div class="field"><label>Display name</label><input name="display_name" maxlength="80" required value="${escapeHtml(target.display_name)}"></div><div class="field"><label>Role</label><select name="role"><option value="owner" ${target.role === 'owner' ? 'selected' : ''}>Owner</option><option value="admin" ${target.role === 'admin' ? 'selected' : ''}>Admin</option><option value="moderator" ${target.role === 'moderator' ? 'selected' : ''}>Moderator</option></select></div></div><div class="field"><label>Status</label><select name="active"><option value="true" ${target.active ? 'selected' : ''}>Active</option><option value="false" ${!target.active ? 'selected' : ''}>Inactive</option></select></div><div class="actions"><button class="button" type="submit">Save user</button><a class="button secondary" href="/admin/users">Cancel</a></div></form></section>`;
+function userEditPage({ target, walls, user, csrf, error = null }) {
+  const wallField = target.role === 'moderator'
+    ? `<div class="field"><label>Assigned Wall</label><select name="wall_id" required>${wallOptions(walls, target.wall_id)}</select></div>`
+    : `<div class="field"><label>Access</label><input value="All Walls" disabled></div>`;
+  const content = `<a class="back" href="/admin/users">← Back to Users</a><section class="panel"><h2>Edit admin user</h2>${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}<form method="post" action="/admin/users/${encodeURIComponent(target.id)}/edit" class="stack"><input type="hidden" name="_csrf" value="__CSRF__"><div class="grid"><div class="field"><label>Username</label><input value="${escapeHtml(target.username)}" disabled></div><div class="field"><label>Role</label><input value="${escapeHtml(roleLabel(target.role))}" disabled></div><div class="field"><label>Display name</label><input name="display_name" maxlength="80" required value="${escapeHtml(target.display_name)}"></div>${wallField}</div><div class="field"><label>Status</label><select name="active"><option value="true" ${target.active ? 'selected' : ''}>Active</option><option value="false" ${!target.active ? 'selected' : ''}>Inactive</option></select></div><div class="actions"><button class="button" type="submit">Save user</button><a class="button secondary" href="/admin/users">Cancel</a></div></form></section>`;
   return shellBody({ user, csrf, content, title: 'Edit User' });
 }
 
 function resetPasswordPage({ target, user, csrf, error = null }) {
   const content = `<a class="back" href="/admin/users">← Back to Users</a><section class="panel"><h2>Reset password</h2><h3>${escapeHtml(target.display_name)} · ${escapeHtml(target.username)}</h3>${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}<p class="help">This signs the user out everywhere and marks the new password as temporary.</p><form method="post" action="/admin/users/${encodeURIComponent(target.id)}/password" class="stack"><input type="hidden" name="_csrf" value="__CSRF__"><div class="field"><label>Temporary password</label><input name="password" type="password" minlength="8" required></div><div><button class="button warn" type="submit">Reset password</button></div></form></section>`;
   return shellBody({ user, csrf, content, title: 'Reset Password' });
+}
+
+function reportsPage({ reports, user, csrf, notice = null, error = null }) {
+  const items = reports.length
+    ? `<div class="report-list">${reports.map((item) => `<article class="report-card ${item.hidden_at ? 'auto-hidden' : ''}"><div class="report-top"><div><div class="report-wall">${escapeHtml(item.wall_name)}</div><div class="code">${escapeHtml(item.location_hint || '')}</div></div><div class="report-count">${escapeHtml(item.report_count)} report${Number(item.report_count) === 1 ? '' : 's'}${item.hidden_at ? ' · auto-hidden' : ''}</div></div><div class="report-body">${escapeHtml(item.body)}</div><div class="report-meta">${item.parent_id ? 'Reply' : 'Post'} · posted ${escapeHtml(formatDate(item.created_at))} · last reported ${escapeHtml(formatDate(item.last_reported_at))}</div><div class="report-actions"><form method="post" action="/admin/reports/${encodeURIComponent(item.id)}/remove"><input type="hidden" name="_csrf" value="__CSRF__"><button class="button warn" type="submit">Remove post</button></form><form method="post" action="/admin/reports/${encodeURIComponent(item.id)}/keep"><input type="hidden" name="_csrf" value="__CSRF__"><button class="button secondary" type="submit">Keep post</button></form></div></article>`).join('')}</div>`
+    : '<div class="panel"><p>No reported posts need review.</p></div>';
+  const scope = user.role === 'moderator' ? 'Only reports from your assigned Wall are shown.' : 'Reports from all Walls are shown.';
+  const content = `${notice ? `<div class="notice">${escapeHtml(notice)}</div>` : ''}${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}<section class="panel"><h2>Reported posts</h2><p class="help">${scope} Three reports automatically hide a post while it waits for review. <strong>Remove</strong> permanently deletes it; <strong>Keep</strong> clears its reports and restores it if it was auto-hidden.</p></section>${items}`;
+  return shellBody({ user, csrf, content, title: 'Reports' });
 }
 
 function auditPage({ entries, user, csrf }) {
@@ -596,6 +704,13 @@ function redirectUsers(res, { notice = null, error = null } = {}) {
   return res.redirect(303, `/admin/users${params.toString() ? `?${params}` : ''}`);
 }
 
+function redirectReports(res, { notice = null, error = null } = {}) {
+  const params = new URLSearchParams();
+  if (notice) params.set('notice', notice);
+  if (error) params.set('error', error);
+  return res.redirect(303, `/admin/reports${params.toString() ? `?${params}` : ''}`);
+}
+
 export function mountAdminPortal(app) {
   const router = express.Router();
   const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false });
@@ -611,9 +726,7 @@ export function mountAdminPortal(app) {
       }
       const nextPath = cleanBody(req.query?.next) || '/admin/walls';
       return res.type('html').send(loginPage({ next: nextPath }));
-    } catch (error) {
-      return next(error);
-    }
+    } catch (error) { return next(error); }
   });
 
   router.post('/login', loginLimiter, async (req, res, next) => {
@@ -628,19 +741,17 @@ export function mountAdminPortal(app) {
       await pool.query(`delete from admin_sessions where expires_at <= now()`);
       const session = await createAdminSession(req, user);
       await pool.query(`update admin_users set last_login_at = now() where id = $1`, [user.id]);
-      await writeAudit({ id: user.id, username: user.username }, 'login');
+      await writeAudit({ id: user.id, username: user.username }, 'auth.login');
       setSessionCookie(req, res, session.rawToken);
       const safeNext = nextPath.startsWith('/admin/') ? nextPath : '/admin/walls';
       return res.redirect(303, safeNext);
-    } catch (error) {
-      return next(error);
-    }
+    } catch (error) { return next(error); }
   });
 
   router.use(requireBrowserAdmin);
 
   router.post('/logout', requireCsrf, async (req, res) => {
-    await writeAudit(req.adminSession.user, 'logout');
+    await writeAudit(req.adminSession.user, 'auth.logout');
     await pool.query(`delete from admin_sessions where id = $1`, [req.adminSession.id]);
     clearSessionCookie(req, res);
     return res.redirect(303, '/admin/login');
@@ -650,7 +761,7 @@ export function mountAdminPortal(app) {
 
   router.get('/walls', async (req, res, next) => {
     try {
-      const walls = await listWalls();
+      const walls = await listWalls(req.adminSession.user);
       return res.type('html').send(dashboardPage({ walls, user: req.adminSession.user, csrf: req.adminSession.csrf, notice: cleanBody(req.query?.notice), error: cleanBody(req.query?.error) }));
     } catch (error) { return next(error); }
   });
@@ -665,7 +776,7 @@ export function mountAdminPortal(app) {
 
   router.get('/walls/:wallId/edit', requireWallManager, async (req, res) => {
     const wall = await getWall(req.params.wallId);
-    if (!wall) return res.status(404).type('html').send(messagePage({ title: 'Wall not found', message: 'This Wall no longer exists.', actionHref: '/admin/walls', actionLabel: 'Back to Walls' }));
+    if (!wall) return res.sendStatus(404);
     return res.type('html').send(editPage({ wall, user: req.adminSession.user, csrf: req.adminSession.csrf }));
   });
 
@@ -692,11 +803,13 @@ export function mountAdminPortal(app) {
     if (!wall) return res.sendStatus(404);
     return res.type('html').send(confirmPage({ wall, user: req.adminSession.user, csrf: req.adminSession.csrf, kind: 'replace-nfc' }));
   });
-  router.get('/walls/:wallId/clear', requireModerator, async (req, res) => {
+
+  router.get('/walls/:wallId/clear', requireWallManager, async (req, res) => {
     const wall = await getWall(req.params.wallId);
     if (!wall) return res.sendStatus(404);
     return res.type('html').send(confirmPage({ wall, user: req.adminSession.user, csrf: req.adminSession.csrf, kind: 'clear' }));
   });
+
   router.get('/walls/:wallId/delete', requireWallManager, async (req, res) => {
     const wall = await getWall(req.params.wallId);
     if (!wall) return res.sendStatus(404);
@@ -712,7 +825,7 @@ export function mountAdminPortal(app) {
     } catch (error) { return redirectDashboard(res, { error: error?.message || 'Could not replace NFC URL.' }); }
   });
 
-  router.post('/walls/:wallId/clear', requireCsrf, requireModerator, async (req, res) => {
+  router.post('/walls/:wallId/clear', requireCsrf, requireWallManager, async (req, res) => {
     if (cleanBody(req.body?.confirmation) !== 'CLEAR') return redirectDashboard(res, { error: 'Type CLEAR exactly to continue.' });
     try {
       const result = await clearWallMessages(req.params.wallId);
@@ -728,6 +841,29 @@ export function mountAdminPortal(app) {
       await writeAudit(req.adminSession.user, 'wall.delete', { wallId: wall.id, wallName: wall.display_name, details: { slug: wall.slug } });
       return redirectDashboard(res, { notice: `Deleted ${wall.display_name}. Its old NFC plaque URL is now invalid.` });
     } catch (error) { return redirectDashboard(res, { error: error?.message || 'Could not delete Wall.' }); }
+  });
+
+  router.get('/reports', requireModerator, async (req, res, next) => {
+    try {
+      const reports = await listReportedPosts(req.adminSession.user);
+      return res.type('html').send(reportsPage({ reports, user: req.adminSession.user, csrf: req.adminSession.csrf, notice: cleanBody(req.query?.notice), error: cleanBody(req.query?.error) }));
+    } catch (error) { return next(error); }
+  });
+
+  router.post('/reports/:postId/remove', requireCsrf, requireModerator, async (req, res) => {
+    try {
+      const post = await removeReportedPost(req.adminSession.user, req.params.postId);
+      await writeAudit(req.adminSession.user, 'report.remove_post', { wallId: post.wall_id, wallName: post.wall_name, details: { report_count: post.report_count } });
+      return redirectReports(res, { notice: 'Reported post removed.' });
+    } catch (error) { return redirectReports(res, { error: error?.message || 'Could not remove the reported post.' }); }
+  });
+
+  router.post('/reports/:postId/keep', requireCsrf, requireModerator, async (req, res) => {
+    try {
+      const post = await keepReportedPost(req.adminSession.user, req.params.postId);
+      await writeAudit(req.adminSession.user, 'report.keep_post', { wallId: post.wall_id, wallName: post.wall_name, details: { cleared_reports: post.report_count } });
+      return redirectReports(res, { notice: 'Post kept and its reports cleared.' });
+    } catch (error) { return redirectReports(res, { error: error?.message || 'Could not keep the reported post.' }); }
   });
 
   router.get('/account/password', (req, res) => res.type('html').send(passwordPage({ user: req.adminSession.user, csrf: req.adminSession.csrf, notice: cleanBody(req.query?.notice), error: cleanBody(req.query?.error) })));
@@ -748,34 +884,38 @@ export function mountAdminPortal(app) {
     }
   });
 
-  router.get('/users', requireOwner, async (req, res) => {
-    const users = await listAdminUsers();
-    return res.type('html').send(usersPage({ users, user: req.adminSession.user, csrf: req.adminSession.csrf, notice: cleanBody(req.query?.notice), error: cleanBody(req.query?.error) }));
+  router.get('/users', requireOwner, async (req, res, next) => {
+    try {
+      const [users, walls] = await Promise.all([listAdminUsers(), listAllWalls()]);
+      return res.type('html').send(usersPage({ users, walls, user: req.adminSession.user, csrf: req.adminSession.csrf, notice: cleanBody(req.query?.notice), error: cleanBody(req.query?.error) }));
+    } catch (error) { return next(error); }
   });
 
   router.post('/users/create', requireCsrf, requireOwner, async (req, res) => {
     try {
-      const created = await createAdminUser({ username: req.body?.username, displayName: cleanBody(req.body?.display_name), password: typeof req.body?.password === 'string' ? req.body.password : '', role: cleanBody(req.body?.role) });
-      await writeAudit(req.adminSession.user, 'admin_user.create', { targetAdminUserId: created.id, details: { username: created.username, role: created.role } });
-      return redirectUsers(res, { notice: `Created ${created.username}. Their initial password is temporary.` });
+      const created = await createAdminUser({ username: req.body?.username, displayName: cleanBody(req.body?.display_name), password: typeof req.body?.password === 'string' ? req.body.password : '', wallId: cleanBody(req.body?.wall_id) });
+      await writeAudit(req.adminSession.user, 'admin_user.create', { targetAdminUserId: created.id, wallId: created.wall_id, details: { username: created.username, role: created.role } });
+      return redirectUsers(res, { notice: `Created Moderator ${created.username}. Their initial password is temporary.` });
     } catch (error) {
       const message = error?.code === '23505' ? 'That username already exists.' : (error?.message || 'Could not create user.');
       return redirectUsers(res, { error: message });
     }
   });
 
-  router.get('/users/:userId/edit', requireOwner, async (req, res) => {
-    const target = await getAdminUser(req.params.userId);
-    if (!target) return res.sendStatus(404);
-    return res.type('html').send(userEditPage({ target, user: req.adminSession.user, csrf: req.adminSession.csrf }));
+  router.get('/users/:userId/edit', requireOwner, async (req, res, next) => {
+    try {
+      const [target, walls] = await Promise.all([getAdminUser(req.params.userId), listAllWalls()]);
+      if (!target) return res.sendStatus(404);
+      return res.type('html').send(userEditPage({ target, walls, user: req.adminSession.user, csrf: req.adminSession.csrf }));
+    } catch (error) { return next(error); }
   });
 
   router.post('/users/:userId/edit', requireCsrf, requireOwner, async (req, res) => {
     try {
       const target = await getAdminUser(req.params.userId);
       if (!target) throw new Error('Admin user not found.');
-      const updated = await updateAdminUser(target, { displayName: cleanBody(req.body?.display_name), role: cleanBody(req.body?.role), active: cleanBody(req.body?.active) === 'true' }, req.adminSession.user.id);
-      await writeAudit(req.adminSession.user, 'admin_user.edit', { targetAdminUserId: updated.id, details: { username: updated.username, role: updated.role, active: updated.active } });
+      const updated = await updateAdminUser(target, { displayName: cleanBody(req.body?.display_name), active: cleanBody(req.body?.active) === 'true', wallId: cleanBody(req.body?.wall_id) || null }, req.adminSession.user.id);
+      await writeAudit(req.adminSession.user, 'admin_user.edit', { targetAdminUserId: updated.id, wallId: updated.wall_id, details: { username: updated.username, role: updated.role, active: updated.active } });
       return redirectUsers(res, { notice: `Updated ${updated.username}.` });
     } catch (error) { return redirectUsers(res, { error: error?.message || 'Could not update user.' }); }
   });
