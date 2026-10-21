@@ -16,15 +16,15 @@
   }[char]));
 
   function installStyles() {
-    if ($('#admin-v2-styles')) return;
+    if ($('#admin-v3-styles')) return;
     const style = document.createElement('style');
-    style.id = 'admin-v2-styles';
+    style.id = 'admin-v3-styles';
     style.textContent = `
       body.modal-open{overflow:hidden}
-      .admin-modal{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:18px}
+      .admin-modal{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:max(18px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom));min-height:100dvh}
       .admin-modal.is-open{display:flex}
       .admin-modal-backdrop{position:absolute;inset:0;background:rgba(14,12,10,.66);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
-      .admin-modal-dialog{position:relative;z-index:1;width:min(560px,100%);max-height:min(88vh,760px);overflow:auto;background:var(--tw-paper);border:1px solid var(--tw-line);border-radius:16px;box-shadow:0 28px 80px rgba(17,14,11,.32)}
+      .admin-modal-dialog{position:relative;z-index:1;width:min(560px,100%);max-height:min(82dvh,720px);overflow:auto;background:var(--tw-paper);border:1px solid var(--tw-line);border-radius:16px;box-shadow:0 28px 80px rgba(17,14,11,.32)}
       .admin-modal-head{position:sticky;top:0;z-index:2;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:18px 20px 14px;background:rgba(251,248,241,.98);border-bottom:1px solid var(--tw-line)}
       .admin-modal-head h2{margin:0!important;font-size:22px!important;letter-spacing:-.5px!important}
       .admin-modal-head p{margin:5px 0 0;color:var(--tw-muted);font-size:12px;line-height:1.45}
@@ -33,7 +33,6 @@
       .admin-modal-body>.help:first-child{margin-top:0!important}
       .admin-modal-body .grid{gap:12px!important}
       .admin-modal-body .actions{margin-top:14px!important}
-      .admin-modal-body form>.grid+.actions,.admin-modal-body form>.actions{margin-top:14px}
 
       .admin-page-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:4px 0 14px}
       .admin-page-heading h2{margin:0;font-size:31px;line-height:1;letter-spacing:-1px}
@@ -76,13 +75,14 @@
       .users-panel{padding:0!important;overflow:hidden}
       .users-panel>.help{display:none!important}
       .users-panel>h2{display:none!important}
-      .users-toolbar-v2{display:grid;grid-template-columns:minmax(0,1fr) 130px auto;gap:8px;align-items:center;padding:14px 14px 10px;border-bottom:1px solid var(--tw-line)}
+      .users-toolbar-v3{display:grid;grid-template-columns:minmax(0,1fr) 130px auto;gap:8px;align-items:center;padding:14px 14px 10px;border-bottom:1px solid var(--tw-line)}
       .user-list{display:flex;flex-direction:column}
-      .user-row{display:grid;grid-template-columns:minmax(180px,1fr) 90px 118px 150px auto;align-items:center;gap:12px;min-height:66px;padding:10px 14px;border-bottom:1px solid #e8dfd2;background:#fffdf9}
+      .user-row{display:grid;grid-template-columns:minmax(210px,1fr) 100px 118px 150px auto;align-items:center;gap:12px;min-height:66px;padding:10px 14px;border-bottom:1px solid #e8dfd2;background:#fffdf9}
       .user-row:last-child{border-bottom:0}
       .user-identity{min-width:0}
       .user-identity strong{display:block;font-size:14px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-      .user-handle{margin-top:3px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--tw-muted);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .user-handle,.user-wall{margin-top:3px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--tw-muted);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .user-wall{font-family:inherit;font-weight:750}
       .user-role{justify-self:start;padding:5px 7px;border-radius:999px;background:#eee8de;font-size:8px;text-transform:uppercase;letter-spacing:.7px;font-weight:950}
       .user-status{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
       .user-status .badge{font-size:8px!important;padding:4px 6px!important}
@@ -106,9 +106,9 @@
       .audit-details-toggle pre{white-space:pre-wrap;overflow-wrap:anywhere;margin:7px 0 0;padding:8px;border-radius:7px;background:#f1ece4;font-size:9px}
 
       @media(max-width:760px){
-        .admin-modal{align-items:flex-end;padding:0}
-        .admin-modal-dialog{width:100%;max-height:88vh;border-radius:18px 18px 0 0;border-bottom:0}
-        .admin-modal-head{padding:16px 17px 13px}.admin-modal-body{padding:16px 17px 22px;padding-bottom:max(22px,env(safe-area-inset-bottom))}
+        .admin-modal{align-items:center;justify-content:center;padding:max(14px,env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom));min-height:100dvh}
+        .admin-modal-dialog{width:100%;max-height:min(78dvh,680px);border-radius:18px;border:1px solid var(--tw-line)}
+        .admin-modal-head{padding:15px 16px 12px}.admin-modal-body{padding:15px 16px 18px}
         .admin-page-heading{align-items:center}.admin-page-heading h2{font-size:27px}.admin-page-heading .button{min-width:auto}
         .overview-stats{grid-template-columns:repeat(4,minmax(0,1fr))!important}
         .overview-stat{padding:8px 7px!important}.overview-stat strong{font-size:17px!important}.overview-stat span{font-size:7px!important;margin-top:4px!important}
@@ -120,7 +120,7 @@
         .wall-row-metric strong{font-size:12px}.wall-row-metric span{font-size:6px}.wall-row-status{display:none}
         .wall-row-actions .wall-manage{font-size:0!important;width:34px!important;padding:0!important}.wall-row-actions .wall-manage::after{content:'›';font-size:21px;line-height:1;font-weight:500}
         .wall-row-actions .more-menu>summary{width:30px!important;min-height:32px!important}
-        .users-toolbar-v2{grid-template-columns:minmax(0,1fr) 104px;padding:11px 11px 8px}.user-result-count{grid-column:1/-1}
+        .users-toolbar-v3{grid-template-columns:minmax(0,1fr) 104px;padding:11px 11px 8px}.user-result-count{grid-column:1/-1}
         .user-row{grid-template-columns:minmax(0,1fr) auto auto;gap:7px;min-height:60px;padding:9px 11px}
         .user-role{grid-column:2}.user-status{grid-column:1 / 3;grid-row:2}.user-login{display:none}.user-actions{grid-column:3;grid-row:1 / 3;align-self:center}
         .user-actions .button{font-size:0!important;width:34px!important;padding:0!important}.user-actions .button:first-child::after{content:'Edit';font-size:7px}.user-actions .button:last-child::after{content:'Reset';font-size:7px}
@@ -158,9 +158,7 @@
 
   function createModalFromPanel(panel, { title, description = '' } = {}) {
     if (!panel) return null;
-    const existingHeading = $('h2', panel);
-    if (existingHeading) existingHeading.remove();
-
+    $('h2', panel)?.remove();
     const modal = document.createElement('div');
     modal.className = 'admin-modal';
     modal.setAttribute('aria-hidden', 'true');
@@ -172,21 +170,19 @@
     dialog.setAttribute('aria-modal', 'true');
     const head = document.createElement('div');
     head.className = 'admin-modal-head';
-    const titleWrap = document.createElement('div');
-    titleWrap.innerHTML = `<h2>${escapeHtml(title)}</h2>${description ? `<p>${escapeHtml(description)}</p>` : ''}`;
+    head.innerHTML = `<div><h2>${escapeHtml(title)}</h2>${description ? `<p>${escapeHtml(description)}</p>` : ''}</div>`;
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'admin-modal-close';
     close.setAttribute('aria-label', `Close ${title}`);
     close.textContent = '×';
-    head.append(titleWrap, close);
+    head.appendChild(close);
     const body = document.createElement('div');
     body.className = 'admin-modal-body';
     while (panel.firstChild) body.appendChild(panel.firstChild);
     dialog.append(head, body);
     modal.append(backdrop, dialog);
-    panel.remove();
-    document.body.appendChild(modal);
+    panel.replaceWith(modal);
 
     let previousFocus = null;
     const open = () => {
@@ -194,7 +190,7 @@
       modal.classList.add('is-open');
       modal.setAttribute('aria-hidden', 'false');
       document.body.classList.add('modal-open');
-      window.setTimeout(() => $('input:not([type="hidden"]),select,button', body)?.focus(), 40);
+      window.setTimeout(() => $('input:not([type="hidden"]),select,button', body)?.focus(), 30);
     };
     const closeModal = () => {
       modal.classList.remove('is-open');
@@ -204,10 +200,10 @@
     };
     close.addEventListener('click', closeModal);
     backdrop.addEventListener('click', closeModal);
-    modal.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') closeModal();
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && modal.classList.contains('is-open')) closeModal();
     });
-    return { modal, body, open, close: closeModal };
+    return { modal, open, close: closeModal };
   }
 
   function wallStats(cards) {
@@ -232,17 +228,18 @@
   function compactWallActions(card) {
     const actions = $('.actions', card);
     if (!actions) return null;
-    const edit = $$('a.button', actions).find((a) => /\/edit$/.test(a.getAttribute('href') || ''));
+    const buttons = $$('a.button', actions);
+    let primaryLink = buttons.find((a) => /\/edit$/.test(a.getAttribute('href') || ''));
+    if (!primaryLink) primaryLink = buttons.find((a) => /\/reports/.test(a.getAttribute('href') || ''));
     const children = Array.from(actions.children);
     const primary = document.createElement('div');
     primary.className = 'wall-primary-actions';
-    if (edit) {
-      edit.className = 'button wall-manage';
-      edit.textContent = 'Manage';
-      edit.setAttribute('aria-label', `Manage ${text($('h3', card))}`);
-      primary.appendChild(edit);
+    if (primaryLink) {
+      primaryLink.className = 'button wall-manage';
+      primaryLink.textContent = /\/reports/.test(primaryLink.getAttribute('href') || '') ? 'Reports' : 'Manage';
+      primary.appendChild(primaryLink);
     }
-    const moreChildren = children.filter((child) => child !== edit);
+    const moreChildren = children.filter((child) => child !== primaryLink);
     if (moreChildren.length) {
       const more = document.createElement('details');
       more.className = 'more-menu';
@@ -294,32 +291,29 @@
     return card;
   }
 
-  function addFilterToolbar({ container, items, searchText, statusOptions, getSearch, getStatus, emptyText, countLabel }) {
+  function addFilterToolbar({ userMode = false, items, searchText, statusOptions, getSearch, getStatus, emptyText, countLabel }) {
     const toolbar = document.createElement('div');
-    toolbar.className = container.includes('user') ? 'users-toolbar-v2' : 'wall-inventory-toolbar';
+    toolbar.className = userMode ? 'users-toolbar-v3' : 'wall-inventory-toolbar';
     const search = document.createElement('input');
-    search.className = `admin-control ${container.includes('user') ? 'user-search' : 'wall-search'}`;
+    search.className = `admin-control ${userMode ? 'user-search' : 'wall-search'}`;
     search.type = 'search';
     search.placeholder = searchText;
     const filter = document.createElement('select');
-    filter.className = `admin-control ${container.includes('user') ? 'user-filter' : 'wall-filter'}`;
+    filter.className = `admin-control ${userMode ? 'user-filter' : 'wall-filter'}`;
     filter.innerHTML = statusOptions.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join('');
     const count = document.createElement('div');
-    count.className = container.includes('user') ? 'user-result-count' : 'wall-result-count';
+    count.className = userMode ? 'user-result-count' : 'wall-result-count';
     const empty = document.createElement('div');
     empty.className = 'list-empty';
     empty.textContent = emptyText;
-
     const apply = () => {
       const query = search.value.trim().toLowerCase();
       const status = filter.value;
       let visible = 0;
       items.forEach((item) => {
-        const matchesText = !query || getSearch(item).includes(query);
-        const itemStatus = getStatus(item);
-        const matchesStatus = status === 'all' || itemStatus === status;
-        item.hidden = !(matchesText && matchesStatus);
-        if (!item.hidden) visible += 1;
+        const show = (!query || getSearch(item).includes(query)) && (status === 'all' || getStatus(item) === status);
+        item.hidden = !show;
+        if (show) visible += 1;
       });
       count.textContent = `${visible} of ${items.length} ${countLabel}`;
       empty.classList.toggle('is-visible', visible === 0);
@@ -343,20 +337,21 @@
     const cards = $$('.wall-card');
     const stats = wallStats(cards);
     const wallSection = cards[0]?.closest('section') || $$('section').find((section) => text($('h2', section)).startsWith('Walls')) || null;
-    const oldHeading = wallSection ? $('h2', wallSection) : null;
-    oldHeading?.classList.add('wall-original-heading');
+    $('h2', wallSection)?.classList.add('wall-original-heading');
 
     const overview = document.createElement('section');
     overview.className = 'admin-overview';
     const heading = document.createElement('div');
     heading.className = 'overview-heading admin-page-heading';
     heading.innerHTML = '<div><span class="eyebrow">Overview</span><h2>Walls</h2></div>';
-    const newButton = document.createElement('button');
-    newButton.type = 'button';
-    newButton.className = 'button overview-new';
-    newButton.textContent = '+ New Wall';
-    newButton.addEventListener('click', () => createModal?.open());
-    heading.appendChild(newButton);
+    if (createModal) {
+      const newButton = document.createElement('button');
+      newButton.type = 'button';
+      newButton.className = 'button overview-new';
+      newButton.textContent = '+ New Wall';
+      newButton.addEventListener('click', () => createModal.open());
+      heading.appendChild(newButton);
+    }
     const statsRow = document.createElement('div');
     statsRow.className = 'overview-stats';
     statsRow.append(makeStat('Walls', stats.total), makeStat('Active', stats.active), makeStat('Messages', stats.messages), makeStat('Visitors', stats.visitors));
@@ -373,10 +368,13 @@
     kicker.className = 'wall-inventory-kicker';
     kicker.textContent = 'Wall inventory';
     const { toolbar, empty } = addFilterToolbar({
-      container: 'wall', items: rows, searchText: 'Search Walls or location',
+      items: rows,
+      searchText: 'Search Walls or location',
       statusOptions: [['all', 'All'], ['active', 'Active'], ['inactive', 'Inactive']],
-      getSearch: (item) => item.dataset.search || '', getStatus: (item) => item.dataset.status || '',
-      emptyText: 'No Walls match this search.', countLabel: 'Walls',
+      getSearch: (item) => item.dataset.search || '',
+      getStatus: (item) => item.dataset.status || '',
+      emptyText: 'No Walls match this search.',
+      countLabel: 'Walls',
     });
     const listHead = document.createElement('div');
     listHead.className = 'wall-list-head';
@@ -397,7 +395,9 @@
     const cells = $$('td', row);
     if (cells.length < 5) return null;
     const display = text($('strong', cells[0]));
-    const username = text($('.code', cells[0]));
+    const codes = $$('.code', cells[0]);
+    const username = text(codes[0]);
+    const wall = text(codes[1]).replace(/^Wall:\s*/i, '');
     const role = text(cells[1]);
     const active = Boolean($('.badge.active', cells[2]));
     const temporary = /temporary password/i.test(text(cells[2]));
@@ -405,35 +405,25 @@
 
     const item = document.createElement('article');
     item.className = 'user-row';
-    item.dataset.search = `${display} ${username} ${role}`.toLowerCase();
+    item.dataset.search = `${display} ${username} ${role} ${wall}`.toLowerCase();
     item.dataset.status = active ? 'active' : 'inactive';
 
     const identity = document.createElement('div');
     identity.className = 'user-identity';
-    const strong = document.createElement('strong');
-    strong.textContent = display;
-    const handle = document.createElement('div');
-    handle.className = 'user-handle';
-    handle.textContent = username;
-    identity.append(strong, handle);
-
+    identity.innerHTML = `<strong>${escapeHtml(display)}</strong><div class="user-handle">${escapeHtml(username)}</div><div class="user-wall">${escapeHtml(wall || 'No Wall assigned')}</div>`;
     const roleChip = document.createElement('span');
     roleChip.className = 'user-role';
     roleChip.textContent = role;
-
     const status = document.createElement('div');
     status.className = 'user-status';
     status.innerHTML = `<span class="badge ${active ? 'active' : 'inactive'}">${active ? 'Active' : 'Inactive'}</span>${temporary ? '<span class="temp-badge">Temp password</span>' : ''}`;
-
     const login = document.createElement('div');
     login.className = 'user-login';
     login.textContent = lastLogin || 'Never';
-
     const actions = document.createElement('div');
     actions.className = 'user-actions';
     while (cells[4].firstChild) actions.appendChild(cells[4].firstChild);
     $$('a.button', actions).forEach((button) => button.classList.add('secondary'));
-
     item.append(identity, roleChip, status, login, actions);
     return item;
   }
@@ -443,8 +433,8 @@
     const panels = $$('.panel');
     const addPanel = panels.find((panel) => text($('h2', panel)) === 'Add admin user');
     const addModal = createModalFromPanel(addPanel, {
-      title: 'Add admin user',
-      description: 'Create a login and choose the access level for this administrator.',
+      title: 'Add Moderator',
+      description: 'Create a Moderator login and assign the one Wall they can manage.',
     });
 
     const usersPanel = panels.find((panel) => text($('h2', panel)) === 'Admin users');
@@ -453,12 +443,14 @@
     const pageHeading = document.createElement('div');
     pageHeading.className = 'admin-page-heading';
     pageHeading.innerHTML = '<div><span class="eyebrow">Access</span><h2>Users</h2></div>';
-    const addButton = document.createElement('button');
-    addButton.type = 'button';
-    addButton.className = 'button';
-    addButton.textContent = '+ Add User';
-    addButton.addEventListener('click', () => addModal?.open());
-    pageHeading.appendChild(addButton);
+    if (addModal) {
+      const addButton = document.createElement('button');
+      addButton.type = 'button';
+      addButton.className = 'button';
+      addButton.textContent = '+ Add Moderator';
+      addButton.addEventListener('click', () => addModal.open());
+      pageHeading.appendChild(addButton);
+    }
     usersPanel.parentNode.insertBefore(pageHeading, usersPanel);
 
     const table = $('table', usersPanel);
@@ -467,28 +459,31 @@
     const list = document.createElement('div');
     list.className = 'user-list';
     rows.forEach((row) => list.appendChild(row));
-
     const { toolbar, empty } = addFilterToolbar({
-      container: 'user', items: rows, searchText: 'Search users',
+      userMode: true,
+      items: rows,
+      searchText: 'Search users or Walls',
       statusOptions: [['all', 'All'], ['active', 'Active'], ['inactive', 'Inactive']],
-      getSearch: (item) => item.dataset.search || '', getStatus: (item) => item.dataset.status || '',
-      emptyText: 'No admin users match this search.', countLabel: 'Users',
+      getSearch: (item) => item.dataset.search || '',
+      getStatus: (item) => item.dataset.status || '',
+      emptyText: 'No users match this search.',
+      countLabel: 'Users',
     });
-
     const roleHelp = document.createElement('details');
     roleHelp.className = 'role-help';
-    roleHelp.innerHTML = '<summary>Role permissions</summary><p><strong>Owner</strong> — full access including users and audit. <strong>Admin</strong> — full Wall management. <strong>Moderator</strong> — review Walls and clear messages only.</p>';
-
+    roleHelp.innerHTML = '<summary>Permissions</summary><p><strong>Main Admin</strong> — all Walls, users, reports and audit. <strong>Moderator</strong> — only their assigned Wall; can review reported posts and choose Remove or Keep.</p>';
     const wrap = $('.table-wrap', usersPanel);
     if (wrap) wrap.replaceWith(toolbar, list, empty, roleHelp);
     else usersPanel.append(toolbar, list, empty, roleHelp);
   }
 
   const actionLabels = {
-    'wall.create': 'Created Wall', 'wall.edit': 'Edited Wall', 'wall.status': 'Changed Wall status',
-    'wall.replace_nfc': 'Replaced NFC URL', 'wall.clear_messages': 'Cleared messages', 'wall.delete': 'Deleted Wall',
-    'admin_user.create': 'Created admin user', 'admin_user.edit': 'Updated admin user',
-    'admin_user.password_reset': 'Reset admin password', 'account.password_changed': 'Changed password',
+    'wall.create': 'Created Wall', 'wall.edit': 'Edited Wall', 'wall.activate': 'Activated Wall',
+    'wall.deactivate': 'Deactivated Wall', 'wall.replace_nfc': 'Replaced NFC URL',
+    'wall.clear_messages': 'Cleared messages', 'wall.delete': 'Deleted Wall',
+    'admin_user.create': 'Created Moderator', 'admin_user.edit': 'Updated user',
+    'admin_user.password_reset': 'Reset password', 'account.password_changed': 'Changed password',
+    'report.remove_post': 'Removed reported post', 'report.keep_post': 'Kept reported post',
     'auth.login': 'Logged in', 'auth.logout': 'Logged out',
   };
   const prettyAction = (raw) => actionLabels[raw] || raw.replaceAll('_', ' ').replaceAll('.', ' · ').replace(/\b\w/g, (m) => m.toUpperCase());
@@ -518,15 +513,6 @@
     if (heading) heading.innerHTML = '<span class="eyebrow">Activity</span><span>Audit log</span>';
   }
 
-  function tidySingleFormPages() {
-    if (!['/admin/account/password'].includes(path) && !/\/admin\/walls\/[^/]+\/(edit|replace-nfc|clear|delete)$/.test(path) && !/\/admin\/users\/[^/]+\/(edit|password)$/.test(path)) return;
-    const panel = $('.panel');
-    if (!panel) return;
-    panel.style.maxWidth = '720px';
-    panel.style.marginLeft = 'auto';
-    panel.style.marginRight = 'auto';
-  }
-
   installStyles();
   refineHeader();
   setActiveNav();
@@ -534,5 +520,4 @@
   rebuildWalls();
   rebuildUsers();
   rebuildAudit();
-  tidySingleFormPages();
 })();
