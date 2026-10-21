@@ -15,6 +15,14 @@ try {
   const sql = await fs.readFile(schemaPath, 'utf8');
   await pool.query(sql);
 
+  // Commerce evolved after the first order table was created. Keep the upgrade
+  // path idempotent so existing Render Postgres databases gain the fields used
+  // by Stripe shipping details and Side A-style email confirmations.
+  await pool.query(`alter table commerce_orders add column if not exists customer_name text`);
+  await pool.query(`alter table commerce_orders add column if not exists shipping_address jsonb`);
+  await pool.query(`alter table commerce_orders add column if not exists customer_confirmation_sent_at timestamptz`);
+  await pool.query(`alter table commerce_orders add column if not exists owner_notification_sent_at timestamptz`);
+
   // Collapse the old Owner/Admin/Moderator model into Main Admin + Moderator.
   // Any legacy full Admin becomes a Moderator and must be assigned a Wall by the Owner.
   await pool.query(`update admin_users set role = 'moderator' where role = 'admin'`);
