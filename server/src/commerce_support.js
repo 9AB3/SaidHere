@@ -1,3 +1,5 @@
+import nodemailer from 'nodemailer';
+
 import { hashToken, makeToken } from './auth.js';
 import { pool } from './db.js';
 
@@ -54,6 +56,30 @@ function money(amount, currency = 'aud') {
   } catch (_) {
     return `$${(Number(amount) / 100).toFixed(2)} ${String(currency || 'AUD').toUpperCase()}`;
   }
+}
+
+function smtpTransport() {
+  const host = clean(process.env.SMTP_HOST) || 'mail-au.smtp2go.com';
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = clean(process.env.SMTP_USERNAME);
+  const pass = process.env.SMTP_PASSWORD || '';
+  if (!user || !pass) return null;
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    requireTLS: port !== 465,
+    auth: { user, pass },
+  });
+}
+
+async function sendMail(message) {
+  const transport = smtpTransport();
+  if (!transport) {
+    return { sent: false, reason: 'SMTP_USERNAME/SMTP_PASSWORD are not configured.' };
+  }
+  const info = await transport.sendMail(message);
+  return { sent: true, messageId: info.messageId };
 }
 
 async function ensureCustomer(client, email, stripeCustomerId = null) {
@@ -118,24 +144,6 @@ export async function ensureOrderCustomerLink(client, order) {
   return customer.id;
 }
 
-async function resend(body) {
-  const apiKey = process.env.RESEND_API_KEY || '';
-  if (!apiKey) return { sent: false, reason: 'RESEND_API_KEY is not configured.' };
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    throw new Error(`Resend ${response.status}: ${text.slice(0, 500)}`);
-  }
-  return { sent: true };
-}
-
 async function sendCustomerConfirmation(order, activationUrl) {
   if (!order.purchaser_email || order.customer_confirmation_sent_at) return false;
   const from = process.env.CUSTOMER_EMAIL_FROM || 'The Wall <orders@saidhere.app>';
@@ -146,9 +154,10 @@ async function sendCustomerConfirmation(order, activationUrl) {
   const shippingText = lines.length ? `\n\nShipping to:\n${lines.join('\n')}` : '';
   const qty = Number(order.quantity || 1);
   const total = money(order.amount_total, order.currency);
-  const result = await resend({
+  const result = await sendMail({
     from,
-    to: [order.purchaser_email],
+    to: order.purchaser_email,
+    replyTo: clean(process.env.CUSTOMER_REPLY_TO) || undefined,
     subject: `The Wall order confirmed — ${order.id}`,
     text: `Thanks for your The Wall order.\n\nOrder: ${order.id}\nPlaques: ${qty}\nTotal: ${total}${shippingText}\n\nSet up or manage your Wall account: ${activationUrl}\n\nWe'll prepare your physical plaque and link it to your account when it is assigned.`,
     html: `<div style="max-width:600px;margin:auto;font-family:Arial,sans-serif;color:#171411"><div style="background:#171411;color:#f7f0e5;padding:28px"><div style="font-size:12px;letter-spacing:3px">THE WALL</div><h1 style="margin:8px 0 0">Order confirmed.</h1></div><div style="padding:28px;border:1px solid #d8cdbc;border-top:0;background:#fffaf1"><p>Thanks${order.customer_name ? ` ${escapeHtml(order.customer_name)}` : ''}. We've received your order.</p><p><b>Order ${escapeHtml(order.id)}</b></p><table style="width:100%;border-collapse:collapse"><tr><td style="padding:8px 0">The Wall plaque</td><td style="text-align:right">× ${qty}</td></tr><tr><td style="padding-top:16px;border-top:1px solid #ddd"><b>Total</b></td><td style="padding-top:16px;border-top:1px solid #ddd;text-align:right"><b>${escapeHtml(total)}</b></td></tr></table>${shippingHtml}<p style="margin:26px 0"><a href="${escapeHtml(activationUrl)}" style="display:inline-block;padding:14px 18px;background:#171411;color:#fff;text-decoration:none;font-weight:700">${order.customer_has_password ? 'Manage My Walls' : 'Activate My Walls'}</a></p><p style="color:#6f675d">Your physical plaque will appear in My Walls when it is packed and assigned to your order.</p><p><b>Every place has something to say.</b><br>The Wall</p></div></div>`,
@@ -169,9 +178,9 @@ async function sendOwnerNotification(order) {
   const from = process.env.ORDER_EMAIL_FROM || process.env.CUSTOMER_EMAIL_FROM || 'The Wall <orders@saidhere.app>';
   const lines = addressLines(order.shipping_address);
   const qty = Number(order.quantity || 1);
-  const result = await resend({
+  const result = await sendMail({
     from,
-    to: recipients,
+    to: recipients.join(','),
     subject: `New The Wall order — ${order.id} — ${qty} plaque${qty === 1 ? '' : 's'}`,
     text: `New paid The Wall order\n\nOrder: ${order.id}\nCustomer: ${order.customer_name || ''}\nEmail: ${order.purchaser_email}\nPlaques: ${qty}\nTotal: ${money(order.amount_total, order.currency)}\n\nShipping:\n${lines.join('\n') || 'Not supplied'}`,
   });
