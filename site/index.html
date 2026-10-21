@@ -4,169 +4,53 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#171411">
-  <title>The Wall</title>
+  <title>The Wall — Every place has something to say</title>
   <style>
-    :root{
-      --ink:#171411;
-      --cream:#eee5d5;
-      --cream-soft:#d8ccb8;
-      --muted:#756b5f;
-      --line:rgba(238,229,213,.18);
-    }
-    *{box-sizing:border-box}
-    html,body{margin:0;min-height:100%;background:#b7aa93}
-    body{
-      min-height:100svh;
-      color:var(--ink);
-      font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-      background:
-        linear-gradient(rgba(216,204,183,.08),rgba(216,204,183,.08)),
-        url('/wall-background.png') center/cover fixed no-repeat;
-    }
-    .page{
-      min-height:100svh;
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      padding:max(22px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom));
-    }
-    .hero{
-      width:min(100%,520px);
-      flex:1 1 auto;
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:center;
-      text-align:center;
-      padding:28px 0 22px;
-    }
-    .plaque{
-      display:block;
-      width:min(76vw,330px);
-      height:auto;
-      filter:drop-shadow(0 14px 16px rgba(20,16,12,.24));
-    }
-    .tagline{
-      margin:30px 0 0;
-      max-width:360px;
-      font-size:24px;
-      line-height:1.06;
-      font-weight:950;
-      letter-spacing:-.6px;
-    }
-    .eyebrow{
-      margin:15px 0 0;
-      font-size:11px;
-      font-weight:900;
-      letter-spacing:1.7px;
-      text-transform:uppercase;
-      color:#5e5549;
-    }
-    .handoff{
-      width:min(100%,520px);
-      background:rgba(23,20,17,.96);
-      color:var(--cream);
-      padding:22px 20px 20px;
-      box-shadow:0 10px 34px rgba(18,14,10,.25);
-      border:1px solid rgba(255,255,255,.06);
-    }
-    .handoff h1{
-      margin:0 0 8px;
-      font-size:27px;
-      line-height:1;
-      font-weight:950;
-      letter-spacing:-.7px;
-      text-transform:uppercase;
-    }
-    .handoff p{
-      margin:0;
-      color:#c9bead;
-      font-size:14px;
-      line-height:1.45;
-      font-weight:600;
-    }
-    .actions{display:grid;gap:10px;margin-top:18px}
-    .button{
-      min-height:54px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:13px 18px;
-      border:1px solid var(--cream);
-      text-decoration:none;
-      font-size:13px;
-      font-weight:950;
-      letter-spacing:1px;
-      text-transform:uppercase;
-    }
-    .button.primary{background:var(--cream);color:var(--ink)}
-    .button.secondary{background:transparent;color:var(--cream)}
-    .hint{
-      display:flex;
-      gap:10px;
-      align-items:flex-start;
-      padding-top:16px;
-      margin-top:17px;
-      border-top:1px solid var(--line);
-      color:#9f9587;
-      font-size:11px;
-      line-height:1.4;
-      font-weight:700;
-    }
-    .hint-mark{
-      flex:0 0 24px;
-      width:24px;height:24px;
-      border:1px solid #70685e;
-      border-radius:50%;
-      display:grid;place-items:center;
-      color:var(--cream);
-      font-size:12px;
-      font-weight:900;
-    }
-    footer{
-      width:min(100%,520px);
-      display:flex;
-      justify-content:center;
-      gap:16px;
-      padding:17px 0 0;
-      font-size:11px;
-      font-weight:800;
-    }
-    footer a{color:#463f36;text-decoration:none}
-    @media(min-width:700px){
-      .page{padding-left:28px;padding-right:28px}
-      .hero{padding-top:42px}
-      .plaque{width:300px}
-      .tagline{font-size:28px}
-      .handoff{padding:26px}
-    }
+    :root{--ink:#171411;--paper:#f5ede0;--muted:#6e6559;--line:#cbbfaa;--red:#8f3c34;--green:#516c49}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#d4c7b1 url('/wall-background.png') center/cover fixed no-repeat}.wash{min-height:100vh;background:linear-gradient(rgba(235,224,204,.70),rgba(235,224,204,.86))}.shell{max-width:1080px;margin:0 auto;padding:18px 18px 60px}.top{display:flex;align-items:center;justify-content:space-between;gap:14px}.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}.brand img{width:48px;height:48px;object-fit:cover;border-radius:9px;box-shadow:0 5px 15px rgba(0,0,0,.18)}.brand strong{display:block;font-size:20px;line-height:1}.brand small{display:block;margin-top:3px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;font-weight:900;color:var(--muted)}.nav{display:flex;align-items:center;gap:8px}.nav a{padding:10px 12px;border-radius:8px;text-decoration:none;color:inherit;font-size:11px;text-transform:uppercase;letter-spacing:.65px;font-weight:900}.nav .dark{background:var(--ink);color:var(--paper)}.hero{min-height:70svh;display:grid;grid-template-columns:1.1fr .9fr;align-items:center;gap:48px;padding:55px 0 45px}.hero-copy .eyebrow,.eyebrow{display:block;font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:950;color:#6f665a}.hero h1{font-size:clamp(48px,8vw,88px);line-height:.88;letter-spacing:-4px;margin:12px 0 20px;max-width:700px}.hero p{font-size:19px;line-height:1.5;color:#5e564c;max-width:620px}.hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}.button{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:13px 18px;border:1px solid var(--ink);border-radius:9px;background:var(--ink);color:#fff;text-decoration:none;font-size:11px;text-transform:uppercase;letter-spacing:.8px;font-weight:950}.button.secondary{background:rgba(255,252,246,.7);color:var(--ink)}.hero-art{text-align:center}.hero-art img{width:min(100%,390px);height:auto;filter:drop-shadow(0 24px 27px rgba(24,18,13,.28))}.hero-art p{margin:18px auto 0;max-width:340px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#5e564c}.section{padding:48px 0;border-top:1px solid rgba(68,56,45,.22)}.section h2{font-size:38px;line-height:1;margin:9px 0 12px;letter-spacing:-1.5px}.section>p{max-width:680px;color:#655d52;line-height:1.55}.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:24px}.step,.owner-card{background:rgba(255,251,243,.88);border:1px solid var(--line);border-radius:13px;padding:20px;box-shadow:0 9px 24px rgba(35,27,20,.06)}.step .num{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--ink);color:#fff;font-weight:950;font-size:12px}.step h3{font-size:20px;margin:17px 0 7px}.step p{margin:0;color:#6c6357;line-height:1.5;font-size:14px}.owner-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px}.owner-card h3{font-size:24px;margin:0 0 9px}.owner-card ul{margin:12px 0 0;padding-left:19px;color:#625a50;line-height:1.75}.dark-panel{background:rgba(23,20,17,.96);color:var(--paper);border-radius:18px;padding:30px;margin-top:18px}.dark-panel p{color:#c8bdad;max-width:700px;line-height:1.55}.dark-panel .button{background:var(--paper);color:var(--ink);border-color:var(--paper)}footer{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;padding-top:26px;font-size:11px;font-weight:800;color:#514a41}footer a{color:inherit;text-decoration:none}@media(max-width:780px){.shell{padding:12px 14px 42px}.top{align-items:flex-start}.brand small{display:none}.nav a{padding:9px 8px;font-size:9px}.nav a:first-child{display:none}.hero{grid-template-columns:1fr;gap:25px;min-height:auto;padding:50px 0 44px}.hero-copy{text-align:center}.hero h1{font-size:58px;letter-spacing:-3px}.hero p{font-size:16px}.hero-actions{justify-content:center}.hero-art{order:-1}.hero-art img{width:min(78vw,310px)}.steps,.owner-grid{grid-template-columns:1fr}.section{padding:38px 0}.section h2{font-size:32px}.dark-panel{padding:22px}.button{flex:1 1 180px}}
   </style>
 </head>
 <body>
-  <main class="page">
-    <section class="hero">
-      <img class="plaque" src="/plaque.png" alt="The Wall — Tap Here plaque">
-      <p class="tagline">Every place has something to say.</p>
-      <p class="eyebrow">You found one</p>
-    </section>
+  <div class="wash">
+    <main class="shell">
+      <header class="top">
+        <a class="brand" href="/"><img src="/plaque.png" alt="The Wall"><span><strong>The Wall</strong><small>Physical place. Anonymous voice.</small></span></a>
+        <nav class="nav"><a href="#how">How it works</a><a href="/my-walls">My Walls</a><a class="dark" href="/shop">Buy a plaque</a></nav>
+      </header>
 
-    <section class="handoff">
-      <h1>Open this Wall</h1>
-      <p>Read what people have left here. A physical plaque tap unlocks writing for 15 minutes.</p>
-      <div class="actions">
-        <a id="open-app" class="button primary" href="saidhere://">Open The Wall</a>
-        <a class="button secondary" href="https://apps.apple.com/app/id6823565189">Get the iPhone app</a>
-      </div>
-      <div class="hint">
-        <span class="hint-mark">i</span>
-        <span>If The Wall is already installed, this plaque normally opens it automatically. If Safari opened instead, tap <strong>Open The Wall</strong>.</span>
-      </div>
-    </section>
+      <section class="hero">
+        <div class="hero-copy">
+          <span class="eyebrow">The physical place is the social network</span>
+          <h1>Every place has something to say.</h1>
+          <p>Put a Wall plaque somewhere worth talking about. Anyone who physically taps it can discover the Wall, read what has been left there and unlock 15 minutes to leave their own mark.</p>
+          <div class="hero-actions"><a class="button" href="/shop">Buy a Wall plaque</a><a class="button secondary" href="/my-walls">Manage My Walls</a></div>
+        </div>
+        <div class="hero-art"><img src="/plaque.png" alt="The Wall NFC plaque"><p>Your plaque. Your Wall. The conversation belongs to the place.</p></div>
+      </section>
 
-    <footer>
-      <a href="/privacy/">Privacy</a>
-      <a href="/support/">Support</a>
-    </footer>
-  </main>
+      <section id="how" class="section">
+        <span class="eyebrow">How ownership works</span>
+        <h2>Buy it. Place it. Let the place speak.</h2>
+        <p>Each physical plaque is linked to one Wall and one purchaser. Ownership is established from the paid order, so only the buyer and The Wall platform administrator can change that Wall's identity or moderation settings.</p>
+        <div class="steps">
+          <article class="step"><div class="num">1</div><h3>Buy your plaque</h3><p>Checkout creates the purchase record that will own the Wall. Buy one or several under the same email.</p></article>
+          <article class="step"><div class="num">2</div><h3>We link the hardware</h3><p>When your order is packed, the exact physical NFC plaque is assigned to your purchase and its Wall is created.</p></article>
+          <article class="step"><div class="num">3</div><h3>You control your Wall</h3><p>Sign into My Walls to name it, set its location, pause it and review posts that users have reported.</p></article>
+        </div>
+      </section>
+
+      <section class="section">
+        <span class="eyebrow">Simple permissions</span>
+        <h2>The buyer owns the Wall controls.</h2>
+        <div class="owner-grid">
+          <article class="owner-card"><h3>Wall owner</h3><ul><li>Rename Walls they purchased</li><li>Change the Wall location</li><li>Deactivate or reactivate their Wall</li><li>Review reported posts</li><li>Keep or remove reported posts</li><li>See basic Wall activity</li></ul></article>
+          <article class="owner-card"><h3>Platform admin</h3><ul><li>Manage all Walls and customers</li><li>Assign physical plaques to paid orders</li><li>Replace NFC links when hardware is compromised</li><li>Transfer ownership when required</li><li>Override moderation and investigate issues</li><li>Review order and audit history</li></ul></article>
+        </div>
+      </section>
+
+      <section class="dark-panel"><span class="eyebrow" style="color:#b7ab9c">Already found a Wall?</span><h2 style="font-size:34px;margin:8px 0">Tap the physical plaque.</h2><p>Reading follows you after discovery. Writing does not. A fresh NFC tap at the place is what unlocks posting and replies.</p><div class="hero-actions"><a class="button" href="https://apps.apple.com/app/id6823565189">Get the iPhone app</a><a class="button secondary" style="color:#f5ede0;border-color:#9a9084;background:transparent" href="/my-walls">Wall owner login</a></div></section>
+
+      <footer><span>© 2026 The Wall</span><span><a href="/privacy/">Privacy</a> · <a href="/support/">Support</a> · <a href="/admin">Admin</a></span></footer>
+    </main>
+  </div>
 </body>
 </html>
