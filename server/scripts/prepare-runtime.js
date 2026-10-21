@@ -6,6 +6,25 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const serverRoot = path.resolve(here, '..');
 const sourcePath = path.join(serverRoot, 'src', 'index.js');
 const runtimePath = path.join(serverRoot, 'src', 'index.runtime.js');
+const commerceSourcePath = path.join(serverRoot, 'src', 'commerce.js');
+const commerceRuntimePath = path.join(serverRoot, 'src', 'commerce.runtime.js');
+
+// Stripe's newer Managed Payments mode does not support Checkout's normal
+// shipping_address_collection parameter. The Wall sells a physical plaque, so
+// its Checkout Session deliberately opts out of Managed Payments and keeps the
+// standard Stripe-hosted shipping-address flow.
+let commerceSource = fs.readFileSync(commerceSourcePath, 'utf8');
+const checkoutModeMarker = "    params.set('mode', 'payment');";
+if (!commerceSource.includes("managed_payments[enabled]")) {
+  if (!commerceSource.includes(checkoutModeMarker)) {
+    throw new Error('Could not find the Stripe Checkout mode marker.');
+  }
+  commerceSource = commerceSource.replace(
+    checkoutModeMarker,
+    `${checkoutModeMarker}\n    params.set('managed_payments[enabled]', 'false');`,
+  );
+}
+fs.writeFileSync(commerceRuntimePath, commerceSource, 'utf8');
 
 let source = fs.readFileSync(sourcePath, 'utf8');
 
@@ -17,7 +36,7 @@ const dbImport = "import { pool } from './db.js';";
 const adminImport = "import { mountAdminPortal } from './admin_portal.js';";
 const brandImport = "import { mountAdminBrand } from './admin_brand.js';";
 const ownershipNavImport = "import { mountOwnershipAdminNav } from './admin_ownership_nav.js';";
-const commerceImport = "import { mountCommerce, mountStripeWebhook } from './commerce.js';";
+const commerceImport = "import { mountCommerce, mountStripeWebhook } from './commerce.runtime.js';";
 const activationImport = "import { mountPurchaseActivation } from './purchase_activation.js';";
 const customerImport = "import { mountCustomerPortal } from './customer_portal.js';";
 const publicImport = "import { mountCanonicalWebRedirect, mountPublicSite } from './public_site.js';";
