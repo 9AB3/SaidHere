@@ -43,7 +43,7 @@ projects:
                 value: A$15.00
               - key: STRIPE_SHIPPING_COUNTRIES
                 value: AU
-              - key: RESEND_API_KEY
+              - key: SMTP2GO_API_KEY
                 sync: false
               - key: CUSTOMER_EMAIL_FROM
                 value: The Wall <orders@saidhere.app>
