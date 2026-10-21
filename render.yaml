@@ -33,6 +33,24 @@ projects:
                 value: https://saidhere.app,https://www.saidhere.app,https://saidhere-api-9ab3.onrender.com
               - key: ADMIN_KEY
                 generateValue: true
+              - key: STRIPE_SECRET_KEY
+                sync: false
+              - key: STRIPE_PRICE_WALL_PLAQUE
+                sync: false
+              - key: STRIPE_WEBHOOK_SECRET
+                sync: false
+              - key: WALL_PLAQUE_DISPLAY_PRICE
+                value: A$15.00
+              - key: STRIPE_SHIPPING_COUNTRIES
+                value: AU
+              - key: RESEND_API_KEY
+                sync: false
+              - key: CUSTOMER_EMAIL_FROM
+                value: The Wall <orders@saidhere.app>
+              - key: ORDER_EMAIL_FROM
+                value: The Wall <orders@saidhere.app>
+              - key: ORDER_NOTIFICATION_EMAIL
+                sync: false
 
         databases:
           - name: saidhere-db-9ab3
