@@ -37,21 +37,8 @@ commerceSource = replaceFunction(
   'paid checkout',
 );
 
-// Stripe Managed Payments is enabled by default on this account, but Managed
-// Payments currently rejects shipping_address_collection. A Wall plaque is a
-// physical product, so explicitly opt this Checkout Session out and let the
-// standard Checkout flow collect the delivery address.
-const managedPaymentsParam = "    params.set('managed_payments[enabled]', 'false');";
-if (!commerceSource.includes(managedPaymentsParam)) {
-  const checkoutCancelMarker = "    params.set('cancel_url', `${baseUrl()}/shop?cancelled=1`);";
-  if (!commerceSource.includes(checkoutCancelMarker)) {
-    throw new Error('Could not find the Stripe checkout cancel URL marker.');
-  }
-  commerceSource = commerceSource.replace(
-    checkoutCancelMarker,
-    `${checkoutCancelMarker}\n${managedPaymentsParam}`,
-  );
-}
+// Use ordinary Stripe Checkout for the physical plaque. Do not inject preview
+// or account-specific payment-mode flags into generated production code.
 
 const missingCustomerMarker = "    if (!order.customer_id) throw new Error('This paid order has no customer account attached.');";
 if (!commerceSource.includes(missingCustomerMarker)) throw new Error('Could not find the fulfilment customer marker.');
@@ -90,18 +77,19 @@ fs.writeFileSync(customerRuntimePath, customerSource, 'utf8');
 let source = fs.readFileSync(sourcePath, 'utf8');
 
 // Keep index.js as the stable consumer API source. The generated runtime layers
-// the canonical web host, Stripe webhook, commerce/fulfilment, customer owner
-// portal and polished browser admin around it without disturbing TestFlight API
-// compatibility.
+// the canonical web host, Stripe webhook, commerce, first-scan plaque setup,
+// customer owner portal and polished browser admin around it without disturbing
+// TestFlight API compatibility.
 const dbImport = "import { pool } from './db.js';";
 const adminImport = "import { mountAdminPortal } from './admin_portal.js';";
 const brandImport = "import { mountAdminBrand } from './admin_brand.js';";
 const ownershipNavImport = "import { mountOwnershipAdminNav } from './admin_ownership_nav.js';";
 const commerceImport = "import { mountCommerce, mountStripeWebhook } from './commerce.runtime.js';";
 const activationImport = "import { mountPurchaseActivation } from './purchase_activation.js';";
+const plaqueSetupImport = "import { mountPlaqueSetup } from './plaque_setup.js';";
 const customerImport = "import { mountCustomerPortal } from './customer_portal.runtime.js';";
 const publicImport = "import { mountCanonicalWebRedirect, mountPublicSite } from './public_site.js';";
-const requiredImports = [brandImport, ownershipNavImport, commerceImport, activationImport, customerImport, adminImport, publicImport];
+const requiredImports = [brandImport, ownershipNavImport, commerceImport, activationImport, plaqueSetupImport, customerImport, adminImport, publicImport];
 if (requiredImports.some((line) => !source.includes(line))) {
   if (!source.includes(dbImport)) {
     throw new Error('Could not find the database import marker.');
@@ -145,8 +133,9 @@ const mountBlock = [
   'mountOwnershipAdminNav(app);',
   // The paid-return activation route must mount before commerce's generic success page.
   'mountPurchaseActivation(app);',
-  // Commerce must mount before /admin because /admin/fulfillment is a commerce route.
   'mountCommerce(app);',
+  // First-scan interception must mount before the original /api/tags/open and public /t route.
+  'mountPlaqueSetup(app);',
   'mountCustomerPortal(app);',
   'mountAdminPortal(app);',
   'mountPublicSite(app);',
@@ -161,13 +150,14 @@ if (!source.includes('mountAdminPortal(app);')) {
     'mountOwnershipAdminNav(app);',
     'mountPurchaseActivation(app);',
     'mountCommerce(app);',
+    'mountPlaqueSetup(app);',
     'mountCustomerPortal(app);',
     'mountAdminPortal(app);',
     'mountPublicSite(app);',
   ];
   for (const line of desired) {
     if (source.includes(line)) continue;
-    if (line === 'mountOwnershipAdminNav(app);' || line === 'mountPurchaseActivation(app);' || line === 'mountCommerce(app);' || line === 'mountCustomerPortal(app);') {
+    if (line === 'mountOwnershipAdminNav(app);' || line === 'mountPurchaseActivation(app);' || line === 'mountCommerce(app);' || line === 'mountPlaqueSetup(app);' || line === 'mountCustomerPortal(app);') {
       source = source.replace('mountAdminPortal(app);', `${line}\nmountAdminPortal(app);`);
     } else if (line === 'mountCanonicalWebRedirect(app);' || line === 'mountAdminBrand(app);') {
       source = source.replace('mountAdminPortal(app);', `${line}\nmountAdminPortal(app);`);
@@ -178,4 +168,4 @@ if (!source.includes('mountAdminPortal(app);')) {
 }
 
 fs.writeFileSync(runtimePath, source, 'utf8');
-console.log('Prepared SaidHere runtime for canonical web, SMTP2GO SMTP email, customer ownership, admin, NFC and API hosting.');
+console.log('Prepared SaidHere runtime for checkout, first-scan plaque setup, SMTP2GO email, customer ownership, admin, NFC and API hosting.');
