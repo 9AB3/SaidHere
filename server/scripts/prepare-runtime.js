@@ -18,26 +18,10 @@ function replaceFunction(source, startMarker, endMarker, replacement, label) {
   return `${source.slice(0, start)}${replacement}\n\n${source.slice(end)}`;
 }
 
-// Stripe's newer Managed Payments mode does not support Checkout's normal
-// shipping_address_collection parameter. The Wall sells a physical plaque, so
-// its Checkout Session deliberately opts out of Managed Payments and keeps the
-// standard Stripe-hosted shipping-address flow.
-let commerceSource = fs.readFileSync(commerceSourcePath, 'utf8');
-const checkoutModeMarker = "    params.set('mode', 'payment');";
-if (!commerceSource.includes("managed_payments[enabled]")) {
-  if (!commerceSource.includes(checkoutModeMarker)) {
-    throw new Error('Could not find the Stripe Checkout mode marker.');
-  }
-  commerceSource = commerceSource.replace(
-    checkoutModeMarker,
-    `${checkoutModeMarker}\n    params.set('managed_payments[enabled]', 'false');`,
-  );
-}
-
 // Keep payment reconciliation and SMTP2GO email handling in commerce_support.js.
-// The support module now contains the final Nodemailer/SMTP implementation, so
-// the runtime must import it directly rather than trying to transform an older
-// email-provider implementation at startup.
+// The support module contains the final Nodemailer/SMTP implementation, so the
+// runtime imports it directly rather than transforming an older email provider.
+let commerceSource = fs.readFileSync(commerceSourcePath, 'utf8');
 const commerceDbImport = "import { pool } from './db.js';";
 const commerceSupportImport = "import { reconcilePaidCheckout, ensureOrderCustomerLink, manualClaimLinkForOrder } from './commerce_support.js';";
 if (!commerceSource.includes(commerceSupportImport)) {
