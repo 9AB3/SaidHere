@@ -59,10 +59,15 @@ class SaidHereService {
     }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      final message = data is Map<String, dynamic>
-          ? (data['error'] ?? 'Request failed.').toString()
+      final map = data is Map<String, dynamic> ? data : null;
+      final message = map != null
+          ? (map['error'] ?? 'Request failed.').toString()
           : 'Request failed (${response.statusCode}).';
-      throw SaidHereException(message);
+      throw SaidHereException(
+        message,
+        setupRequired: map?['setup_required'] == true,
+        setupUrl: map?['setup_url']?.toString(),
+      );
     }
     return data;
   }
@@ -138,8 +143,15 @@ class SaidHereService {
 }
 
 class SaidHereException implements Exception {
-  const SaidHereException(this.message);
+  const SaidHereException(
+    this.message, {
+    this.setupRequired = false,
+    this.setupUrl,
+  });
+
   final String message;
+  final bool setupRequired;
+  final String? setupUrl;
 
   @override
   String toString() => message;
