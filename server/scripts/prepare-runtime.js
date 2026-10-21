@@ -16,10 +16,11 @@ let source = fs.readFileSync(sourcePath, 'utf8');
 const dbImport = "import { pool } from './db.js';";
 const adminImport = "import { mountAdminPortal } from './admin_portal.js';";
 const brandImport = "import { mountAdminBrand } from './admin_brand.js';";
+const ownershipNavImport = "import { mountOwnershipAdminNav } from './admin_ownership_nav.js';";
 const commerceImport = "import { mountCommerce, mountStripeWebhook } from './commerce.js';";
 const customerImport = "import { mountCustomerPortal } from './customer_portal.js';";
 const publicImport = "import { mountCanonicalWebRedirect, mountPublicSite } from './public_site.js';";
-const requiredImports = [brandImport, commerceImport, customerImport, adminImport, publicImport];
+const requiredImports = [brandImport, ownershipNavImport, commerceImport, customerImport, adminImport, publicImport];
 if (requiredImports.some((line) => !source.includes(line))) {
   if (!source.includes(dbImport)) {
     throw new Error('Could not find the database import marker.');
@@ -48,6 +49,7 @@ if (markerIndex < 0) {
 const mountBlock = [
   'mountCanonicalWebRedirect(app);',
   'mountAdminBrand(app);',
+  'mountOwnershipAdminNav(app);',
   // Commerce must mount before /admin because /admin/fulfillment is a commerce route.
   'mountCommerce(app);',
   'mountCustomerPortal(app);',
@@ -61,6 +63,7 @@ if (!source.includes('mountAdminPortal(app);')) {
   const desired = [
     'mountCanonicalWebRedirect(app);',
     'mountAdminBrand(app);',
+    'mountOwnershipAdminNav(app);',
     'mountCommerce(app);',
     'mountCustomerPortal(app);',
     'mountAdminPortal(app);',
@@ -68,7 +71,7 @@ if (!source.includes('mountAdminPortal(app);')) {
   ];
   for (const line of desired) {
     if (source.includes(line)) continue;
-    if (line === 'mountCommerce(app);' || line === 'mountCustomerPortal(app);') {
+    if (line === 'mountOwnershipAdminNav(app);' || line === 'mountCommerce(app);' || line === 'mountCustomerPortal(app);') {
       source = source.replace('mountAdminPortal(app);', `${line}\nmountAdminPortal(app);`);
     } else if (line === 'mountCanonicalWebRedirect(app);' || line === 'mountAdminBrand(app);') {
       source = source.replace('mountAdminPortal(app);', `${line}\nmountAdminPortal(app);`);
