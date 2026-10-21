@@ -37,6 +37,22 @@ commerceSource = replaceFunction(
   'paid checkout',
 );
 
+// Stripe Managed Payments is enabled by default on this account, but Managed
+// Payments currently rejects shipping_address_collection. A Wall plaque is a
+// physical product, so explicitly opt this Checkout Session out and let the
+// standard Checkout flow collect the delivery address.
+const managedPaymentsParam = "    params.set('managed_payments[enabled]', 'false');";
+if (!commerceSource.includes(managedPaymentsParam)) {
+  const checkoutCancelMarker = "    params.set('cancel_url', `${baseUrl()}/shop?cancelled=1`);";
+  if (!commerceSource.includes(checkoutCancelMarker)) {
+    throw new Error('Could not find the Stripe checkout cancel URL marker.');
+  }
+  commerceSource = commerceSource.replace(
+    checkoutCancelMarker,
+    `${checkoutCancelMarker}\n${managedPaymentsParam}`,
+  );
+}
+
 const missingCustomerMarker = "    if (!order.customer_id) throw new Error('This paid order has no customer account attached.');";
 if (!commerceSource.includes(missingCustomerMarker)) throw new Error('Could not find the fulfilment customer marker.');
 commerceSource = commerceSource.replace(
