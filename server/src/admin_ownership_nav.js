@@ -1,9 +1,11 @@
+import { mountAdminOrders } from './admin_orders.js';
+
 export function mountOwnershipAdminNav(app) {
-  // Commerce adds paying Wall Owners, but it does not replace the existing
-  // Main Admin + Moderator administration model. Keep /admin/users available
-  // for platform staff while routing the commerce shortcuts to fulfilment.
-  app.get('/admin/orders', (_req, res) => res.redirect(303, '/admin/fulfillment'));
-  app.get('/admin/customers', (_req, res) => res.redirect(303, '/admin/fulfillment'));
+  // Mount the commerce/order console before the older admin routes so /admin/orders
+  // is a first-class operational page rather than a redirect into a basic fulfilment view.
+  mountAdminOrders(app);
+
+  app.get('/admin/customers', (_req, res) => res.redirect(303, '/admin/orders'));
 
   app.use('/admin', (_req, res, next) => {
     const originalSend = res.send.bind(res);
