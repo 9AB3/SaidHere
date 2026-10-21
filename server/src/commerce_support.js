@@ -266,6 +266,8 @@ export async function reconcilePaidCheckout(session) {
 
 export async function manualClaimLinkForOrder(orderId) {
   const client = await pool.connect();
+  let notification = null;
+  let url = '';
   try {
     await client.query('begin');
     const result = await client.query(`select * from commerce_orders where id = $1 for update`, [orderId]);
@@ -273,17 +275,25 @@ export async function manualClaimLinkForOrder(orderId) {
     const order = result.rows[0];
     if (!['paid', 'fulfilled'].includes(order.status)) throw new Error('Only paid orders can generate an activation link.');
     const customerId = await ensureOrderCustomerLink(client, order);
-    const customer = await client.query(`select id, password_hash from customer_accounts where id = $1 limit 1`, [customerId]);
+    const customer = await client.query(`select id, email, password_hash from customer_accounts where id = $1 limit 1`, [customerId]);
     if (customer.rowCount === 0) throw new Error('Customer account could not be created for this order.');
-    const url = customer.rows[0].password_hash
+    const hasPassword = Boolean(customer.rows[0].password_hash);
+    url = hasPassword
       ? `${baseUrl()}/my-walls/login`
       : await issueClaimToken(client, customerId, order.id);
+    const refreshed = await client.query(`select * from commerce_orders where id = $1 limit 1`, [order.id]);
+    notification = {
+      ...refreshed.rows[0],
+      purchaser_email: refreshed.rows[0]?.purchaser_email || customer.rows[0].email,
+      customer_has_password: hasPassword,
+    };
     await client.query('commit');
-    return url;
   } catch (error) {
     try { await client.query('rollback'); } catch (_) {}
     throw error;
   } finally {
     client.release();
   }
+  if (notification) await sendOrderEmails(notification, url);
+  return url;
 }
