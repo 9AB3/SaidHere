@@ -87,9 +87,10 @@ const ownershipNavImport = "import { mountOwnershipAdminNav } from './admin_owne
 const commerceImport = "import { mountCommerce, mountStripeWebhook } from './commerce.runtime.js';";
 const activationImport = "import { mountPurchaseActivation } from './purchase_activation.js';";
 const plaqueSetupImport = "import { mountPlaqueSetup } from './plaque_setup.js';";
+const setupGuardImport = "import { mountSetupGuard } from './setup_guard.js';";
 const customerImport = "import { mountCustomerPortal } from './customer_portal.runtime.js';";
 const publicImport = "import { mountCanonicalWebRedirect, mountPublicSite } from './public_site.js';";
-const requiredImports = [brandImport, ownershipNavImport, commerceImport, activationImport, plaqueSetupImport, customerImport, adminImport, publicImport];
+const requiredImports = [brandImport, ownershipNavImport, commerceImport, activationImport, plaqueSetupImport, setupGuardImport, customerImport, adminImport, publicImport];
 if (requiredImports.some((line) => !source.includes(line))) {
   if (!source.includes(dbImport)) {
     throw new Error('Could not find the database import marker.');
@@ -136,6 +137,8 @@ const mountBlock = [
   'mountCommerce(app);',
   // First-scan interception must mount before the original /api/tags/open and public /t route.
   'mountPlaqueSetup(app);',
+  // Prevent owners from bypassing the first physical scan by editing the placeholder Wall in My Walls.
+  'mountSetupGuard(app);',
   'mountCustomerPortal(app);',
   'mountAdminPortal(app);',
   'mountPublicSite(app);',
@@ -151,13 +154,14 @@ if (!source.includes('mountAdminPortal(app);')) {
     'mountPurchaseActivation(app);',
     'mountCommerce(app);',
     'mountPlaqueSetup(app);',
+    'mountSetupGuard(app);',
     'mountCustomerPortal(app);',
     'mountAdminPortal(app);',
     'mountPublicSite(app);',
   ];
   for (const line of desired) {
     if (source.includes(line)) continue;
-    if (line === 'mountOwnershipAdminNav(app);' || line === 'mountPurchaseActivation(app);' || line === 'mountCommerce(app);' || line === 'mountPlaqueSetup(app);' || line === 'mountCustomerPortal(app);') {
+    if (line === 'mountOwnershipAdminNav(app);' || line === 'mountPurchaseActivation(app);' || line === 'mountCommerce(app);' || line === 'mountPlaqueSetup(app);' || line === 'mountSetupGuard(app);' || line === 'mountCustomerPortal(app);') {
       source = source.replace('mountAdminPortal(app);', `${line}\nmountAdminPortal(app);`);
     } else if (line === 'mountCanonicalWebRedirect(app);' || line === 'mountAdminBrand(app);') {
       source = source.replace('mountAdminPortal(app);', `${line}\nmountAdminPortal(app);`);
