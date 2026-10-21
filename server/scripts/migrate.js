@@ -17,11 +17,19 @@ try {
 
   // Commerce evolved after the first order table was created. Keep the upgrade
   // path idempotent so existing Render Postgres databases gain the fields used
-  // by Stripe shipping details and Side A-style email confirmations.
+  // by Stripe shipping details, customer confirmations and operational email diagnostics.
   await pool.query(`alter table commerce_orders add column if not exists customer_name text`);
   await pool.query(`alter table commerce_orders add column if not exists shipping_address jsonb`);
   await pool.query(`alter table commerce_orders add column if not exists customer_confirmation_sent_at timestamptz`);
+  await pool.query(`alter table commerce_orders add column if not exists customer_confirmation_last_attempt_at timestamptz`);
+  await pool.query(`alter table commerce_orders add column if not exists customer_confirmation_error text`);
+  await pool.query(`alter table commerce_orders add column if not exists customer_confirmation_message_id text`);
+  await pool.query(`alter table commerce_orders add column if not exists customer_confirmation_attempts integer not null default 0`);
   await pool.query(`alter table commerce_orders add column if not exists owner_notification_sent_at timestamptz`);
+  await pool.query(`alter table commerce_orders add column if not exists owner_notification_last_attempt_at timestamptz`);
+  await pool.query(`alter table commerce_orders add column if not exists owner_notification_error text`);
+  await pool.query(`alter table commerce_orders add column if not exists owner_notification_message_id text`);
+  await pool.query(`alter table commerce_orders add column if not exists owner_notification_attempts integer not null default 0`);
 
   // Collapse the old Owner/Admin/Moderator model into Main Admin + Moderator.
   // Any legacy full Admin becomes a Moderator and must be assigned a Wall by the Owner.
