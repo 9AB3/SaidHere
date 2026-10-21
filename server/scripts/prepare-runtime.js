@@ -8,6 +8,8 @@ const sourcePath = path.join(serverRoot, 'src', 'index.js');
 const runtimePath = path.join(serverRoot, 'src', 'index.runtime.js');
 const commerceSourcePath = path.join(serverRoot, 'src', 'commerce.js');
 const commerceRuntimePath = path.join(serverRoot, 'src', 'commerce.runtime.js');
+const customerSourcePath = path.join(serverRoot, 'src', 'customer_portal.js');
+const customerRuntimePath = path.join(serverRoot, 'src', 'customer_portal.runtime.js');
 
 // Stripe's newer Managed Payments mode does not support Checkout's normal
 // shipping_address_collection parameter. The Wall sells a physical plaque, so
@@ -26,6 +28,19 @@ if (!commerceSource.includes("managed_payments[enabled]")) {
 }
 fs.writeFileSync(commerceRuntimePath, commerceSource, 'utf8');
 
+// The customer dashboard aggregates Wall activity but sorts by ownership date.
+// PostgreSQL requires that sort column in GROUP BY too.
+let customerSource = fs.readFileSync(customerSourcePath, 'utf8');
+const customerGroupMarker = '      group by w.id\n      order by o.started_at desc`';
+if (!customerSource.includes(customerGroupMarker)) {
+  throw new Error('Could not find the customer Walls GROUP BY marker.');
+}
+customerSource = customerSource.replace(
+  customerGroupMarker,
+  '      group by w.id, o.started_at\n      order by o.started_at desc`',
+);
+fs.writeFileSync(customerRuntimePath, customerSource, 'utf8');
+
 let source = fs.readFileSync(sourcePath, 'utf8');
 
 // Keep index.js as the stable consumer API source. The generated runtime layers
@@ -38,7 +53,7 @@ const brandImport = "import { mountAdminBrand } from './admin_brand.js';";
 const ownershipNavImport = "import { mountOwnershipAdminNav } from './admin_ownership_nav.js';";
 const commerceImport = "import { mountCommerce, mountStripeWebhook } from './commerce.runtime.js';";
 const activationImport = "import { mountPurchaseActivation } from './purchase_activation.js';";
-const customerImport = "import { mountCustomerPortal } from './customer_portal.js';";
+const customerImport = "import { mountCustomerPortal } from './customer_portal.runtime.js';";
 const publicImport = "import { mountCanonicalWebRedirect, mountPublicSite } from './public_site.js';";
 const requiredImports = [brandImport, ownershipNavImport, commerceImport, activationImport, customerImport, adminImport, publicImport];
 if (requiredImports.some((line) => !source.includes(line))) {
