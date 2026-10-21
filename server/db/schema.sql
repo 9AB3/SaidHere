@@ -51,6 +51,7 @@ create table if not exists post_reports (
   unique (post_id, reporter_session_id)
 );
 
+-- Platform administration. Customer Wall owners do not use this table.
 create table if not exists admin_users (
   id uuid primary key default gen_random_uuid(),
   username text not null unique,
@@ -87,14 +88,135 @@ create table if not exists admin_audit_log (
   created_at timestamptz not null default now()
 );
 
+-- Customer accounts are separate from platform administrators. A customer can
+-- own any number of Walls through wall_ownerships.
+create table if not exists customer_accounts (
+  id uuid primary key default gen_random_uuid(),
+  email text not null,
+  display_name text not null default '',
+  password_hash text,
+  active boolean not null default true,
+  stripe_customer_id text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  last_login_at timestamptz
+);
+
+create unique index if not exists idx_customer_accounts_email_lower
+  on customer_accounts (lower(email));
+create unique index if not exists idx_customer_accounts_stripe_customer
+  on customer_accounts(stripe_customer_id)
+  where stripe_customer_id is not null;
+
+create table if not exists customer_sessions (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid not null references customer_accounts(id) on delete cascade,
+  token_hash text not null unique,
+  created_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  user_agent text not null default ''
+);
+
+-- One order represents one Stripe Checkout Session. quantity is the number of
+-- physical Wall plaques purchased in that checkout.
+create table if not exists commerce_orders (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid references customer_accounts(id) on delete set null,
+  purchaser_email text not null,
+  status text not null default 'pending' check (status in ('pending', 'paid', 'fulfilled', 'cancelled', 'refunded')),
+  quantity integer not null default 1 check (quantity between 1 and 50),
+  amount_total integer,
+  currency text,
+  stripe_checkout_session_id text unique,
+  stripe_payment_intent_id text,
+  stripe_customer_id text,
+  created_at timestamptz not null default now(),
+  paid_at timestamptz,
+  fulfilled_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists commerce_order_items (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references commerce_orders(id) on delete cascade,
+  ordinal integer not null,
+  status text not null default 'awaiting_fulfillment' check (status in ('awaiting_fulfillment', 'fulfilled', 'cancelled')),
+  wall_id uuid references walls(id) on delete set null,
+  created_at timestamptz not null default now(),
+  fulfilled_at timestamptz,
+  unique(order_id, ordinal)
+);
+
+-- The serial code is printed/engraved on the physical plaque or its packing
+-- label. The NFC URL itself remains represented by the hashed wall_tags token.
+create table if not exists plaques (
+  id uuid primary key default gen_random_uuid(),
+  serial_code text not null unique,
+  order_item_id uuid unique references commerce_order_items(id) on delete set null,
+  wall_id uuid unique references walls(id) on delete set null,
+  wall_tag_id uuid unique references wall_tags(id) on delete set null,
+  status text not null default 'stock' check (status in ('stock', 'assigned', 'retired')),
+  created_at timestamptz not null default now(),
+  assigned_at timestamptz
+);
+
+-- Ownership is the authority boundary for the customer portal. ended_at lets us
+-- retain transfer history while allowing only one current owner per Wall.
+create table if not exists wall_ownerships (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid not null references customer_accounts(id) on delete cascade,
+  wall_id uuid not null references walls(id) on delete cascade,
+  order_id uuid references commerce_orders(id) on delete set null,
+  plaque_id uuid references plaques(id) on delete set null,
+  started_at timestamptz not null default now(),
+  ended_at timestamptz
+);
+
+create unique index if not exists idx_wall_ownerships_current_wall
+  on wall_ownerships(wall_id) where ended_at is null;
+create index if not exists idx_wall_ownerships_customer_current
+  on wall_ownerships(customer_id, started_at desc) where ended_at is null;
+
+-- A paid checkout creates a short-lived one-time account claim link. Once used,
+-- the customer sets a password and subsequently signs in at /my-walls.
+create table if not exists customer_claim_tokens (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid not null references customer_accounts(id) on delete cascade,
+  order_id uuid references commerce_orders(id) on delete cascade,
+  token_hash text not null unique,
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists customer_audit_log (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid references customer_accounts(id) on delete set null,
+  email_snapshot text not null,
+  action text not null,
+  wall_id uuid,
+  wall_name text,
+  details jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists idx_wall_tags_token_hash on wall_tags(token_hash) where active = true;
 create index if not exists idx_wall_visits_session on wall_visits(session_id, last_visited_at desc);
 create index if not exists idx_wall_posts_wall_created on wall_posts(wall_id, created_at);
 create index if not exists idx_wall_posts_author_recent on wall_posts(author_session_id, created_at desc);
 create index if not exists idx_wall_posts_parent on wall_posts(parent_id) where parent_id is not null;
 create index if not exists idx_post_reports_post on post_reports(post_id);
+create index if not exists idx_post_reports_created on post_reports(created_at desc);
 create index if not exists idx_admin_users_wall on admin_users(wall_id) where role = 'moderator';
 create index if not exists idx_admin_sessions_token_hash on admin_sessions(token_hash);
 create index if not exists idx_admin_sessions_expiry on admin_sessions(expires_at);
 create index if not exists idx_admin_audit_created on admin_audit_log(created_at desc);
 create index if not exists idx_admin_audit_user on admin_audit_log(admin_user_id, created_at desc);
+create index if not exists idx_customer_sessions_token_hash on customer_sessions(token_hash);
+create index if not exists idx_customer_sessions_expiry on customer_sessions(expires_at);
+create index if not exists idx_commerce_orders_customer on commerce_orders(customer_id, created_at desc);
+create index if not exists idx_commerce_orders_status on commerce_orders(status, created_at desc);
+create index if not exists idx_commerce_order_items_order on commerce_order_items(order_id, ordinal);
+create index if not exists idx_customer_claim_tokens_customer on customer_claim_tokens(customer_id, created_at desc);
+create index if not exists idx_customer_audit_customer on customer_audit_log(customer_id, created_at desc);
