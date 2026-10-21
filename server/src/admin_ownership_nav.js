@@ -1,9 +1,9 @@
-import { mountAdminOrders } from './admin_orders.js';
+import { mountAdminOrdersV2 } from './admin_orders_v2.js';
 
 export function mountOwnershipAdminNav(app) {
-  // Mount the commerce/order console before the older admin routes so /admin/orders
-  // is a first-class operational page rather than a redirect into a basic fulfilment view.
-  mountAdminOrders(app);
+  // Paid plaque fulfilment is deliberately simple: assign the physical NFC,
+  // mark the plaque shipped, and leave Wall naming/location to the customer.
+  mountAdminOrdersV2(app);
 
   app.get('/admin/customers', (_req, res) => res.redirect(303, '/admin/orders'));
 
