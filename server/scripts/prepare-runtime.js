@@ -111,7 +111,7 @@ if (requiredImports.some((line) => !source.includes(line))) {
 }
 
 // Stripe signature verification requires the untouched raw request body, so the
-// webhook must be mounted before the application's global express.json parser.
+// webhook must be mounted before the application's body parsers.
 if (!source.includes('mountStripeWebhook(app);')) {
   const bodyParserMarker = "app.use(express.json({ limit: '32kb' }));";
   const bodyParserIndex = source.indexOf(bodyParserMarker);
@@ -119,6 +119,18 @@ if (!source.includes('mountStripeWebhook(app);')) {
     throw new Error('Could not find the JSON body parser marker.');
   }
   source = `${source.slice(0, bodyParserIndex)}mountStripeWebhook(app);\n${source.slice(bodyParserIndex)}`;
+}
+
+// Browser forms such as /shop/checkout submit application/x-www-form-urlencoded.
+// Parse them after the Stripe raw-body webhook is mounted so req.body contains
+// email, quantity and the admin/customer form fields.
+const jsonParserMarker = "app.use(express.json({ limit: '32kb' }));";
+const urlEncodedParser = "app.use(express.urlencoded({ extended: false, limit: '32kb' }));";
+if (!source.includes(urlEncodedParser)) {
+  if (!source.includes(jsonParserMarker)) {
+    throw new Error('Could not find the JSON parser for URL-encoded form setup.');
+  }
+  source = source.replace(jsonParserMarker, `${jsonParserMarker}\n${urlEncodedParser}`);
 }
 
 const adminRouteMarker = "app.get('/admin',";
