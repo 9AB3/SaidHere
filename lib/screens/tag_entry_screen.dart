@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/local_history_service.dart';
 import '../services/said_here_service.dart';
@@ -24,7 +25,9 @@ class TagEntryScreen extends StatefulWidget {
 
 class _TagEntryScreenState extends State<TagEntryScreen> {
   String? _error;
+  String? _setupUrl;
   bool _loading = false;
+  bool _setupLaunchAttempted = false;
 
   @override
   void initState() {
@@ -32,11 +35,25 @@ class _TagEntryScreenState extends State<TagEntryScreen> {
     _claim();
   }
 
+  Future<void> _openSetup() async {
+    final raw = _setupUrl;
+    if (raw == null || raw.isEmpty) return;
+    final uri = Uri.tryParse(raw);
+    if (uri == null) return;
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      setState(() {
+        _error = 'Could not open first-time setup. Try again.';
+      });
+    }
+  }
+
   Future<void> _claim() async {
     if (_loading) return;
     setState(() {
       _loading = true;
       _error = null;
+      _setupUrl = null;
     });
     try {
       final wall = await widget.service.claimWallVisit(widget.tagToken);
@@ -47,6 +64,24 @@ class _TagEntryScreenState extends State<TagEntryScreen> {
       );
       if (!mounted) return;
       context.go('/w/${wall.slug}?fresh=1');
+    } on SaidHereException catch (error) {
+      if (!mounted) return;
+      if (error.setupRequired && error.setupUrl != null && error.setupUrl!.isNotEmpty) {
+        setState(() {
+          _loading = false;
+          _setupUrl = error.setupUrl;
+          _error = 'This is the first scan of this plaque. Set its Wall name and location to finish setup.';
+        });
+        if (!_setupLaunchAttempted) {
+          _setupLaunchAttempted = true;
+          await _openSetup();
+        }
+        return;
+      }
+      setState(() {
+        _loading = false;
+        _error = error.toString();
+      });
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -58,6 +93,7 @@ class _TagEntryScreenState extends State<TagEntryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isSetup = _setupUrl != null;
     return Scaffold(
       body: WallBackground(
         heavy: true,
@@ -143,27 +179,52 @@ class _TagEntryScreenState extends State<TagEntryScreen> {
                               )
                             : Column(
                                 children: [
-                                  const Icon(
-                                    Icons.error_outline,
+                                  Icon(
+                                    isSetup ? Icons.tune : Icons.error_outline,
                                     color: SaidHereTheme.ink,
                                     size: 38,
                                   ),
                                   const SizedBox(height: 14),
                                   Text(
-                                    _error!,
+                                    isSetup ? 'SET UP YOUR WALL' : _error!,
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
                                       color: SaidHereTheme.ink,
                                       height: 1.4,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: FontWeight.w900,
                                     ),
                                   ),
-                                  const SizedBox(height: 18),
-                                  FilledButton.icon(
-                                    onPressed: _claim,
-                                    icon: const Icon(Icons.refresh),
-                                    label: const Text('TRY AGAIN'),
-                                  ),
+                                  if (isSetup) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      _error!,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: SaidHereTheme.ink,
+                                        height: 1.4,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 18),
+                                    FilledButton.icon(
+                                      onPressed: _openSetup,
+                                      icon: const Icon(Icons.open_in_browser),
+                                      label: const Text('CONTINUE SETUP'),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    OutlinedButton.icon(
+                                      onPressed: _claim,
+                                      icon: const Icon(Icons.check_circle_outline),
+                                      label: const Text("I'VE FINISHED SETUP"),
+                                    ),
+                                  ] else ...[
+                                    const SizedBox(height: 18),
+                                    FilledButton.icon(
+                                      onPressed: _claim,
+                                      icon: const Icon(Icons.refresh),
+                                      label: const Text('TRY AGAIN'),
+                                    ),
+                                  ],
                                   const SizedBox(height: 8),
                                   OutlinedButton(
                                     onPressed: () => context.go('/'),
