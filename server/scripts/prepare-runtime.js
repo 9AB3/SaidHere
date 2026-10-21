@@ -8,6 +8,8 @@ const sourcePath = path.join(serverRoot, 'src', 'index.js');
 const runtimePath = path.join(serverRoot, 'src', 'index.runtime.js');
 const commerceSourcePath = path.join(serverRoot, 'src', 'commerce.js');
 const commerceRuntimePath = path.join(serverRoot, 'src', 'commerce.runtime.js');
+const commerceSupportSourcePath = path.join(serverRoot, 'src', 'commerce_support.js');
+const commerceSupportRuntimePath = path.join(serverRoot, 'src', 'commerce_support.runtime.js');
 const customerSourcePath = path.join(serverRoot, 'src', 'customer_portal.js');
 const customerRuntimePath = path.join(serverRoot, 'src', 'customer_portal.runtime.js');
 
@@ -17,6 +19,49 @@ function replaceFunction(source, startMarker, endMarker, replacement, label) {
   if (start < 0 || end < 0) throw new Error(`Could not find ${label} runtime markers.`);
   return `${source.slice(0, start)}${replacement}\n\n${source.slice(end)}`;
 }
+
+// The Wall uses the same SMTP2GO account family as Side A. Keep the source
+// module provider-agnostic for now, then generate a production runtime that
+// sends through SMTP2GO's HTTP API. Namecheap remains the domain/DNS provider
+// and can continue forwarding inbound addresses separately.
+let commerceSupportSource = fs.readFileSync(commerceSupportSourcePath, 'utf8');
+commerceSupportSource = replaceFunction(
+  commerceSupportSource,
+  'async function resend(body) {',
+  'async function sendCustomerConfirmation(order, activationUrl) {',
+  `async function resend(body) {
+  const apiKey = process.env.SMTP2GO_API_KEY || '';
+  if (!apiKey) return { sent: false, reason: 'SMTP2GO_API_KEY is not configured.' };
+  const payload = {
+    sender: body.from,
+    to: Array.isArray(body.to) ? body.to : [body.to].filter(Boolean),
+    subject: body.subject,
+    text_body: body.text || '',
+    html_body: body.html || '',
+    fastaccept: true,
+  };
+  const response = await fetch('https://api.smtp2go.com/v3/email/send', {
+    method: 'POST',
+    headers: {
+      'X-Smtp2go-Api-Key': apiKey,
+      'content-type': 'application/json',
+      accept: 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(\`SMTP2GO \${response.status}: \${JSON.stringify(data || {}).slice(0, 500)}\`);
+  }
+  const failed = Number(data?.data?.failed || 0);
+  if (failed > 0) {
+    throw new Error(\`SMTP2GO rejected \${failed} email(s): \${JSON.stringify(data?.data?.failures || []).slice(0, 500)}\`);
+  }
+  return { sent: true, emailId: data?.data?.email_id || null };
+}`,
+  'email provider',
+);
+fs.writeFileSync(commerceSupportRuntimePath, commerceSupportSource, 'utf8');
 
 // Stripe's newer Managed Payments mode does not support Checkout's normal
 // shipping_address_collection parameter. The Wall sells a physical plaque, so
@@ -38,7 +83,7 @@ if (!commerceSource.includes("managed_payments[enabled]")) {
 // generated commerce runtime delegates paid checkouts to it so old/test orders
 // can repair missing customer links and new orders receive confirmations.
 const commerceDbImport = "import { pool } from './db.js';";
-const commerceSupportImport = "import { reconcilePaidCheckout, ensureOrderCustomerLink, manualClaimLinkForOrder } from './commerce_support.js';";
+const commerceSupportImport = "import { reconcilePaidCheckout, ensureOrderCustomerLink, manualClaimLinkForOrder } from './commerce_support.runtime.js';";
 if (!commerceSource.includes(commerceSupportImport)) {
   if (!commerceSource.includes(commerceDbImport)) throw new Error('Could not find the commerce database import marker.');
   commerceSource = commerceSource.replace(commerceDbImport, `${commerceDbImport}\n${commerceSupportImport}`);
@@ -165,4 +210,4 @@ if (!source.includes('mountAdminPortal(app);')) {
 }
 
 fs.writeFileSync(runtimePath, source, 'utf8');
-console.log('Prepared SaidHere runtime for canonical web, customer ownership, commerce, admin, NFC and API hosting.');
+console.log('Prepared SaidHere runtime for canonical web, SMTP2GO commerce email, customer ownership, admin, NFC and API hosting.');
