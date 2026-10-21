@@ -6,6 +6,7 @@ import express from 'express';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const publicRoot = path.resolve(here, '..', 'public');
 const indexPath = path.join(publicRoot, 'index.html');
+const fallbackPath = path.join(publicRoot, 'fallback.html');
 const CANONICAL_HOST = 'saidhere.app';
 const RENDER_HOST = 'saidhere-api-9ab3.onrender.com';
 
@@ -15,7 +16,7 @@ function sendIndex(_req, res) {
 }
 
 function renderAppFallback(res, appHref) {
-  const template = fs.readFileSync(indexPath, 'utf8');
+  const template = fs.readFileSync(fallbackPath, 'utf8');
   const html = template
     .replace('href="saidhere://"', `href="${appHref}"`)
     .replace(/\n\s*<script>[\s\S]*?<\/script>\s*/i, '\n');
@@ -30,10 +31,8 @@ export function mountCanonicalWebRedirect(app) {
     const pathName = req.path || '/';
 
     // During the custom-domain cutover the old static saidhere.app service still
-    // forwards /admin to the Render service. Keep /admin on the Render hostname
-    // temporarily so that handoff cannot bounce straight back to saidhere.app and
-    // create an infinite redirect loop. Once saidhere.app is attached directly to
-    // this Node service, users will naturally remain on saidhere.app/admin.
+    // forwards /admin to the Render service. Keep /admin and API traffic on the
+    // Render hostname when explicitly addressed there so old builds remain valid.
     const keepLegacyHost =
       pathName === '/health' ||
       pathName === '/api' ||
@@ -63,7 +62,8 @@ export function mountPublicSite(app) {
     return res.sendFile(path.join(publicRoot, '.well-known', 'apple-app-site-association'));
   });
 
-  // Public informational pages now live on the same host as the API/admin portal.
+  // The root is now the product/store homepage. NFC links use fallback.html so
+  // their app handoff remains focused and does not show storefront content.
   app.get('/', sendIndex);
   app.get(['/privacy', '/privacy/'], (_req, res) => {
     res.set('Cache-Control', 'no-cache');
@@ -74,9 +74,6 @@ export function mountPublicSite(app) {
     return res.sendFile(path.join(publicRoot, 'support', 'index.html'));
   });
 
-  // HTTPS plaque URLs are the iOS/Android app links. If the OS does not hand the
-  // request to the app, the browser fallback still gets an exact custom-scheme
-  // button without relying on inline JavaScript that security headers could block.
   app.get('/t/:token', (req, res) => {
     const token = encodeURIComponent(req.params.token || '');
     return renderAppFallback(res, `saidhere://t/${token}`);
@@ -86,7 +83,6 @@ export function mountPublicSite(app) {
     return renderAppFallback(res, `saidhere://w/${slug}`);
   });
 
-  // Images and any other public static assets used by the pages above.
   app.use(express.static(publicRoot, {
     dotfiles: 'ignore',
     fallthrough: true,
