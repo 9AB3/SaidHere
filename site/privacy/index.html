@@ -13,19 +13,35 @@
   <div class="mark"><img src="/the-wall.png" alt="The Wall"></div>
   <h1>Privacy</h1>
   <p class="muted">Last updated 22 October 2026</p>
-  <p>The Wall is designed around anonymous, place-based conversations. You do not create a public account, username, profile, follower list or social graph.</p>
-  <h2>Information The Wall uses</h2>
-  <p>When you use the app, The Wall creates an anonymous session identifier so the service can remember which Walls you have discovered, enforce write access, apply abuse controls and prevent duplicate reports. The service also stores the Walls you visit, messages and replies you submit, reports you make, and technical request information ordinarily required to operate and secure an internet service.</p>
+  <p>The Wall is designed around anonymous, place-based conversations. People reading and posting on a Wall do not create public profiles, usernames, follower lists or a social graph.</p>
+
+  <h2>Anonymous Wall use</h2>
+  <p>When you use the app, The Wall creates an anonymous session identifier so the service can remember which Walls you have discovered, enforce temporary write access, apply abuse controls and prevent duplicate reports. The service stores the Walls visited by that anonymous session, messages and replies submitted, reports made, and technical request information needed to operate and secure the service.</p>
+
   <h2>Physical Wall discovery</h2>
-  <p>A Wall is discovered by opening its NFC link. Tapping a valid Wall temporarily unlocks writing for that Wall. The Wall does not require a public profile or precise GPS location to identify the Wall; the physical Wall itself is the discovery mechanism.</p>
-  <h2>Messages and moderation</h2>
-  <p>Messages are intentionally public to people who have discovered that Wall. Posts are stored with an internal anonymous session identifier for abuse prevention and moderation. Users can report inappropriate content, and reported content may be hidden automatically or removed by an administrator.</p>
+  <p>A Wall is discovered by opening its NFC link. A valid physical scan temporarily unlocks writing for that Wall. Precise GPS location is not required to prove that you are at the Wall; the NFC interaction is the presence check.</p>
+
+  <h2>Posts and anonymity</h2>
+  <p>Posts are intentionally anonymous to other users and to the Wall owner. Wall owners can see Wall activity and reported posts, but they are not given the identity of the person who posted a message. Internal anonymous session identifiers are retained only for service operation, abuse prevention and moderation.</p>
+
+  <h2>Wall purchases and owner accounts</h2>
+  <p>If you buy a Wall, the service stores information needed to process and fulfil the order, including your purchase email, order status, quantity, shipping name and address supplied through checkout, Stripe order/payment identifiers, and the Wall ownership records created from that purchase. A Wall owner account stores your email, optional display name, a securely hashed password, login sessions and an audit history of owner actions.</p>
+
+  <h2>Payments and email</h2>
+  <p>Payments are processed through Stripe. The Wall does not store full payment-card numbers. Stripe returns payment and checkout identifiers, payment status, totals, customer details and shipping information needed to verify and fulfil the order. Transactional order and activation email is sent through the configured SMTP email provider. Those providers process the information necessary to perform those services under their own privacy terms.</p>
+
+  <h2>Moderation</h2>
+  <p>Users can report inappropriate content. Repeated reports may automatically hide a post while it waits for review. A Wall owner can review reported posts and choose to keep or remove them without being shown who authored the post. Platform administrators may also moderate content and investigate operational issues.</p>
+
   <h2>Local device data</h2>
-  <p>The app may keep a small local cache of Walls you have previously discovered so your history remains useful during temporary connection problems. This data stays on your device unless it is also represented in the service as part of normal Wall discovery history.</p>
-  <h2>What The Wall does not provide</h2>
-  <p>The Wall does not require public names, profile photos, followers, likes or direct messages. The current product is text-only.</p>
+  <p>The app may keep a small local cache of Walls you have previously discovered so your history remains useful during temporary connection problems. This cache is stored on your device.</p>
+
   <h2>Retention and deletion</h2>
-  <p>Wall content is intended to preserve the history of a physical place and may remain available until it is moderated, cleared by an administrator or the Wall is deleted. Anonymous session and visit information may be retained as needed to operate the service, preserve discovered-Wall history and prevent abuse.</p>
+  <p>Wall content is intended to preserve the history of a physical place and may remain available until it is moderated, cleared or the Wall is deleted. Order and ownership records may be retained as needed for fulfilment, support, accounting, fraud prevention and legal obligations. Expired authenticated browser sessions are periodically removed.</p>
+
+  <h2>What The Wall does not provide</h2>
+  <p>The public conversation product does not require public names, profile photos, followers, likes or direct messages. The current Wall conversation is text-only.</p>
+
   <h2>Changes</h2>
   <p>This page will be updated if The Wall materially changes the information it collects or how the service works.</p>
   <footer><a href="/">The Wall home</a> · <a href="/support/">Support</a></footer>
