@@ -85,7 +85,9 @@ workflows:
       - name: Build signed IPA
         script: |
           set -euo pipefail
+          test -n "${PROJECT_BUILD_NUMBER:-}"
           flutter build ipa --release \
+            --build-number="$PROJECT_BUILD_NUMBER" \
             --export-options-plist=/Users/builder/export_options.plist \
             --dart-define=API_BASE_URL="$API_BASE_URL" \
             --dart-define=APP_HOST="$APP_HOST"
