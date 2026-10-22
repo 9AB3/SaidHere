@@ -59,10 +59,10 @@ try {
     }
   }
 
-  // Keep long-running production databases from accumulating expired bearer sessions.
+  // Keep long-running production databases from accumulating expired auth state.
   await pool.query(`delete from admin_sessions where expires_at <= now()`);
   await pool.query(`delete from customer_sessions where expires_at <= now()`);
-  await pool.query(`delete from customer_claim_tokens where expires_at <= now() and used_at is not null`);
+  await pool.query(`delete from customer_claim_tokens where expires_at <= now()`);
   console.log('SaidHere database schema is up to date.');
 } finally {
   await pool.end();
