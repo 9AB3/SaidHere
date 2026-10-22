@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  analyze-test:
+  analyze-test-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,5 +17,9 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      - name: Build Flutter web
+        run: flutter build web --release --dart-define=API_BASE_URL=https://saidhere.app
+      - name: Build Android debug APK
+        run: flutter build apk --debug --dart-define=API_BASE_URL=https://saidhere.app
       - name: Check Render API JavaScript
         run: npm --prefix server run check
