@@ -12,7 +12,10 @@ class SaidHereService {
   SaidHereService({http.Client? client}) : _http = client ?? http.Client();
 
   static const _sessionKey = 'saidhere_api_session';
-  static const _requestTimeout = Duration(seconds: 25);
+  // Render's free service can take well over 50 seconds to wake from sleep.
+  // A shorter timeout makes the first app request look broken even though the
+  // service is only cold-starting.
+  static const _requestTimeout = Duration(seconds: 75);
 
   final http.Client _http;
   Future<String>? _sessionFuture;
