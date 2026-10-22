@@ -1,37 +1,35 @@
-# SaidHere
+# The Wall / SaidHere
 
-**Real places. Real people. Anonymous thoughts.**
+**Every place has something to say.**
 
-SaidHere is a location-bound anonymous message app. A physical NFC plaque identifies a specific Wall. Tapping the plaque discovers that Wall and unlocks writing for 15 minutes. After that, the Wall remains readable from the user's discovered-Walls list, but writing requires another plaque tap.
+The Wall is a place-based anonymous message app. A physical NFC Wall identifies a conversation tied to a real place. Scanning it discovers the Wall and unlocks anonymous writing for 15 minutes. Reading remains available from **Walls You've Found**, while writing requires another physical scan after the window expires.
 
-## What is implemented
+## Current product
 
-- Flutter app for iOS, Android and web
-- NFC/deep-link route: `/t/<secret-tag-token>`
-- Public Wall route: `/w/<wall-slug>`
-- Anonymous API sessions — no sign-up UI
-- Render Node web service + Render Postgres
-- Per-Wall discovery history
-- 15-minute server-enforced write/reply window after a plaque tap
-- Text-only anonymous posts, max 300 characters
+- Flutter app for iOS and Android, with web build support
+- HTTPS/NFC deep links at `/t/<secret-tag-token>` and `/w/<wall-slug>`
+- Anonymous app sessions with no public profile or username
+- Render Node/Express API + private Render Postgres
+- 15-minute server-enforced write/reply window
+- Text-only posts up to 300 characters
 - One-level replies
-- Dates only; no username, avatar, likes or followers
-- Previous-year browsing on long-lived Walls
-- Reporting flow
-- Automatic hiding after three distinct reports
-- Private anonymous session IDs retained only for abuse controls
-- NFC tag token stored only as a SHA-256 hash
-- Wall/NFC provisioning command
-- Render Blueprint (`render.yaml`)
-- Codemagic build workflow
-- GitHub analyze/test workflow
-- iOS Universal Link / Android App Link bootstrap templates
+- Reporting and automatic hiding after three distinct reports
+- Wall-owner portal at `/my-walls`
+- Wall owners can change name/location, pause/reactivate, see aggregate activity and moderate **reported** posts
+- Wall owners are not shown who authored posts
+- Platform admin with Main Admin / per-Wall Moderator roles and audit logging
+- Stripe Checkout for physical Wall purchases
+- SMTP2GO order and activation email
+- Admin fulfilment: assign NFC → program tag → mark shipped
+- Customer first-scan setup for Wall name/location and account recovery
+- iOS Universal Links support
+- Android App Link bootstrap support; production `assetlinks.json` still requires the real release signing SHA-256
 
 ## Product rules
 
-SaidHere deliberately does **not** have profiles, handles, likes, DMs, follower counts, global feeds or searchable public Walls. The place is the network.
+The public conversation does **not** use profiles, handles, likes, direct messages, follower counts, global feeds or searchable public Walls. The place is the network.
 
-A user can revisit a Wall they previously found and read it, but posting is locked unless that anonymous session currently has a non-expired write window created by opening the plaque link.
+A Wall owner manages the Wall, not the identities of the people using it. Owner moderation exposes reported content and report counts, not post-author identities.
 
 ## Stack
 
@@ -39,94 +37,84 @@ A user can revisit a Wall they previously found and read it, but posting is lock
 - Node.js / Express
 - Render Web Service
 - Render Postgres
-- `go_router` for web/native deep links
-- `shared_preferences` for the anonymous API token and lightweight local history
+- Stripe Checkout
+- Nodemailer + SMTP2GO
+- `go_router`
+- `shared_preferences`
 
-## 1. Deploy the backend on Render
+## Backend deployment
 
-Follow [RENDER_SETUP.md](RENDER_SETUP.md).
+See [RENDER_SETUP.md](RENDER_SETUP.md).
 
-The repository includes a root `render.yaml` Blueprint that creates:
+The root `render.yaml` defines:
 
 - `saidhere-api-9ab3` — Node web service
-- `saidhere-db-9ab3` — private Render Postgres database
+- `saidhere-db-9ab3` — private Render Postgres
 
-Both are configured in Render's Singapore region.
+The service starts with:
 
-## 2. Generate native Flutter platform folders
+```text
+npm run migrate && npm start
+```
 
-The repository keeps generated Flutter platform boilerplate out of source control so the current Flutter stable templates are used.
+Health check:
+
+```text
+https://saidhere.app/health
+```
+
+## Flutter platform bootstrap
+
+Generated platform boilerplate is recreated from the current Flutter stable templates:
 
 ```bash
 python3 tool/bootstrap_platforms.py --host saidhere.app
 flutter pub get
 ```
 
-The script runs `flutter create` if needed, then adds SaidHere's Android/iOS deep-link configuration.
-
-## 3. Run the app
-
-Once the Render Blueprint is live:
+Run against production:
 
 ```bash
 flutter run \
-  --dart-define=API_BASE_URL=https://saidhere-api-9ab3.onrender.com \
+  --dart-define=API_BASE_URL=https://saidhere.app \
   --dart-define=APP_HOST=saidhere.app
 ```
 
-`API_BASE_URL` already defaults to that Render service, so it can be omitted unless you are overriding it.
+`API_BASE_URL` and `APP_HOST` already default to `saidhere.app`.
 
-## 4. Create your first Wall
+## Purchased Wall workflow
 
-Open the Render Shell for `saidhere-api-9ab3` and run:
+1. Customer buys one or more Walls at `/shop` through Stripe Checkout.
+2. Stripe confirms payment and the order is linked to the purchaser email/account.
+3. Customer and internal order emails are attempted through SMTP2GO and delivery status is recorded.
+4. Admin opens `/admin/orders` and clicks **Assign next NFC**.
+5. Admin programs the one-time `https://saidhere.app/t/<secret>` URL into the physical tag.
+6. If that URL is lost before shipping, **Replace NFC** invalidates it and creates a new one.
+7. Admin clicks **Mark shipped**.
+8. Customer scans the physical Wall on arrival and chooses its name/location. If the owner account was never activated, that first scan can verify the purchase email and create the password.
+9. Later owner changes and reported-post moderation happen through `/my-walls`.
 
-```bash
-npm run create-wall -- "The Crown - Upstairs" "Newcastle"
-```
+## NFC security model
 
-It returns a URL similar to:
+The raw NFC secret is never stored in Postgres. Only its SHA-256 hash is retained.
 
-```text
-https://saidhere.app/t/4ca8...<random secret>...31af
-```
+A normal locked NTAG213/215/216 prevents rewriting the chip, but a static URL can still be copied and replayed. The 15-minute writing window is server-enforced, but static tags are not cryptographic proof of physical presence.
 
-Encode that exact URL onto the NFC tag, test it, then permanently write-lock the tag.
+For a future higher-security version, use a dynamic cryptographic tag such as NTAG 424 DNA and verify its dynamic authentication server-side.
 
-See [DOMAIN_LINKS.md](DOMAIN_LINKS.md) for Universal Link / App Link deployment.
+See [DOMAIN_LINKS.md](DOMAIN_LINKS.md) for iOS Universal Links and Android App Links.
 
-## Privacy and security model
+## Validation
 
-The phone never talks directly to Postgres. It receives a random anonymous API token and sends that to the Render API as a Bearer token.
+GitHub Actions runs:
 
-Post author/session IDs never appear in the public feed. The server returns only post ID, Wall ID, parent ID, body, date and reply count.
+- platform bootstrap
+- `flutter analyze`
+- Flutter tests
+- release web build
+- Android debug APK build
+- Node/Express production-module syntax checks
 
-A plaque token is hashed with SHA-256 before it is stored. The raw token only appears in the one-time NFC URL printed by the provisioning command.
+Codemagic contains the signed iOS/TestFlight workflow and verifies the Associated Domains entitlement.
 
-Render Postgres is configured with `ipAllowList: []`, so the database is reachable only over Render's private network from the web service.
-
-## Important limitation of ordinary NFC tags
-
-A permanently locked NTAG213/215/216 prevents someone from rewriting the physical tag, but a static NFC URL can still be copied after somebody legitimately scans it. The 15-minute access window is server-enforced, but a copied static tag URL could be replayed later.
-
-For strict proof that a user physically tapped the plaque each time, move production plaques to a cryptographic dynamic tag such as NTAG 424 DNA, or add another proximity check. The current static-tag MVP is suitable for field testing but should not be described as cryptographically location-proof.
-
-## Physical plaque recommendation
-
-```text
-SAIDHERE
-
-(( NFC ))
-TAP HERE
-
-Leave something behind.
-```
-
-Put the locked NFC in a non-metallic window/layer inside the plaque. If the face itself is metal, use an on-metal NFC tag or isolate the antenna from the metal with a ferrite layer.
-
-## Before a large public launch
-
-The MVP is complete enough to test with real plaques. Before deploying at scale, add automated text moderation, a moderator/admin dashboard, stronger bot controls, legal/privacy pages, production signing/store metadata and final Apple/Android domain-association credentials.
-
-## Suggested first field test
-
-Create 2–3 Walls, install them in controlled locations, and seed each with a few messages. Test cold/warm NFC taps on iPhone and Android, replies, 15-minute expiry, revisiting from **Walls you've found**, reporting, and NFC read range through the final plaque material.
+Before a public launch, complete at least one end-to-end Stripe test-mode order through payment, email, Admin Orders, NFC programming/replacement, shipping and customer first-scan setup. Also deploy Android `assetlinks.json` using the real release/Google Play signing SHA-256 before relying on Android App Links.
