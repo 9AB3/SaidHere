@@ -134,6 +134,7 @@ async function stripeGet(path, params = {}) {
 async function ensureCustomer(client, email, stripeCustomerId = null) {
   const normalized = clean(email).toLowerCase();
   if (!normalized || !normalized.includes('@')) throw new Error('A valid purchaser email is required.');
+
   let result = await client.query(
     `select id, email, display_name, password_hash, stripe_customer_id
        from customer_accounts
@@ -141,14 +142,30 @@ async function ensureCustomer(client, email, stripeCustomerId = null) {
       limit 1`,
     [normalized],
   );
+
   if (result.rowCount === 0) {
-    result = await client.query(
+    const inserted = await client.query(
       `insert into customer_accounts (email, stripe_customer_id)
        values ($1, $2)
+       on conflict do nothing
        returning id, email, display_name, password_hash, stripe_customer_id`,
       [normalized, stripeCustomerId],
     );
-  } else if (stripeCustomerId && !result.rows[0].stripe_customer_id) {
+    if (inserted.rowCount > 0) {
+      result = inserted;
+    } else {
+      result = await client.query(
+        `select id, email, display_name, password_hash, stripe_customer_id
+           from customer_accounts
+          where lower(email) = $1
+          limit 1`,
+        [normalized],
+      );
+    }
+  }
+
+  if (result.rowCount === 0) throw new Error('Could not create or load the customer account.');
+  if (stripeCustomerId && !result.rows[0].stripe_customer_id) {
     result = await client.query(
       `update customer_accounts
           set stripe_customer_id = $2, updated_at = now()
@@ -161,11 +178,13 @@ async function ensureCustomer(client, email, stripeCustomerId = null) {
 }
 
 async function issueClaimToken(client, customerId, orderId) {
+  // Only one unused account-activation token may be valid for a customer at a time.
+  // This prevents a link from an older order from being used later to overwrite a password.
   await client.query(
     `update customer_claim_tokens
         set used_at = coalesce(used_at, now())
-      where customer_id = $1 and order_id = $2 and used_at is null`,
-    [customerId, orderId],
+      where customer_id = $1 and used_at is null`,
+    [customerId],
   );
   const raw = makeToken(32);
   await client.query(
@@ -184,9 +203,7 @@ export async function ensureOrderCustomerLink(client, order) {
   const customer = await ensureCustomer(client, order.purchaser_email, order.stripe_customer_id || null);
   await client.query(
     `update commerce_orders
-        set customer_id = $2,
-            purchaser_email = $3,
-            updated_at = now()
+        set customer_id = $2, purchaser_email = $3, updated_at = now()
       where id = $1`,
     [order.id, customer.id, customer.email],
   );
@@ -194,8 +211,7 @@ export async function ensureOrderCustomerLink(client, order) {
 }
 
 async function recordEmailAttempt(orderId, kind) {
-  const customer = kind === 'customer';
-  const prefix = customer ? 'customer_confirmation' : 'owner_notification';
+  const prefix = kind === 'customer' ? 'customer_confirmation' : 'owner_notification';
   await pool.query(
     `update commerce_orders
         set ${prefix}_last_attempt_at = now(),
@@ -208,8 +224,7 @@ async function recordEmailAttempt(orderId, kind) {
 }
 
 async function recordEmailResult(orderId, kind, result) {
-  const customer = kind === 'customer';
-  const prefix = customer ? 'customer_confirmation' : 'owner_notification';
+  const prefix = kind === 'customer' ? 'customer_confirmation' : 'owner_notification';
   if (result.sent) {
     await pool.query(
       `update commerce_orders
@@ -223,8 +238,7 @@ async function recordEmailResult(orderId, kind, result) {
   } else {
     await pool.query(
       `update commerce_orders
-          set ${prefix}_error = $2,
-              updated_at = now()
+          set ${prefix}_error = $2, updated_at = now()
         where id = $1`,
       [orderId, clean(result.reason) || 'Email provider did not accept the message.'],
     );
@@ -243,14 +257,14 @@ async function sendCustomerConfirmation(order, activationUrl, { force = false } 
   const shippingText = lines.length ? `\n\nShipping to:\n${lines.join('\n')}` : '';
   const qty = Number(order.quantity || 1);
   const total = money(order.amount_total, order.currency);
-  const from = process.env.CUSTOMER_EMAIL_FROM || 'The Wall <orders@saidhere.app>';
+  const manageLabel = order.customer_has_password ? 'Manage My Walls' : 'Activate My Walls';
   const result = await sendMail({
-    from,
+    from: process.env.CUSTOMER_EMAIL_FROM || 'The Wall <orders@saidhere.app>',
     to: order.purchaser_email,
     replyTo: clean(process.env.CUSTOMER_REPLY_TO) || undefined,
     subject: `The Wall order confirmed — ${order.id}`,
-    text: `Thanks for your The Wall order.\n\nOrder: ${order.id}\nPlaques: ${qty}\nTotal: ${total}${shippingText}\n\nSet up or manage your Wall account: ${activationUrl}\n\nWe'll prepare your physical plaque and link it to your account when it is assigned.`,
-    html: `<div style="max-width:620px;margin:auto;font-family:Arial,sans-serif;color:#171411;background:#f5efe5;padding:24px"><div style="background:#171411;color:#f7f0e5;padding:28px;border-radius:14px 14px 0 0"><div style="font-size:11px;letter-spacing:3px;font-weight:700">THE WALL</div><h1 style="margin:8px 0 0;font-size:30px">Order confirmed.</h1></div><div style="padding:28px;border:1px solid #d8cdbc;border-top:0;background:#fffaf1;border-radius:0 0 14px 14px"><p style="font-size:16px;line-height:1.55">Thanks${order.customer_name ? ` ${escapeHtml(order.customer_name)}` : ''}. Your payment is confirmed and your plaque order is now in our queue.</p><p style="font-size:13px;color:#6f675d">Order <b>${escapeHtml(order.id)}</b></p><table style="width:100%;border-collapse:collapse;margin-top:18px"><tr><td style="padding:10px 0">The Wall plaque</td><td style="text-align:right;font-weight:700">× ${qty}</td></tr><tr><td style="padding-top:16px;border-top:1px solid #ddd"><b>Total</b></td><td style="padding-top:16px;border-top:1px solid #ddd;text-align:right"><b>${escapeHtml(total)}</b></td></tr></table>${shippingHtml}<p style="margin:28px 0 18px"><a href="${escapeHtml(activationUrl)}" style="display:inline-block;padding:15px 20px;background:#171411;color:#fff;text-decoration:none;font-weight:800;border-radius:8px">${order.customer_has_password ? 'Manage My Walls' : 'Activate My Walls'}</a></p><p style="color:#6f675d;font-size:13px;line-height:1.55">Your Wall appears in My Walls when its physical plaque is packed and assigned. If the button does not work, paste this address into your browser:<br><span style="word-break:break-all">${escapeHtml(activationUrl)}</span></p><p style="margin-top:26px"><b>Every place has something to say.</b><br>The Wall</p></div></div>`,
+    text: `Thanks for your The Wall order.\n\nOrder: ${order.id}\nWalls: ${qty}\nTotal: ${total}${shippingText}\n\n${manageLabel}: ${activationUrl}\n\nWe'll prepare your Wall, link its NFC and ship it to you. When it arrives, the first scan lets you choose its name and location.`,
+    html: `<div style="max-width:620px;margin:auto;font-family:Arial,sans-serif;color:#171411;background:#f5efe5;padding:24px"><div style="background:#171411;color:#f7f0e5;padding:28px;border-radius:14px 14px 0 0"><div style="font-size:11px;letter-spacing:3px;font-weight:700">THE WALL</div><h1 style="margin:8px 0 0;font-size:30px">Order confirmed.</h1></div><div style="padding:28px;border:1px solid #d8cdbc;border-top:0;background:#fffaf1;border-radius:0 0 14px 14px"><p style="font-size:16px;line-height:1.55">Thanks${order.customer_name ? ` ${escapeHtml(order.customer_name)}` : ''}. Your payment is confirmed and your order is now in our queue.</p><p style="font-size:13px;color:#6f675d">Order <b>${escapeHtml(order.id)}</b></p><table style="width:100%;border-collapse:collapse;margin-top:18px"><tr><td style="padding:10px 0">The Wall</td><td style="text-align:right;font-weight:700">× ${qty}</td></tr><tr><td style="padding-top:16px;border-top:1px solid #ddd"><b>Total</b></td><td style="padding-top:16px;border-top:1px solid #ddd;text-align:right"><b>${escapeHtml(total)}</b></td></tr></table>${shippingHtml}<p style="margin:28px 0 18px"><a href="${escapeHtml(activationUrl)}" style="display:inline-block;padding:15px 20px;background:#171411;color:#fff;text-decoration:none;font-weight:800;border-radius:8px">${manageLabel}</a></p><p style="color:#6f675d;font-size:13px;line-height:1.55">We'll link the NFC before shipping. When your Wall arrives, scan it to choose its name and location. If the button above does not work, paste this address into your browser:<br><span style="word-break:break-all">${escapeHtml(activationUrl)}</span></p><p style="margin-top:26px"><b>Every place has something to say.</b><br>The Wall</p></div></div>`,
   });
   await recordEmailResult(order.id, 'customer', result);
   return result;
@@ -268,15 +282,15 @@ async function sendOwnerNotification(order, { force = false } = {}) {
     await recordEmailResult(order.id, 'owner', result);
     return result;
   }
+
   await recordEmailAttempt(order.id, 'owner');
-  const from = process.env.ORDER_EMAIL_FROM || process.env.CUSTOMER_EMAIL_FROM || 'The Wall <orders@saidhere.app>';
   const lines = addressLines(order.shipping_address);
   const qty = Number(order.quantity || 1);
   const result = await sendMail({
-    from,
+    from: process.env.ORDER_EMAIL_FROM || process.env.CUSTOMER_EMAIL_FROM || 'The Wall <orders@saidhere.app>',
     to: recipients.join(','),
-    subject: `New The Wall order — ${order.id} — ${qty} plaque${qty === 1 ? '' : 's'}`,
-    text: `New paid The Wall order\n\nOrder: ${order.id}\nCustomer: ${order.customer_name || ''}\nEmail: ${order.purchaser_email}\nPlaques: ${qty}\nTotal: ${money(order.amount_total, order.currency)}\n\nShipping:\n${lines.join('\n') || 'Not supplied'}\n\nAdmin: ${baseUrl()}/admin/orders`,
+    subject: `New The Wall order — ${order.id} — ${qty} Wall${qty === 1 ? '' : 's'}`,
+    text: `New paid The Wall order\n\nOrder: ${order.id}\nCustomer: ${order.customer_name || ''}\nEmail: ${order.purchaser_email}\nWalls: ${qty}\nTotal: ${money(order.amount_total, order.currency)}\n\nShipping:\n${lines.join('\n') || 'Not supplied'}\n\nAdmin: ${baseUrl()}/admin/orders`,
   });
   await recordEmailResult(order.id, 'owner', result);
   return result;
@@ -310,14 +324,16 @@ function verifyCheckoutSession(session, order) {
   if (order.stripe_checkout_session_id && order.stripe_checkout_session_id !== session.id) {
     throw new Error('Stripe Checkout Session does not match this order.');
   }
-  if (orderIdFromSession(session) !== order.id) throw new Error('Stripe Checkout Session references a different order.');
+  if (orderIdFromSession(session) !== order.id) {
+    throw new Error('Stripe Checkout Session references a different order.');
+  }
 
   const items = Array.isArray(session?.line_items?.data) ? session.line_items.data : [];
   if (items.length !== 1) throw new Error('Stripe Checkout Session has an unexpected line-item count.');
   const item = items[0];
   const priceId = stripeId(item?.price);
   if (!priceId || priceId !== process.env.STRIPE_PRICE_WALL_PLAQUE) {
-    throw new Error('Stripe Checkout Session used an unexpected plaque Price ID.');
+    throw new Error('Stripe Checkout Session used an unexpected Wall Price ID.');
   }
   if (Number(item.quantity) !== Number(order.quantity)) {
     throw new Error('Stripe Checkout Session quantity does not match this order.');
@@ -328,7 +344,6 @@ function verifyCheckoutSession(session, order) {
   if (order.amount_total != null && Number(order.amount_total) !== Number(session.amount_total)) {
     throw new Error('Stripe Checkout Session total does not match the stored order total.');
   }
-  return true;
 }
 
 async function loadCheckoutSession(sessionId) {
@@ -408,8 +423,7 @@ async function reconcileVerifiedPaidSession(session) {
 }
 
 export async function reconcileCheckoutSessionById(sessionId) {
-  const session = await loadCheckoutSession(sessionId);
-  return reconcileVerifiedPaidSession(session);
+  return reconcileVerifiedPaidSession(await loadCheckoutSession(sessionId));
 }
 
 export async function reconcilePaidCheckout(session) {
@@ -444,6 +458,7 @@ export async function resendCustomerConfirmation(orderId) {
   } finally {
     client.release();
   }
+
   const result = await sendCustomerConfirmation(order, activationUrl, { force: true });
   if (!result.sent) throw new Error(result.reason || 'Customer confirmation email failed.');
   return result;
@@ -468,9 +483,9 @@ export async function manualClaimLinkForOrder(orderId) {
     const order = result.rows[0];
     if (!['paid', 'fulfilled'].includes(order.status)) throw new Error('Only paid orders can generate an activation link.');
     const customerId = await ensureOrderCustomerLink(client, order);
-    const customer = await client.query(`select id, password_hash from customer_accounts where id = $1 limit 1`, [customerId]);
-    if (customer.rowCount === 0) throw new Error('Customer account could not be created for this order.');
-    const url = customer.rows[0].password_hash
+    const customerResult = await client.query(`select id, password_hash from customer_accounts where id = $1 limit 1`, [customerId]);
+    if (customerResult.rowCount === 0) throw new Error('Customer account could not be created for this order.');
+    const url = customerResult.rows[0].password_hash
       ? `${baseUrl()}/my-walls/login`
       : await issueClaimToken(client, customerId, order.id);
     await client.query('commit');
