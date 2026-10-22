@@ -10,8 +10,15 @@ const fallbackPath = path.join(publicRoot, 'fallback.html');
 const CANONICAL_HOST = 'saidhere.app';
 const RENDER_HOST = 'saidhere-api-9ab3.onrender.com';
 
+function noStore(res) {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  return res;
+}
+
 function sendIndex(_req, res) {
-  res.set('Cache-Control', 'no-cache');
+  noStore(res);
   return res.sendFile(indexPath);
 }
 
@@ -21,7 +28,7 @@ function renderAppFallback(res, appHref) {
     .replace('href="saidhere://"', `href="${appHref}"`)
     .replace(/\n\s*<script>[\s\S]*?<\/script>\s*/i, '\n');
   res.type('html');
-  res.set('Cache-Control', 'no-cache');
+  noStore(res);
   return res.send(html);
 }
 
@@ -62,15 +69,16 @@ export function mountPublicSite(app) {
     return res.sendFile(path.join(publicRoot, '.well-known', 'apple-app-site-association'));
   });
 
-  // The root is now the product/store homepage. NFC links use fallback.html so
-  // their app handoff remains focused and does not show storefront content.
+  // Public HTML should always reflect the currently deployed build. These pages
+  // change frequently during launch, so browsers and proxies must not retain an
+  // older copy after a Render deploy.
   app.get('/', sendIndex);
   app.get(['/privacy', '/privacy/'], (_req, res) => {
-    res.set('Cache-Control', 'no-cache');
+    noStore(res);
     return res.sendFile(path.join(publicRoot, 'privacy', 'index.html'));
   });
   app.get(['/support', '/support/'], (_req, res) => {
-    res.set('Cache-Control', 'no-cache');
+    noStore(res);
     return res.sendFile(path.join(publicRoot, 'support', 'index.html'));
   });
 
