@@ -178,6 +178,7 @@ create table if not exists commerce_order_items (
   ordinal integer not null,
   status text not null default 'awaiting_fulfillment' check (status in ('awaiting_fulfillment', 'fulfilled', 'cancelled')),
   wall_id uuid references walls(id) on delete set null,
+  reserved_wall_id uuid references walls(id) on delete set null,
   created_at timestamptz not null default now(),
   nfc_assigned_at timestamptz,
   shipped_at timestamptz,
@@ -255,5 +256,6 @@ create index if not exists idx_commerce_orders_customer on commerce_orders(custo
 create index if not exists idx_commerce_orders_status on commerce_orders(status, created_at desc);
 create index if not exists idx_stripe_webhook_events_received on stripe_webhook_events(received_at desc);
 create index if not exists idx_stripe_webhook_events_unprocessed on stripe_webhook_events(received_at) where processed_at is null;
+create unique index if not exists idx_commerce_order_items_reserved_wall on commerce_order_items(reserved_wall_id) where reserved_wall_id is not null;
 create index if not exists idx_customer_claim_tokens_customer on customer_claim_tokens(customer_id, created_at desc);
 create index if not exists idx_customer_audit_customer on customer_audit_log(customer_id, created_at desc);
