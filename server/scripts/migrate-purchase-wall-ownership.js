@@ -3,7 +3,13 @@ import { pool } from '../src/db.js';
 try {
   await pool.query(`
     alter table commerce_order_items
-      add column if not exists reserved_wall_id uuid references walls(id) on delete set null;
+      add column if not exists reserved_wall_id uuid;
+
+    alter table commerce_order_items
+      drop constraint if exists commerce_order_items_reserved_wall_id_fkey;
+    alter table commerce_order_items
+      add constraint commerce_order_items_reserved_wall_id_fkey
+      foreign key (reserved_wall_id) references walls(id) on delete set null;
 
     create unique index if not exists idx_commerce_order_items_reserved_wall
       on commerce_order_items(reserved_wall_id)
