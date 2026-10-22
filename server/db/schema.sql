@@ -13,6 +13,8 @@ create table if not exists walls (
   display_name text not null,
   location_hint text not null default '',
   active boolean not null default true,
+  setup_required boolean not null default false,
+  setup_completed_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -124,13 +126,25 @@ create table if not exists commerce_orders (
   id uuid primary key default gen_random_uuid(),
   customer_id uuid references customer_accounts(id) on delete set null,
   purchaser_email text not null,
+  customer_name text,
+  shipping_address jsonb,
   status text not null default 'pending' check (status in ('pending', 'paid', 'fulfilled', 'cancelled', 'refunded')),
-  quantity integer not null default 1 check (quantity between 1 and 50),
+  quantity integer not null default 1 check (quantity between 1 and 10),
   amount_total integer,
   currency text,
   stripe_checkout_session_id text unique,
   stripe_payment_intent_id text,
   stripe_customer_id text,
+  customer_confirmation_sent_at timestamptz,
+  customer_confirmation_last_attempt_at timestamptz,
+  customer_confirmation_error text,
+  customer_confirmation_message_id text,
+  customer_confirmation_attempts integer not null default 0,
+  owner_notification_sent_at timestamptz,
+  owner_notification_last_attempt_at timestamptz,
+  owner_notification_error text,
+  owner_notification_message_id text,
+  owner_notification_attempts integer not null default 0,
   created_at timestamptz not null default now(),
   paid_at timestamptz,
   fulfilled_at timestamptz,
@@ -156,6 +170,8 @@ create table if not exists commerce_order_items (
   status text not null default 'awaiting_fulfillment' check (status in ('awaiting_fulfillment', 'fulfilled', 'cancelled')),
   wall_id uuid references walls(id) on delete set null,
   created_at timestamptz not null default now(),
+  nfc_assigned_at timestamptz,
+  shipped_at timestamptz,
   fulfilled_at timestamptz,
   unique(order_id, ordinal)
 );
@@ -213,24 +229,21 @@ create table if not exists customer_audit_log (
   created_at timestamptz not null default now()
 );
 
-create index if not exists idx_wall_tags_token_hash on wall_tags(token_hash) where active = true;
+-- Deliberately omit indexes already supplied by UNIQUE/PRIMARY KEY constraints.
 create index if not exists idx_wall_visits_session on wall_visits(session_id, last_visited_at desc);
 create index if not exists idx_wall_posts_wall_created on wall_posts(wall_id, created_at);
 create index if not exists idx_wall_posts_author_recent on wall_posts(author_session_id, created_at desc);
 create index if not exists idx_wall_posts_parent on wall_posts(parent_id) where parent_id is not null;
-create index if not exists idx_post_reports_post on post_reports(post_id);
 create index if not exists idx_post_reports_created on post_reports(created_at desc);
+create index if not exists idx_post_reports_reporter_recent on post_reports(reporter_session_id, created_at desc);
 create index if not exists idx_admin_users_wall on admin_users(wall_id) where role = 'moderator';
-create index if not exists idx_admin_sessions_token_hash on admin_sessions(token_hash);
 create index if not exists idx_admin_sessions_expiry on admin_sessions(expires_at);
 create index if not exists idx_admin_audit_created on admin_audit_log(created_at desc);
 create index if not exists idx_admin_audit_user on admin_audit_log(admin_user_id, created_at desc);
-create index if not exists idx_customer_sessions_token_hash on customer_sessions(token_hash);
 create index if not exists idx_customer_sessions_expiry on customer_sessions(expires_at);
 create index if not exists idx_commerce_orders_customer on commerce_orders(customer_id, created_at desc);
 create index if not exists idx_commerce_orders_status on commerce_orders(status, created_at desc);
 create index if not exists idx_stripe_webhook_events_received on stripe_webhook_events(received_at desc);
 create index if not exists idx_stripe_webhook_events_unprocessed on stripe_webhook_events(received_at) where processed_at is null;
-create index if not exists idx_commerce_order_items_order on commerce_order_items(order_id, ordinal);
 create index if not exists idx_customer_claim_tokens_customer on customer_claim_tokens(customer_id, created_at desc);
 create index if not exists idx_customer_audit_customer on customer_audit_log(customer_id, created_at desc);
