@@ -17,7 +17,11 @@ try {
   const sql = await fs.readFile(schemaPath, 'utf8');
   await pool.query(sql);
 
-  // Keep upgrades idempotent for existing Render databases.
+  // Keep upgrades idempotent for existing Render databases. These columns also
+  // live in schema.sql so new databases and upgraded databases share one model.
+  await pool.query(`alter table walls add column if not exists setup_required boolean not null default false`);
+  await pool.query(`alter table walls add column if not exists setup_completed_at timestamptz`);
+
   await pool.query(`alter table commerce_orders add column if not exists customer_name text`);
   await pool.query(`alter table commerce_orders add column if not exists shipping_address jsonb`);
   await pool.query(`alter table commerce_orders add column if not exists customer_confirmation_sent_at timestamptz`);
@@ -31,11 +35,38 @@ try {
   await pool.query(`alter table commerce_orders add column if not exists owner_notification_message_id text`);
   await pool.query(`alter table commerce_orders add column if not exists owner_notification_attempts integer not null default 0`);
 
+  await pool.query(`alter table commerce_order_items add column if not exists nfc_assigned_at timestamptz`);
+  await pool.query(`alter table commerce_order_items add column if not exists shipped_at timestamptz`);
+
+  // Normalize the old admin role and, importantly, fix the legacy default of
+  // 'admin', which conflicts with the current owner/moderator check constraint.
   await pool.query(`update admin_users set role = 'moderator' where role = 'admin'`);
+  await pool.query(`alter table admin_users alter column role set default 'moderator'`);
   await pool.query(`alter table admin_users drop constraint if exists admin_users_role_check`);
   await pool.query(`alter table admin_users add constraint admin_users_role_check check (role in ('owner', 'moderator'))`);
   await pool.query(`alter table admin_users drop constraint if exists admin_users_wall_id_fkey`);
   await pool.query(`alter table admin_users add constraint admin_users_wall_id_fkey foreign key (wall_id) references walls(id) on delete set null`);
+
+  // Checkout only permits 1-10 physical Walls. Enforce that at the database
+  // boundary too. NOT VALID preserves any historical >10 order if one exists,
+  // while still enforcing the rule for all new/updated rows.
+  await pool.query(`alter table commerce_orders drop constraint if exists commerce_orders_quantity_check`);
+  await pool.query(`alter table commerce_orders add constraint commerce_orders_quantity_check check (quantity between 1 and 10) not valid`);
+  const oversizedOrders = await pool.query(`select count(*)::int as count from commerce_orders where quantity < 1 or quantity > 10`);
+  if (oversizedOrders.rows[0].count === 0) {
+    await pool.query(`alter table commerce_orders validate constraint commerce_orders_quantity_check`);
+  } else {
+    console.warn(`Kept ${oversizedOrders.rows[0].count} historical order(s) outside the current 1-10 quantity rule; new/updated orders are constrained to 1-10.`);
+  }
+
+  // Remove indexes that duplicate PRIMARY KEY/UNIQUE indexes and add the index
+  // actually needed by the per-reporter moderation rate-limit query.
+  await pool.query(`drop index if exists idx_wall_tags_token_hash`);
+  await pool.query(`drop index if exists idx_post_reports_post`);
+  await pool.query(`drop index if exists idx_admin_sessions_token_hash`);
+  await pool.query(`drop index if exists idx_customer_sessions_token_hash`);
+  await pool.query(`drop index if exists idx_commerce_order_items_order`);
+  await pool.query(`create index if not exists idx_post_reports_reporter_recent on post_reports(reporter_session_id, created_at desc)`);
 
   const existing = await pool.query(`select id from admin_users limit 1`);
   if (existing.rowCount === 0) {
