@@ -10,9 +10,10 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const schemaPath = path.join(here, '..', 'db', 'schema.sql');
 
 try {
-  // Existing databases predate moderator Wall ownership. Add the column before
-  // loading schema.sql so indexes that reference it can be created safely.
+  // Existing databases predate moderator Wall ownership and automatic purchase
+  // reservations. Add columns referenced by schema indexes before loading schema.sql.
   await pool.query(`alter table if exists admin_users add column if not exists wall_id uuid`);
+  await pool.query(`alter table if exists commerce_order_items add column if not exists reserved_wall_id uuid`);
 
   const sql = await fs.readFile(schemaPath, 'utf8');
   await pool.query(sql);
