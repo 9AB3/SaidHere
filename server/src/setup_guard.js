@@ -2,8 +2,9 @@ import { hashToken } from './auth.js';
 import { pool } from './db.js';
 
 const CUSTOMER_COOKIE = 'the_wall_customer';
-const UUID_PATH = /^\/([0-9a-fA-F-]{36})\/?$/;
-const EDIT_PATH = /^\/([0-9a-fA-F-]{36})\/edit\/?$/;
+const UUID = '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})';
+const UUID_PATH = new RegExp(`^/${UUID}/?$`);
+const EDIT_PATH = new RegExp(`^/${UUID}/edit/?$`);
 
 function parseCookies(req) {
   const result = {};
@@ -28,13 +29,17 @@ function escapeHtml(value) {
 }
 
 function waitingPage(email) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>First scan required · The Wall</title><style>*{box-sizing:border-box}body{margin:0;background:#d6cab4 url('/wall-background.png') center/cover fixed;color:#171411;font-family:Inter,Arial,sans-serif}.shade{min-height:100vh;background:rgba(237,227,208,.82);padding:18px}.card{max-width:520px;margin:8vh auto;padding:28px;background:#fffaf1;border:1px solid #cabfaa;border-radius:18px;text-align:center}.logo{width:106px}.card h1{margin:16px 0 8px;font-size:30px}.card p{color:#625a50;line-height:1.55}.button{display:flex;align-items:center;justify-content:center;min-height:48px;margin-top:14px;border:1px solid #171411;border-radius:8px;background:#171411;color:#fff;text-decoration:none;font-weight:900}.account{margin-top:16px;color:#7b7266;font-size:11px}</style></head><body><div class="shade"><main class="card"><img class="logo" src="/plaque.png" alt="The Wall"><h1>Scan the plaque first.</h1><p>This Wall has been assigned to your account, but its name and location are intentionally locked until you receive the physical plaque.</p><p>When it arrives, tap your phone to the NFC plaque. The first scan will open setup and let you choose the Wall name and location. After that, you can change them here whenever you like.</p><a class="button" href="/my-walls">Back to My Walls</a><div class="account">Signed in as ${escapeHtml(email)}</div></main></div></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>First scan required · The Wall</title><style>*{box-sizing:border-box}body{margin:0;background:#d6cab4 url('/wall-background.png') center/cover fixed;color:#171411;font-family:Inter,Arial,sans-serif}.shade{min-height:100vh;background:rgba(237,227,208,.82);padding:18px}.card{max-width:520px;margin:8vh auto;padding:28px;background:#fffaf1;border:1px solid #cabfaa;border-radius:18px;text-align:center}.logo{width:106px}.card h1{margin:16px 0 8px;font-size:30px}.card p{color:#625a50;line-height:1.55}.button{display:flex;align-items:center;justify-content:center;min-height:48px;margin-top:14px;border:1px solid #171411;border-radius:8px;background:#171411;color:#fff;text-decoration:none;font-weight:900}.account{margin-top:16px;color:#7b7266;font-size:11px}</style></head><body><div class="shade"><main class="card"><img class="logo" src="/plaque.png" alt="The Wall"><h1>Scan the Wall first.</h1><p>This Wall has been assigned to your account, but its name and location stay locked until you receive the physical Wall.</p><p>When it arrives, scan the NFC. The first scan opens setup so you can choose the Wall name and location. After that, you can change them here whenever you like.</p><a class="button" href="/my-walls">Back to My Walls</a><div class="account">Signed in as ${escapeHtml(email)}</div></main></div></body></html>`;
 }
 
 export function mountSetupGuard(app) {
   app.use('/my-walls', async (req, res, next) => {
     try {
-      const match = req.method === 'GET' ? req.path.match(UUID_PATH) : req.method === 'POST' ? req.path.match(EDIT_PATH) : null;
+      const match = req.method === 'GET'
+        ? req.path.match(UUID_PATH)
+        : req.method === 'POST'
+          ? req.path.match(EDIT_PATH)
+          : null;
       if (!match) return next();
       const raw = parseCookies(req)[CUSTOMER_COOKIE] || '';
       if (!raw) return next();
