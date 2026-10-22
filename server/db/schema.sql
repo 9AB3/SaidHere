@@ -68,6 +68,15 @@ create table if not exists admin_users (
   last_login_at timestamptz
 );
 
+-- A Moderator can be responsible for multiple Walls. admin_users.wall_id is kept
+-- as a legacy primary assignment while access control uses this join table.
+create table if not exists admin_wall_assignments (
+  admin_user_id uuid not null references admin_users(id) on delete cascade,
+  wall_id uuid not null references walls(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (admin_user_id, wall_id)
+);
+
 create table if not exists admin_sessions (
   id uuid primary key default gen_random_uuid(),
   admin_user_id uuid not null references admin_users(id) on delete cascade,
@@ -237,6 +246,7 @@ create index if not exists idx_wall_posts_parent on wall_posts(parent_id) where 
 create index if not exists idx_post_reports_created on post_reports(created_at desc);
 create index if not exists idx_post_reports_reporter_recent on post_reports(reporter_session_id, created_at desc);
 create index if not exists idx_admin_users_wall on admin_users(wall_id) where role = 'moderator';
+create index if not exists idx_admin_wall_assignments_wall on admin_wall_assignments(wall_id, admin_user_id);
 create index if not exists idx_admin_sessions_expiry on admin_sessions(expires_at);
 create index if not exists idx_admin_audit_created on admin_audit_log(created_at desc);
 create index if not exists idx_admin_audit_user on admin_audit_log(admin_user_id, created_at desc);
