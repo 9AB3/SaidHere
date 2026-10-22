@@ -3,7 +3,6 @@ import crypto from 'node:crypto';
 import { hashToken, makeToken } from './auth.js';
 import { pool } from './db.js';
 import {
-  commerceEmailStatus,
   ensureOrderCustomerLink,
   manualClaimLinkForOrder,
   reconcileCheckoutSessionById,
@@ -125,10 +124,9 @@ function addressLines(address) {
   ].filter(Boolean);
 }
 
-async function listOrders() {
+async function listOutstandingOrders() {
   const result = await pool.query(
     `select o.*,
-            c.password_hash is not null as customer_active,
             count(i.id)::int as item_count,
             count(i.id) filter (where i.wall_id is not null)::int as nfc_assigned_count,
             count(i.id) filter (where i.status = 'fulfilled')::int as shipped_count,
@@ -146,20 +144,18 @@ async function listOrders() {
               ) order by i.ordinal
             ) filter (where i.id is not null), '[]'::jsonb) as items
        from commerce_orders o
-       left join customer_accounts c on c.id = o.customer_id
        left join commerce_order_items i on i.order_id = o.id
        left join walls w on w.id = i.wall_id
        left join plaques p on p.order_item_id = i.id
-      group by o.id, c.password_hash
-      order by
-        case
-          when o.status = 'paid' then 0
-          when o.customer_confirmation_error is not null then 1
-          when o.status = 'pending' then 2
-          when o.status = 'fulfilled' then 3
-          else 4
-        end,
-        o.created_at desc
+      where o.status = 'paid'
+        and exists (
+          select 1
+            from commerce_order_items pending_item
+           where pending_item.order_id = o.id
+             and pending_item.status = 'awaiting_fulfillment'
+        )
+      group by o.id
+      order by o.created_at asc
       limit 250`,
   );
   return result.rows;
@@ -186,7 +182,7 @@ async function assignNextNfc(orderId) {
         for update`,
       [order.id],
     );
-    if (itemResult.rowCount === 0) throw new Error('Every Wall in this order already has an NFC assigned.');
+    if (itemResult.rowCount === 0) throw new Error('Every outstanding Wall in this order already has an NFC assigned.');
     const item = itemResult.rows[0];
 
     const slug = crypto.randomBytes(5).toString('hex').toUpperCase();
@@ -259,7 +255,7 @@ async function replaceUnshippedNfc(orderId, itemId) {
     );
     if (result.rowCount === 0) throw new Error('Assigned Wall not found on this paid order.');
     const item = result.rows[0];
-    if (item.status !== 'awaiting_fulfillment') throw new Error('A shipped Wall cannot be reprogrammed from Orders. Use Wall management for a replacement.');
+    if (item.status !== 'awaiting_fulfillment') throw new Error('A shipped Wall cannot be reprogrammed from Orders.');
 
     const rawNfc = makeToken(36);
     await client.query(`update wall_tags set active = false where wall_id = $1 and active = true`, [item.wall_id]);
@@ -309,7 +305,7 @@ async function markItemShipped(orderId, itemId) {
     if (itemResult.rowCount === 0) throw new Error('Wall item not found.');
     const item = itemResult.rows[0];
     if (!['paid', 'fulfilled'].includes(item.order_status)) throw new Error('Payment must be confirmed before shipping.');
-    if (!item.wall_id) throw new Error('Assign the NFC before marking this Wall shipped.');
+    if (!item.wall_id) throw new Error('Program the NFC before marking this Wall shipped.');
     if (item.status === 'fulfilled') {
       await client.query('commit');
       return { wallId: item.wall_id, wallName: item.display_name, alreadyDone: true };
@@ -346,116 +342,61 @@ async function markItemShipped(orderId, itemId) {
   }
 }
 
-function itemState(item) {
-  if (item.status === 'fulfilled') return { text: 'Shipped', cls: 'good' };
-  if (item.wall_id) return { text: 'NFC assigned · ready to ship', cls: 'warn' };
-  return { text: 'Awaiting NFC', cls: 'muted' };
-}
-
-function matchesView(order, view) {
-  if (view === 'all') return true;
-  if (view === 'action') {
-    return order.status === 'paid'
-      || (['paid', 'fulfilled'].includes(order.status)
-        && (!order.customer_confirmation_sent_at || order.customer_confirmation_error));
-  }
-  return order.status === view;
-}
-
-function orderCard(order, csrf) {
+function nextAction(order) {
   const items = Array.isArray(order.items) ? order.items : [];
-  const shipping = addressLines(order.shipping_address);
-  const canAssign = order.status === 'paid'
-    && items.some((item) => item.status === 'awaiting_fulfillment' && !item.wall_id);
-  const assignedWaiting = items.filter((item) => item.status === 'awaiting_fulfillment' && item.wall_id);
-  const emailState = order.customer_confirmation_error
-    ? `<div class="email bad"><b>Customer email failed</b><span>${escapeHtml(order.customer_confirmation_error)}</span></div>`
-    : order.customer_confirmation_sent_at
-      ? `<div class="email good"><b>Customer confirmation sent</b><span>${escapeHtml(fmt(order.customer_confirmation_sent_at))}</span></div>`
-      : ['paid', 'fulfilled'].includes(order.status)
-        ? '<div class="email warn"><b>Customer confirmation not recorded</b><span>Use Order controls to send or retry it.</span></div>'
-        : '';
+  if (items.some((item) => item.status === 'awaiting_fulfillment' && !item.wall_id)) return 'Program NFC';
+  if (items.some((item) => item.status === 'awaiting_fulfillment' && item.wall_id)) return 'Ship';
+  return 'Complete';
+}
 
-  const rows = items.map((item) => {
-    const state = itemState(item);
-    const setupText = item.wall_id
-      ? item.setup_required ? 'Customer setup pending' : 'Customer setup complete'
-      : '—';
-    const ship = item.status === 'awaiting_fulfillment' && item.wall_id
-      ? `<div class="item-actions"><form method="post" action="/admin/orders/${encodeURIComponent(order.id)}/items/${encodeURIComponent(item.id)}/replace-nfc"><input type="hidden" name="_csrf" value="${escapeHtml(csrf)}"><button class="button secondary" type="submit">Replace NFC</button></form><form method="post" action="/admin/orders/${encodeURIComponent(order.id)}/items/${encodeURIComponent(item.id)}/ship"><input type="hidden" name="_csrf" value="${escapeHtml(csrf)}"><button class="button good" type="submit">Mark shipped</button></form></div>`
-      : '<span></span>';
-    return `<div class="item-row"><div><b>Wall ${escapeHtml(item.ordinal)}</b><span>${escapeHtml(item.serial_code || 'Serial assigned with NFC')}</span></div><div><span class="pill ${state.cls}">${escapeHtml(state.text)}</span><small>${escapeHtml(setupText)}</small></div>${ship}</div>`;
+function orderRow(order, csrf) {
+  const items = Array.isArray(order.items) ? order.items : [];
+  const outstanding = items.filter((item) => item.status === 'awaiting_fulfillment');
+  const shipping = addressLines(order.shipping_address);
+  const unprogrammed = outstanding.filter((item) => !item.wall_id);
+  const readyToShip = outstanding.filter((item) => item.wall_id);
+  const progress = `${order.shipped_count || 0}/${order.quantity} shipped`;
+
+  const itemRows = outstanding.map((item) => {
+    if (!item.wall_id) {
+      return `<div class="fulfilment-item"><div><b>Wall ${escapeHtml(item.ordinal)}</b><span>Needs NFC programming</span></div><span class="step-badge program">Program NFC</span><span class="item-placeholder">Use the Program NFC button above</span></div>`;
+    }
+    return `<div class="fulfilment-item"><div><b>Wall ${escapeHtml(item.ordinal)}</b><span>${escapeHtml(item.serial_code || 'NFC assigned')}</span></div><span class="step-badge ship">Ready to ship</span><div class="item-actions"><form method="post" action="/admin/orders/${encodeURIComponent(order.id)}/items/${encodeURIComponent(item.id)}/ship"><input type="hidden" name="_csrf" value="${escapeHtml(csrf)}"><button class="button good" type="submit">Mark shipped</button></form><form method="post" action="/admin/orders/${encodeURIComponent(order.id)}/items/${encodeURIComponent(item.id)}/replace-nfc"><input type="hidden" name="_csrf" value="${escapeHtml(csrf)}"><button class="button secondary quiet" type="submit">Replace NFC</button></form></div></div>`;
   }).join('');
 
-  const operational = `
-    ${canAssign ? `<form method="post" action="/admin/orders/${encodeURIComponent(order.id)}/assign-nfc"><input type="hidden" name="_csrf" value="${escapeHtml(csrf)}"><button class="button" type="submit">Assign next NFC</button></form>` : ''}
-    ${assignedWaiting.length > 0 ? `<span class="ready-note">${assignedWaiting.length} Wall${assignedWaiting.length === 1 ? '' : 's'} ready to ship</span>` : ''}`;
-
-  const paidControls = ['paid', 'fulfilled'].includes(order.status) ? `
-    <form method="post" action="/admin/orders/${encodeURIComponent(order.id)}/email/customer"><input type="hidden" name="_csrf" value="${escapeHtml(csrf)}"><button class="button secondary" type="submit">${order.customer_confirmation_sent_at ? 'Resend customer email' : 'Send customer email'}</button></form>
-    <form method="post" action="/admin/orders/${encodeURIComponent(order.id)}/email/owner"><input type="hidden" name="_csrf" value="${escapeHtml(csrf)}"><button class="button secondary" type="submit">Resend admin notice</button></form>
-    <form method="post" action="/admin/orders/${encodeURIComponent(order.id)}/claim-link"><input type="hidden" name="_csrf" value="${escapeHtml(csrf)}"><button class="link-action" type="submit">Recovery activation link</button></form>` : '';
-  const pendingControl = order.status === 'pending' && order.stripe_checkout_session_id
-    ? `<form method="post" action="/admin/orders/${encodeURIComponent(order.id)}/reconcile"><input type="hidden" name="_csrf" value="${escapeHtml(csrf)}"><button class="button secondary" type="submit">Recheck payment with Stripe</button></form>`
+  const programButton = unprogrammed.length
+    ? `<form method="post" action="/admin/orders/${encodeURIComponent(order.id)}/assign-nfc"><input type="hidden" name="_csrf" value="${escapeHtml(csrf)}"><button class="button" type="submit">Program NFC</button></form>`
     : '';
 
-  return `<article class="order-card"><div class="head"><div><span class="eyebrow">Order ${escapeHtml(shortId(order.id))}</span><h3>${escapeHtml(order.purchaser_email)}</h3><p>${escapeHtml(fmt(order.created_at))} · ${escapeHtml(order.quantity)} Wall${Number(order.quantity) === 1 ? '' : 's'} · ${escapeHtml(money(order.amount_total, order.currency))}</p></div><div class="badges"><span class="pill ${order.status === 'fulfilled' ? 'good' : order.status === 'paid' ? 'warn' : 'muted'}">${escapeHtml(order.status === 'fulfilled' ? 'Shipped' : order.status)}</span></div></div>
-    <div class="facts"><div><span>Shipping</span><b>${shipping.length ? escapeHtml(shipping.join(', ')) : 'Not captured'}</b></div><div><span>Customer</span><b>${order.customer_active ? 'Account active' : ['paid', 'fulfilled'].includes(order.status) ? 'Activation pending' : 'Not created'}</b></div><div><span>Progress</span><b>${escapeHtml(order.nfc_assigned_count || 0)}/${escapeHtml(order.quantity)} NFC · ${escapeHtml(order.shipped_count || 0)}/${escapeHtml(order.quantity)} shipped</b></div></div>
-    ${emailState}
-    <div class="primary-actions">${operational}</div>
-    <details class="drawer" open><summary>Walls <span>${items.length}</span></summary><div class="items">${rows}</div></details>
-    <details class="drawer"><summary>Order controls <span>›</span></summary><div class="controls">${pendingControl}${paidControls}</div></details>
-    <details class="drawer"><summary>Technical details <span>›</span></summary><div class="tech"><div><span>Order ID</span><code>${escapeHtml(order.id)}</code></div><div><span>Checkout</span><code>${escapeHtml(order.stripe_checkout_session_id || '—')}</code></div><div><span>Payment</span><code>${escapeHtml(order.stripe_payment_intent_id || '—')}</code></div></div></details>
-  </article>`;
+  return `<details class="fulfilment-row"><summary class="fulfilment-summary"><div class="fulfilment-customer"><b>${escapeHtml(order.purchaser_email)}</b><small>${escapeHtml(fmt(order.created_at))}</small></div><div class="fulfilment-order"><b>${escapeHtml(shortId(order.id))}</b><small>${escapeHtml(order.quantity)} Wall${Number(order.quantity) === 1 ? '' : 's'}</small></div><div><span class="step-badge ${unprogrammed.length ? 'program' : 'ship'}">${escapeHtml(nextAction(order))}</span></div><div class="fulfilment-progress"><b>${escapeHtml(progress)}</b><small>${escapeHtml(order.nfc_assigned_count || 0)}/${escapeHtml(order.quantity)} NFC programmed</small></div><div class="fulfilment-total">${escapeHtml(money(order.amount_total, order.currency))}</div><div class="fulfilment-chevron">›</div></summary><div class="fulfilment-body"><div class="fulfilment-meta"><div><span>Ship to</span><b>${shipping.length ? escapeHtml(shipping.join(', ')) : 'Shipping address not captured'}</b></div><div><span>Remaining</span><b>${outstanding.length} Wall${outstanding.length === 1 ? '' : 's'} · ${unprogrammed.length} to program · ${readyToShip.length} to ship</b></div></div>${programButton ? `<div class="fulfilment-primary">${programButton}<span>Creates the Wall and shows the one-time NFC URL.</span></div>` : ''}<div class="fulfilment-items">${itemRows}</div></div></details>`;
 }
 
-function page({ admin, orders, view, search, notice = '', error = '', oneTime = null }) {
-  const smtp = commerceEmailStatus();
-  const counts = {
-    action: orders.filter((order) => matchesView(order, 'action')).length,
-    paid: orders.filter((order) => order.status === 'paid').length,
-    fulfilled: orders.filter((order) => order.status === 'fulfilled').length,
-    pending: orders.filter((order) => order.status === 'pending').length,
-    email: orders.filter((order) => ['paid', 'fulfilled'].includes(order.status)
-      && (!order.customer_confirmation_sent_at || order.customer_confirmation_error)).length,
-  };
-  let filtered = orders.filter((order) => matchesView(order, view));
+function page({ admin, orders, search, notice = '', error = '', oneTime = null }) {
   const q = clean(search).toLowerCase();
-  if (q) {
-    filtered = filtered.filter((order) => `${order.id} ${order.purchaser_email} ${order.stripe_checkout_session_id || ''} ${order.stripe_payment_intent_id || ''}`.toLowerCase().includes(q));
-  }
-  const tabs = [
-    ['action', 'Needs action', counts.action],
-    ['paid', 'Paid', counts.paid],
-    ['fulfilled', 'Shipped', counts.fulfilled],
-    ['pending', 'Pending', counts.pending],
-    ['cancelled', 'Cancelled', orders.filter((order) => order.status === 'cancelled').length],
-    ['all', 'All', orders.length],
-  ].map(([key, label, count]) => `<a class="tab ${view === key ? 'active' : ''}" href="/admin/orders?view=${key}">${label}<span>${count}</span></a>`).join('');
-  const cards = filtered.length
-    ? filtered.map((order) => orderCard(order, admin.csrf)).join('')
-    : '<div class="empty">No orders in this view.</div>';
+  const filtered = q
+    ? orders.filter((order) => `${order.id} ${order.purchaser_email}`.toLowerCase().includes(q))
+    : orders;
+  const rows = filtered.length
+    ? filtered.map((order) => orderRow(order, admin.csrf)).join('')
+    : `<div class="empty">${q ? 'No outstanding orders match that search.' : 'No outstanding orders. Everything paid has been programmed and shipped.'}</div>`;
 
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Orders · The Wall Admin</title><style>
-    *{box-sizing:border-box}body{margin:0;background:#eee8de;color:#181512;font-family:Inter,Arial,sans-serif}.shell{max-width:1120px;margin:auto;padding:18px 20px 60px}.top{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;background:#171512;color:#fff;border-radius:14px}.top h1{margin:0;font-size:20px}.top small{display:block;margin-top:3px;color:#beb5a9;font-size:9px;text-transform:uppercase;letter-spacing:1.3px}.top form{margin:0}.nav{display:flex;gap:5px;overflow:auto;margin:10px 0 20px;padding:6px;background:#fbf8f1;border:1px solid #ddd4c5;border-radius:11px}.nav a{padding:9px 13px;border-radius:7px;color:#71695e;text-decoration:none;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}.nav a.active{background:#171512;color:#fff}.pagehead{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;margin:8px 0 14px}.pagehead h2{margin:0;font-size:34px;letter-spacing:-1px}.pagehead p{margin:6px 0 0;color:#746c61;font-size:13px}.smtp{display:flex;align-items:center;gap:7px;padding:9px 11px;background:#fffaf1;border:1px solid #d8cdbc;border-radius:9px;font-size:10px;font-weight:850}.dot{width:8px;height:8px;border-radius:50%;background:#9b4137}.dot.ok{background:#52714d}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:13px}.stat{padding:13px;background:#fbf8f1;border:1px solid #ddd4c5;border-radius:10px}.stat b{display:block;font-size:23px}.stat span{display:block;margin-top:4px;color:#746c61;font-size:8px;text-transform:uppercase;letter-spacing:.7px;font-weight:900}.alert{padding:12px 14px;border-radius:9px;margin-bottom:12px;font-size:12px;font-weight:800}.alert.good{background:#e3eee0;border-left:4px solid #52714d}.alert.bad{background:#f2dfdb;border-left:4px solid #9b4137}.nfc{padding:15px;margin-bottom:14px;background:#fff;border:2px solid #171512;border-radius:11px}.nfc code{display:block;margin:9px 0;padding:10px;background:#f2ede4;border-radius:7px;word-break:break-all;font-size:11px}.nfc p{color:#665e55;font-size:12px}.search{display:flex;gap:7px;margin-bottom:9px}.search input{flex:1;min-height:42px;padding:9px 11px;border:1px solid #c9bead;border-radius:8px;background:#fff}.tabs{display:flex;gap:5px;overflow:auto;margin-bottom:10px}.tab{display:flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid #d6ccbd;border-radius:999px;background:#fffaf1;color:#6d655b;text-decoration:none;font-size:9px;font-weight:900;text-transform:uppercase;white-space:nowrap}.tab span{display:grid;place-items:center;min-width:19px;height:19px;padding:0 5px;border-radius:99px;background:#ece5da}.tab.active{background:#171512;color:#fff}.tab.active span{background:#39342f}.orders{display:flex;flex-direction:column;gap:9px}.order-card{padding:16px;background:#fffdf9;border:1px solid #ddd4c5;border-radius:12px;box-shadow:0 5px 18px rgba(34,28,23,.04)}.head{display:flex;justify-content:space-between;gap:16px}.eyebrow{display:block;color:#81786d;font-size:8px;text-transform:uppercase;letter-spacing:1px;font-weight:950}.head h3{margin:5px 0 3px;font-size:16px;overflow-wrap:anywhere}.head p{margin:0;color:#746c61;font-size:10px}.badges{display:flex;gap:5px}.pill{display:inline-flex;align-items:center;width:max-content;padding:5px 7px;border-radius:999px;background:#eee8de;color:#645d55;font-size:7px;text-transform:uppercase;letter-spacing:.55px;font-weight:950}.pill.good{background:#dfead9;color:#355230}.pill.warn{background:#f2e4b9;color:#76550e}.pill.bad{background:#f1d9d5;color:#873a33}.pill.muted{background:#eee8de;color:#6e675f}.facts{display:grid;grid-template-columns:2fr 1fr 1fr;gap:7px;margin:12px 0}.facts>div{min-width:0;padding:8px 9px;background:#f5f0e8;border-radius:8px}.facts span,.tech span{display:block;margin-bottom:4px;color:#81786d;font-size:7px;text-transform:uppercase;letter-spacing:.6px;font-weight:900}.facts b{display:block;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.email{display:flex;justify-content:space-between;gap:10px;padding:9px 10px;margin:9px 0;border-radius:8px;font-size:10px}.email span{overflow-wrap:anywhere}.email.good{background:#e5efe1;color:#3e5c39}.email.warn{background:#f5e7bf;color:#76530d}.email.bad{background:#f2dfdb;color:#7c342f}.primary-actions{display:flex;align-items:center;gap:9px;margin:11px 0}.ready-note{color:#6e665d;font-size:9px;font-weight:800}.button{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:8px 11px;border:1px solid #171512;border-radius:7px;background:#171512;color:#fff;font-size:8px;text-transform:uppercase;letter-spacing:.55px;font-weight:950;cursor:pointer}.button.secondary{background:#fffdf8;color:#171512;border-color:#c8bdad}.button.good{background:#52714d;border-color:#52714d}.drawer{border-top:1px solid #ebe3d7;margin-top:8px}.drawer summary{display:flex;align-items:center;justify-content:space-between;min-height:40px;list-style:none;cursor:pointer;color:#645d55;font-size:9px;text-transform:uppercase;letter-spacing:.6px;font-weight:950}.drawer summary::-webkit-details-marker{display:none}.items{padding:2px 0 7px}.item-row{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #eee7dc}.item-row:last-child{border-bottom:0}.item-row b{display:block;font-size:11px}.item-row span{display:block;margin-top:2px;color:#81786d;font-size:9px}.item-row small{display:block;margin-top:4px;color:#81786d;font-size:8px}.item-actions{display:flex;gap:6px}.item-actions form{margin:0}.controls{display:flex;gap:6px;flex-wrap:wrap;padding:5px 0 10px}.controls form{margin:0}.link-action{min-height:38px;padding:8px;border:0;background:transparent;color:#665e55;text-decoration:underline;font-size:9px;font-weight:800;cursor:pointer}.tech{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;padding:4px 0 10px}.tech>div{min-width:0;padding:8px;background:#f4efe7;border-radius:7px}.tech code{display:block;overflow-wrap:anywhere;font-size:9px}.empty{padding:35px;text-align:center;background:#fffaf1;border:1px dashed #cfc4b4;border-radius:12px;color:#6f675d}@media(max-width:720px){.shell{padding:12px 12px 48px}.pagehead{align-items:flex-start;flex-direction:column}.pagehead h2{font-size:30px}.smtp{width:100%}.stats{grid-template-columns:repeat(2,1fr)}.head{display:block}.badges{margin-top:8px}.facts{grid-template-columns:1fr 1fr}.facts>div:first-child{grid-column:1/-1}.item-row{grid-template-columns:1fr}.item-actions{display:grid;grid-template-columns:1fr 1fr}.item-actions .button{width:100%}.tech{grid-template-columns:1fr}.controls{flex-direction:column}.controls form,.controls .button{width:100%}.top span{display:none}}
-  </style></head><body><main class="shell"><header class="top"><div><h1>The Wall</h1><small>Admin console</small></div><div><span>${escapeHtml(admin.display_name || admin.username)} · Main Admin</span><form method="post" action="/admin/logout" style="display:inline"><input type="hidden" name="_csrf" value="${escapeHtml(admin.csrf)}"><button class="link-action" style="color:#fff;text-decoration:none" type="submit">Logout</button></form></div></header><nav class="nav"><a href="/admin/walls">Walls</a><a class="active" href="/admin/orders">Orders</a><a href="/admin/users">Users</a><a href="/admin/audit">Audit</a></nav>
-    <section class="pagehead"><div><h2>Orders</h2><p>After payment: assign the NFC, pack the Wall, then mark it shipped. The customer names and locates it on first scan.</p></div><div class="smtp"><span class="dot ${smtp.configured ? 'ok' : ''}"></span>${smtp.configured ? `SMTP ready · ${escapeHtml(smtp.host)}` : 'SMTP credentials missing'}</div></section>
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Outstanding Orders · SaidHere Admin</title><style>
+    *{box-sizing:border-box}body{margin:0;background:#eee8de;color:#181512;font-family:Inter,Arial,sans-serif}.shell{max-width:1120px;margin:auto;padding:18px 20px 60px}.top{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;background:#171512;color:#fff;border-radius:14px}.top h1{margin:0;font-size:20px}.top small{display:block;margin-top:3px;color:#beb5a9;font-size:9px;text-transform:uppercase;letter-spacing:1.3px}.top form{margin:0}.nav{display:flex;gap:5px;overflow:auto;margin:10px 0 20px;padding:6px;background:#fbf8f1;border:1px solid #ddd4c5;border-radius:11px}.nav a{padding:9px 13px;border-radius:7px;color:#71695e;text-decoration:none;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}.nav a.active{background:#171512;color:#fff}.pagehead{margin:8px 0 14px}.pagehead h2{margin:0;font-size:34px;letter-spacing:-1px}.pagehead p{margin:6px 0 0;color:#746c61;font-size:13px}.alert{padding:12px 14px;border-radius:9px;margin-bottom:12px;font-size:12px;font-weight:800}.alert.good{background:#e3eee0;border-left:4px solid #52714d}.alert.bad{background:#f2dfdb;border-left:4px solid #9b4137}.nfc{padding:15px;margin-bottom:14px;background:#fff;border:2px solid #171512;border-radius:11px}.nfc code{display:block;margin:9px 0;padding:10px;background:#f2ede4;border-radius:7px;word-break:break-all;font-size:11px}.nfc p{color:#665e55;font-size:12px}.search{display:flex;gap:7px;margin-bottom:10px}.search input{flex:1;min-height:42px;padding:9px 11px;border:1px solid #c9bead;border-radius:8px;background:#fff}.button{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:8px 11px;border:1px solid #171512;border-radius:7px;background:#171512;color:#fff;font-size:8px;text-transform:uppercase;letter-spacing:.55px;font-weight:950;cursor:pointer}.button.secondary{background:#fffdf8;color:#171512;border-color:#c8bdad}.button.good{background:#52714d;border-color:#52714d}.button.quiet{min-height:32px;padding:6px 9px;color:#68625b}.orders{display:block}.fulfilment-list-head,.fulfilment-summary{display:grid;grid-template-columns:minmax(230px,1.55fr) 140px 105px 165px 90px 22px;align-items:center;gap:10px}.fulfilment-list-head{padding:8px 12px;background:#f8f9fa;border:1px solid #e2e5e9;border-bottom:0;border-radius:11px 11px 0 0;color:#6b7280;font-size:7px;text-transform:uppercase;letter-spacing:.65px;font-weight:900}.fulfilment-row{background:#fff;border:1px solid #e2e5e9;border-top:0}.fulfilment-row:last-child{border-radius:0 0 11px 11px}.fulfilment-row[open]{margin:7px 0;border:1px solid #cbd1d8;border-radius:10px;box-shadow:0 7px 24px rgba(17,24,39,.06)}.fulfilment-summary{list-style:none;min-height:66px;padding:10px 12px;cursor:pointer}.fulfilment-summary::-webkit-details-marker{display:none}.fulfilment-summary:hover{background:#fafbfc}.fulfilment-row[open]>.fulfilment-summary{background:#f8fafb;border-radius:10px 10px 0 0}.fulfilment-customer,.fulfilment-order{min-width:0}.fulfilment-customer b,.fulfilment-order b,.fulfilment-progress b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}.fulfilment-customer small,.fulfilment-order small,.fulfilment-progress small{display:block;margin-top:3px;color:#6b7280;font-size:7px}.fulfilment-total{font-size:10px;font-weight:850}.fulfilment-chevron{font-size:18px;color:#999;transition:.18s}.fulfilment-row[open] .fulfilment-chevron{transform:rotate(90deg)}.step-badge{display:inline-flex;width:max-content;padding:5px 7px;border-radius:99px;font-size:7px;text-transform:uppercase;letter-spacing:.5px;font-weight:900}.step-badge.program{background:#fff1c9;color:#7a5815}.step-badge.ship{background:#eaf5ed;color:#356d48}.fulfilment-body{padding:13px;border-top:1px solid #eef0f2}.fulfilment-meta{display:grid;grid-template-columns:2fr 1fr;gap:8px}.fulfilment-meta>div{padding:10px;background:#f7f8fa;border-radius:8px}.fulfilment-meta span{display:block;color:#6b7280;font-size:6px;text-transform:uppercase;letter-spacing:.55px;font-weight:900}.fulfilment-meta b{display:block;margin-top:4px;font-size:9px}.fulfilment-primary{display:flex;align-items:center;gap:10px;margin:12px 0;padding:10px;border:1px solid #e2e5e9;border-radius:9px;background:#fbfcfd}.fulfilment-primary span{color:#6b7280;font-size:8px}.fulfilment-items{border-top:1px solid #eef0f2;margin-top:9px}.fulfilment-item{display:grid;grid-template-columns:minmax(170px,1fr) 145px auto;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #eef0f2}.fulfilment-item:last-child{border-bottom:0}.fulfilment-item b{display:block;font-size:9px}.fulfilment-item>div:first-child span,.item-placeholder{display:block;margin-top:3px;color:#6b7280;font-size:7px}.item-actions{display:flex;align-items:center;gap:6px}.item-actions form{margin:0}.empty{padding:35px;text-align:center;background:#fff;border:1px dashed #cfc4b4;border-radius:12px;color:#6f675d;font-size:11px}@media(max-width:850px){.fulfilment-list-head,.fulfilment-summary{grid-template-columns:minmax(180px,1.4fr) 120px 95px 135px 80px 20px}}@media(max-width:720px){.shell{padding:12px 12px 48px}.top span{display:none}.fulfilment-list-head{display:none}.fulfilment-row{border:1px solid #e2e5e9!important;border-radius:10px!important;margin-bottom:8px}.fulfilment-summary{grid-template-columns:minmax(0,1fr) auto 20px}.fulfilment-summary>.fulfilment-order,.fulfilment-summary>.fulfilment-progress,.fulfilment-summary>.fulfilment-total{display:none}.fulfilment-meta{grid-template-columns:1fr}.fulfilment-item{grid-template-columns:1fr}.item-actions{justify-content:flex-start}.fulfilment-primary{align-items:flex-start;flex-direction:column}.search{display:grid;grid-template-columns:1fr auto}}
+  </style></head><body><main class="shell"><header class="top"><div><h1>SaidHere</h1><small>Admin console</small></div><div><span>${escapeHtml(admin.display_name || admin.username)} · Main Admin</span><form method="post" action="/admin/logout" style="display:inline"><input type="hidden" name="_csrf" value="${escapeHtml(admin.csrf)}"><button class="button secondary" type="submit">Logout</button></form></div></header><nav class="nav"><a href="/admin/walls">Walls</a><a class="active" href="/admin/orders">Orders</a><a href="/admin/users">Users</a><a href="/admin/audit">Activity</a></nav>
+    <section class="pagehead"><h2>Outstanding orders</h2><p>Only paid orders that still need an NFC programmed or a Wall shipped appear here.</p></section>
     ${notice ? `<div class="alert good">${escapeHtml(notice)}</div>` : ''}${error ? `<div class="alert bad">${escapeHtml(error)}</div>` : ''}
-    ${oneTime?.nfcUrl ? `<section class="nfc"><b>Wall ${escapeHtml(oneTime.ordinal)} · ${escapeHtml(oneTime.serial)}</b><p>Write this exact URL to the physical NFC tag now. The raw token is intentionally shown once. If you lose it before shipping, use Replace NFC for that Wall.</p><code>${escapeHtml(oneTime.nfcUrl)}</code></section>` : ''}
+    ${oneTime?.nfcUrl ? `<section class="nfc"><b>Wall ${escapeHtml(oneTime.ordinal)} · ${escapeHtml(oneTime.serial)}</b><p>Write this exact URL to the NFC tag now. It is intentionally shown once.</p><code>${escapeHtml(oneTime.nfcUrl)}</code></section>` : ''}
     ${oneTime?.claimUrl ? `<section class="nfc"><b>Recovery activation link</b><p>Use only if the purchaser cannot access their account.</p><code>${escapeHtml(oneTime.claimUrl)}</code></section>` : ''}
-    <section class="stats"><div class="stat"><b>${counts.action}</b><span>Needs action</span></div><div class="stat"><b>${counts.paid}</b><span>Paid / packing</span></div><div class="stat"><b>${counts.email}</b><span>Email attention</span></div><div class="stat"><b>${counts.fulfilled}</b><span>Shipped</span></div></section>
-    <form class="search" method="get" action="/admin/orders"><input type="hidden" name="view" value="${escapeHtml(view)}"><input name="q" value="${escapeHtml(search)}" placeholder="Search email, order or Stripe ID"><button class="button secondary" type="submit">Search</button></form><nav class="tabs">${tabs}</nav><section class="orders">${cards}</section>
+    <form class="search" method="get" action="/admin/orders"><input name="q" value="${escapeHtml(search)}" placeholder="Search outstanding orders by email or order ID"><button class="button secondary" type="submit">Search</button></form>
+    ${filtered.length ? '<div class="fulfilment-list-head"><span>Customer</span><span>Order</span><span>Next action</span><span>Progress</span><span>Total</span><span></span></div>' : ''}<section class="orders">${rows}</section>
   </main></body></html>`;
 }
 
 async function renderOrders(req, res, { notice = '', error = '', oneTime = null } = {}) {
-  const orders = await listOrders();
-  const valid = new Set(['action', 'paid', 'fulfilled', 'pending', 'cancelled', 'refunded', 'all']);
-  const view = valid.has(clean(req.query?.view)) ? clean(req.query.view) : 'action';
+  const orders = await listOutstandingOrders();
   return res.type('html').send(page({
     admin: req.orderAdmin,
     orders,
-    view,
     search: clean(req.query?.q),
     notice,
     error,
@@ -475,9 +416,9 @@ export function mountAdminOrdersV2(app) {
         wallName: result.wallName,
         details: { order_id: req.params.orderId, ordinal: result.ordinal, serial_code: result.serial },
       });
-      return renderOrders(req, res, { notice: 'NFC assigned. Program the Wall using the one-time URL below.', oneTime: result });
+      return renderOrders(req, res, { notice: 'NFC created. Program the tag using the one-time URL below.', oneTime: result });
     } catch (error) {
-      return renderOrders(req, res, { error: error?.message || 'Could not assign NFC.' });
+      return renderOrders(req, res, { error: error?.message || 'Could not program NFC.' });
     }
   });
 
@@ -505,18 +446,19 @@ export function mountAdminOrdersV2(app) {
           details: { order_id: req.params.orderId, item_id: req.params.itemId },
         });
       }
-      return renderOrders(req, res, { notice: 'Wall marked shipped. The customer will choose name and location on first scan.' });
+      return renderOrders(req, res, { notice: 'Wall marked shipped.' });
     } catch (error) {
       return renderOrders(req, res, { error: error?.message || 'Could not mark Wall shipped.' });
     }
   });
 
+  // Recovery/support endpoints are retained but intentionally not exposed in the normal Orders UI.
   app.post('/admin/orders/:orderId/reconcile', requireOwner, requireCsrf, async (req, res) => {
     try {
       if (!validUuid(req.params.orderId)) throw new Error('Invalid order ID.');
       const result = await pool.query(`select stripe_checkout_session_id from commerce_orders where id = $1 limit 1`, [req.params.orderId]);
       const sessionId = result.rows[0]?.stripe_checkout_session_id;
-      if (!sessionId) throw new Error('This order does not have a Stripe Checkout Session to check.');
+      if (!sessionId) throw new Error('This order has no Stripe checkout session.');
       await reconcileCheckoutSessionById(sessionId);
       return renderOrders(req, res, { notice: 'Stripe payment status rechecked.' });
     } catch (error) {
