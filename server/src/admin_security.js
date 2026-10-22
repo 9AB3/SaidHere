@@ -17,11 +17,29 @@ function parseCookies(req) {
   return cookies;
 }
 
+function explainRequiredPasswordChange(res) {
+  const originalSend = res.send.bind(res);
+  res.send = (body) => {
+    if (typeof body !== 'string') return originalSend(body);
+
+    let html = body;
+    const backLink = '<a class="back" href="/admin/walls">← Back to Walls</a>';
+    const notice = '<div class="notice"><strong>Security setup required.</strong> Change the temporary password below to unlock Walls, Reports, Orders, Users and Audit Log.</div>';
+    if (html.includes(backLink)) html = html.replace(backLink, notice);
+
+    const hideLockedNavigation = '<style id="password-setup-lock">nav a:not([href="/admin/account/password"]){display:none!important}</style>';
+    if (html.includes('</head>') && !html.includes('password-setup-lock')) {
+      html = html.replace('</head>', `${hideLockedNavigation}</head>`);
+    }
+    return originalSend(html);
+  };
+}
+
 export function mountAdminSecurity(app) {
   app.use('/admin', async (req, res, next) => {
     try {
       const path = req.path || '/';
-      if (path === '/login' || path === '/account/password' || path === '/logout') return next();
+      if (path === '/login' || path === '/logout') return next();
 
       const raw = parseCookies(req)[COOKIE_NAME] || '';
       if (!raw) return next();
@@ -35,10 +53,16 @@ export function mountAdminSecurity(app) {
           limit 1`,
         [hashToken(raw)],
       );
-      if (result.rowCount > 0 && result.rows[0].must_change_password) {
-        return res.redirect(303, '/admin/account/password');
+
+      const mustChangePassword = result.rowCount > 0 && result.rows[0].must_change_password;
+      if (!mustChangePassword) return next();
+
+      if (path === '/account/password') {
+        if (req.method === 'GET') explainRequiredPasswordChange(res);
+        return next();
       }
-      return next();
+
+      return res.redirect(303, '/admin/account/password?required=1');
     } catch (error) {
       return next(error);
     }
