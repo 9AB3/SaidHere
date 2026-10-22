@@ -47,16 +47,15 @@ try {
   await pool.query(`alter table admin_users drop constraint if exists admin_users_wall_id_fkey`);
   await pool.query(`alter table admin_users add constraint admin_users_wall_id_fkey foreign key (wall_id) references walls(id) on delete set null`);
 
-  // Checkout only permits 1-10 physical Walls. Enforce that at the database
-  // boundary too. NOT VALID preserves any historical >10 order if one exists,
-  // while still enforcing the rule for all new/updated rows.
-  await pool.query(`alter table commerce_orders drop constraint if exists commerce_orders_quantity_check`);
-  await pool.query(`alter table commerce_orders add constraint commerce_orders_quantity_check check (quantity between 1 and 10) not valid`);
+  // Checkout only permits 1-10 physical Walls. Tighten the database constraint
+  // when historical data already fits the current rule. If legacy data is outside
+  // that range, leave its existing constraint untouched so old orders remain editable.
   const oversizedOrders = await pool.query(`select count(*)::int as count from commerce_orders where quantity < 1 or quantity > 10`);
   if (oversizedOrders.rows[0].count === 0) {
-    await pool.query(`alter table commerce_orders validate constraint commerce_orders_quantity_check`);
+    await pool.query(`alter table commerce_orders drop constraint if exists commerce_orders_quantity_check`);
+    await pool.query(`alter table commerce_orders add constraint commerce_orders_quantity_check check (quantity between 1 and 10)`);
   } else {
-    console.warn(`Kept ${oversizedOrders.rows[0].count} historical order(s) outside the current 1-10 quantity rule; new/updated orders are constrained to 1-10.`);
+    console.warn(`Found ${oversizedOrders.rows[0].count} historical order(s) outside the current 1-10 quantity rule; their existing quantity constraint was left unchanged so those orders remain editable.`);
   }
 
   // Remove indexes that duplicate PRIMARY KEY/UNIQUE indexes and add the index
