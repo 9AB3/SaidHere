@@ -1,6 +1,6 @@
 import express from 'express';
 
-import { reconcileCheckoutSessionById } from './commerce_support.js';
+import { reconcileCheckoutSessionById } from './commerce_reconcile.js';
 import { pool } from './db.js';
 
 function clean(value) {
