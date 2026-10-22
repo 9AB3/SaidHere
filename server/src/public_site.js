@@ -37,6 +37,17 @@ export function mountCanonicalWebRedirect(app) {
     const host = String(req.hostname || '').toLowerCase();
     const pathName = req.path || '/';
 
+    // Account, order and admin pages can contain customer details or a one-time
+    // NFC URL. Never leave those responses in a browser/proxy cache.
+    if (
+      pathName === '/admin' || pathName.startsWith('/admin/') ||
+      pathName === '/my-walls' || pathName.startsWith('/my-walls/') ||
+      pathName === '/shop' || pathName.startsWith('/shop/') ||
+      pathName === '/purchase' || pathName.startsWith('/purchase/')
+    ) {
+      noStore(res);
+    }
+
     // During the custom-domain cutover the old static saidhere.app service still
     // forwards /admin to the Render service. Keep /admin and API traffic on the
     // Render hostname when explicitly addressed there so old builds remain valid.
