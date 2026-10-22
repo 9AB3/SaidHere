@@ -29,6 +29,7 @@ function money(amount, currency = 'aud') {
 }
 
 async function getOrder(sessionId) {
+  if (!clean(sessionId).startsWith('cs_')) return null;
   const result = await pool.query(
     `select o.id, o.status, o.purchaser_email, o.customer_id,
             o.stripe_checkout_session_id, o.quantity, o.amount_total, o.currency,
@@ -47,18 +48,18 @@ function page({ order = null, reconcileError = '' }) {
   const paid = order && ['paid', 'fulfilled'].includes(order.status);
   const accountActive = Boolean(order?.password_hash);
   const emailSent = Boolean(order?.customer_confirmation_sent_at);
-  const emailError = clean(order?.customer_confirmation_error);
+  const emailError = Boolean(clean(order?.customer_confirmation_error));
 
   let body;
   if (!order) {
     body = '<h1>We could not find that order.</h1><p>Return to the shop or contact The Wall support.</p><a class="button secondary" href="/shop">Back to shop</a>';
   } else if (!paid) {
-    body = `<div class="status waiting">Payment processing</div><h1>We’re confirming your payment.</h1><p>Your order exists, but Stripe has not confirmed it as paid yet.</p>${reconcileError ? `<div class="error">${escapeHtml(reconcileError)}</div>` : ''}<a class="button secondary" href="/purchase/success?session_id=${encodeURIComponent(order.stripe_checkout_session_id || '')}">Check again</a>`;
+    body = `<div class="status waiting">Payment processing</div><h1>We’re confirming your payment.</h1><p>Your order exists, but Stripe has not confirmed it as paid yet.</p>${reconcileError ? '<div class="error">Payment status could not be refreshed just now. Your order has not been lost.</div>' : ''}<a class="button secondary" href="/purchase/success?session_id=${encodeURIComponent(order.stripe_checkout_session_id || '')}">Check again</a>`;
   } else {
     const emailBlock = emailSent
-      ? `<div class="email-state good">✓ Confirmation email sent to ${escapeHtml(order.purchaser_email)}</div>`
+      ? '<div class="email-state good">✓ Confirmation email sent.</div>'
       : emailError
-        ? `<div class="email-state bad"><b>Your order is safe.</b><br>The confirmation email could not be delivered: ${escapeHtml(emailError)}</div>`
+        ? '<div class="email-state bad"><b>Your order is safe.</b><br>We could not send the confirmation email. The first physical scan can still activate your owner account.</div>'
         : '<div class="email-state warn">Your order is confirmed. Email delivery has not been recorded yet.</div>';
     const next = accountActive
       ? '<p>Your Wall owner account is already active.</p><a class="button" href="/my-walls">Open My Walls</a>'
@@ -80,7 +81,7 @@ export function mountPurchaseActivation(app) {
     try {
       const sessionId = clean(req.query?.session_id);
       let reconcileError = '';
-      if (sessionId) {
+      if (sessionId.startsWith('cs_')) {
         try {
           await reconcileCheckoutSessionById(sessionId);
         } catch (error) {
