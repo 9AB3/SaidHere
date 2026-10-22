@@ -1,9 +1,14 @@
 import { mountAdminOrdersV2 } from './admin_orders_v2.js';
+import { mountAdminWallSafety } from './admin_wall_safety.js';
 
 export function mountOwnershipAdminNav(app) {
-  // Paid plaque fulfilment is deliberately simple: assign the physical NFC,
-  // mark the plaque shipped, and leave Wall naming/location to the customer.
+  // Paid Wall fulfilment is deliberately simple: assign the physical NFC,
+  // mark the Wall shipped, and leave Wall naming/location to the customer.
   mountAdminOrdersV2(app);
+
+  // Intercept destructive/replacement actions before the older Wall-management
+  // routes so purchase, ownership and physical-inventory records stay consistent.
+  mountAdminWallSafety(app);
 
   app.get('/admin/customers', (_req, res) => res.redirect(303, '/admin/orders'));
 
