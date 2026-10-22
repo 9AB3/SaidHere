@@ -111,7 +111,7 @@ class _DiscoveredWallsScreenState extends State<DiscoveredWallsScreen> {
                       const Padding(
                         padding: EdgeInsets.fromLTRB(14, 70, 14, 40),
                         child: Text(
-                          "YOU HAVEN'T FOUND A WALL YET.\n\nTAP A PHYSICAL THE WALL PLAQUE WHEN YOU SEE ONE.",
+                          "YOU HAVEN'T FOUND A WALL YET.\n\nTAP A PHYSICAL WALL WHEN YOU SEE ONE.",
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: SaidHereTheme.ink,
