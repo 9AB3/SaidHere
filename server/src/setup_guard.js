@@ -5,6 +5,7 @@ const CUSTOMER_COOKIE = 'the_wall_customer';
 const UUID = '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})';
 const UUID_PATH = new RegExp(`^/${UUID}/?$`);
 const EDIT_PATH = new RegExp(`^/${UUID}/edit/?$`);
+const STATUS_PATH = new RegExp(`^/${UUID}/status/?$`);
 
 function parseCookies(req) {
   const result = {};
@@ -38,7 +39,7 @@ export function mountSetupGuard(app) {
       const match = req.method === 'GET'
         ? req.path.match(UUID_PATH)
         : req.method === 'POST'
-          ? req.path.match(EDIT_PATH)
+          ? (req.path.match(EDIT_PATH) || req.path.match(STATUS_PATH))
           : null;
       if (!match) return next();
       const raw = parseCookies(req)[CUSTOMER_COOKIE] || '';
