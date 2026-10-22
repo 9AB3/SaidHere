@@ -50,7 +50,77 @@ void main() {
     await service.getMyWalls();
   });
 
-  test('plaque claim sends token and returns write access', () async {
+  test('a failed initial session request does not poison every later retry', () async {
+    var sessionCalls = 0;
+    final client = MockClient((request) async {
+      if (request.url.path == '/api/session') {
+        sessionCalls += 1;
+        if (sessionCalls == 1) {
+          return http.Response(
+            jsonEncode({'error': 'Service waking up.'}),
+            503,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response(
+          jsonEncode({'token': 'recovered-session'}),
+          201,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      if (request.url.path == '/api/walls') {
+        expect(request.headers['authorization'], 'Bearer recovered-session');
+        return http.Response('[]', 200,
+            headers: {'content-type': 'application/json'});
+      }
+      return http.Response('{}', 404);
+    });
+
+    final service = SaidHereService(client: client);
+    await expectLater(service.getMyWalls(), throwsA(isA<SaidHereException>()));
+    await service.getMyWalls();
+    expect(sessionCalls, 2);
+  });
+
+  test('renews a persisted session once when the API returns 401', () async {
+    SharedPreferences.setMockInitialValues({
+      'saidhere_api_session': 'expired-session',
+    });
+    var sessionCalls = 0;
+    var wallCalls = 0;
+
+    final client = MockClient((request) async {
+      if (request.url.path == '/api/session') {
+        sessionCalls += 1;
+        return http.Response(
+          jsonEncode({'token': 'fresh-session'}),
+          201,
+          headers: {'content-type': 'application/json'},
+        );
+      }
+      if (request.url.path == '/api/walls') {
+        wallCalls += 1;
+        if (request.headers['authorization'] == 'Bearer expired-session') {
+          return http.Response(
+            jsonEncode({'error': 'Unknown anonymous session.'}),
+            401,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        expect(request.headers['authorization'], 'Bearer fresh-session');
+        return http.Response('[]', 200,
+            headers: {'content-type': 'application/json'});
+      }
+      return http.Response('{}', 404);
+    });
+
+    final service = SaidHereService(client: client);
+    await service.getMyWalls();
+    expect(sessionCalls, 1);
+    expect(wallCalls, 2);
+  });
+
+  test('Wall claim sends token and returns write access', () async {
     SharedPreferences.setMockInitialValues({
       'saidhere_api_session': 'session-token',
     });
@@ -60,7 +130,7 @@ void main() {
       expect(request.url.path, '/api/tags/open');
       expect(request.method, 'POST');
       expect(request.headers['authorization'], 'Bearer session-token');
-      expect(jsonDecode(request.body)['token'], 'plaque-token');
+      expect(jsonDecode(request.body)['token'], 'wall-token');
       return http.Response(
         jsonEncode({
           'id': 'wall-1',
@@ -74,7 +144,7 @@ void main() {
       );
     });
 
-    final wall = await SaidHereService(client: client).claimWallVisit('plaque-token');
+    final wall = await SaidHereService(client: client).claimWallVisit('wall-token');
     expect(wall.slug, 'ABC123');
     expect(wall.canWriteNow, isTrue);
   });
