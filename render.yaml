@@ -64,4 +64,6 @@ projects:
             region: singapore
             databaseName: saidhere
             user: saidhere
-            ipAllowList: []
+            ipAllowList:
+              - source: 0.0.0.0/0
+                description: pgAdmin external access
