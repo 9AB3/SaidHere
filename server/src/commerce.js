@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import express from 'express';
 
 import { pool } from './db.js';
-import { reconcilePaidCheckout } from './commerce_support.js';
+import { reconcilePaidCheckout } from './commerce_reconcile.js';
 
 function clean(value) {
   return typeof value === 'string' ? value.trim() : '';
