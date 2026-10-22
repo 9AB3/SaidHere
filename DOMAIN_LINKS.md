@@ -1,12 +1,12 @@
 # Domain + NFC link setup
 
-A physical plaque is encoded with an HTTPS URL like:
+Each physical Wall is encoded with an HTTPS URL like:
 
 ```text
 https://saidhere.app/t/<secret-tag-token>
 ```
 
-The same link is the browser fallback and can also be an iOS Universal Link / Android App Link once the platform association files are deployed correctly.
+The same link is the browser fallback and can also be an iOS Universal Link / Android App Link when the platform association files are deployed correctly.
 
 ## iOS Universal Links
 
@@ -34,7 +34,7 @@ The Codemagic iOS workflow checks that the final signed app still contains the `
 
 `tool/bootstrap_platforms.py` configures the Android manifest for `/t/*` and `/w/*` and generates an `assetlinks.json` template under `web/.well-known/`.
 
-Before a production Android release, obtain the SHA-256 fingerprint of the certificate that signs the release installed by users (Google Play App Signing fingerprint when Play signing is enabled), replace `YOUR_ANDROID_SHA256_FINGERPRINT`, and deploy the finished file as:
+**Production Android App Links are not complete until the release signing SHA-256 is known.** Obtain the certificate fingerprint that signs the build installed by users — use the Google Play App Signing fingerprint when Play signing is enabled — and deploy the finished file as:
 
 ```text
 site/.well-known/assetlinks.json
@@ -46,26 +46,26 @@ served directly at:
 https://saidhere.app/.well-known/assetlinks.json
 ```
 
-Do not publish the placeholder fingerprint and do not use a debug signing fingerprint for the production association.
+Do not publish `YOUR_ANDROID_SHA256_FINGERPRINT`, and do not use a debug signing fingerprint for the production association.
 
-## Creating and programming a Wall
+## Programming a purchased Wall
 
-Walls are provisioned through the Render/Postgres-backed The Wall admin/fulfilment workflow, not Supabase.
+For a paid order:
 
-For a platform-created Wall:
+1. Open `https://saidhere.app/admin/orders`.
+2. Click **Assign next NFC**.
+3. Write the one-time HTTPS URL shown into the physical NFC tag.
+4. Test the tag before permanently write-locking it.
+5. If the URL is lost before shipping, use **Replace NFC** from the order. The old URL is disabled and a new one-time URL is generated.
+6. Pack the Wall and click **Mark shipped**.
+7. The purchaser sets the Wall name and location on the first physical scan after receiving it.
 
-1. Open the browser admin at `https://saidhere.app/admin`.
-2. Create the Wall and copy the one-time NFC URL immediately.
-3. Write that exact HTTPS URL to the NFC tag.
-4. Test the tag on the supported phones before locking it.
-5. Permanently write-lock the tag once the final URL is confirmed.
+For a platform-created/test Wall, use the browser admin Wall-management flow instead.
 
-For a purchased plaque, the Main Admin assigns the next physical plaque from **Admin → Orders** after the Stripe order is paid. That action creates the Wall, ownership record and one-time NFC URL together.
-
-The raw NFC secret is intentionally not stored. Only its SHA-256 hash is retained. If the physical tag or URL is compromised, use **Replace NFC** so the old URL is invalidated while the Wall history remains intact.
+The raw NFC secret is intentionally not stored. Only its SHA-256 hash is retained. A replacement invalidates the previous active URL while preserving the Wall and its history.
 
 ## NFC protection
 
-An NTAG213/215/216 that is permanently write-locked prevents rewriting the physical chip, but its static URL can still be copied and replayed. The current server still limits writing to 15 minutes after a valid tag URL is opened.
+An NTAG213/215/216 that is permanently write-locked prevents rewriting the physical chip, but its static URL can still be copied and replayed. The current server limits anonymous writing to 15 minutes after a valid Wall URL is opened.
 
-For stronger proof of physical presence in a later production revision, move to a cryptographic dynamic tag such as NTAG 424 DNA and verify its dynamic authentication server-side.
+For stronger proof of physical presence in a future revision, use a cryptographic dynamic tag such as NTAG 424 DNA and verify its dynamic authentication server-side.
