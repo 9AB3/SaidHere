@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -11,6 +12,8 @@ class SaidHereService {
   SaidHereService({http.Client? client}) : _http = client ?? http.Client();
 
   static const _sessionKey = 'saidhere_api_session';
+  static const _requestTimeout = Duration(seconds: 25);
+
   final http.Client _http;
   Future<String>? _sessionFuture;
 
@@ -18,8 +21,18 @@ class SaidHereService {
     await _sessionToken();
   }
 
-  Future<String> _sessionToken() {
-    return _sessionFuture ??= _loadOrCreateSession();
+  Future<String> _sessionToken() async {
+    final current = _sessionFuture;
+    if (current != null) return current;
+
+    final future = _loadOrCreateSession();
+    _sessionFuture = future;
+    try {
+      return await future;
+    } catch (_) {
+      if (identical(_sessionFuture, future)) _sessionFuture = null;
+      rethrow;
+    }
   }
 
   Future<String> _loadOrCreateSession() async {
@@ -27,26 +40,52 @@ class SaidHereService {
     final existing = prefs.getString(_sessionKey);
     if (existing != null && existing.isNotEmpty) return existing;
 
-    final response = await _http.post(
-      _uri('/api/session'),
-      headers: const {'content-type': 'application/json'},
-      body: '{}',
-    );
-    final data = _decode(response);
-    final token = (data['token'] ?? '').toString();
-    if (token.isEmpty) {
-      throw const SaidHereException('Could not start an anonymous session.');
+    try {
+      final response = await _http
+          .post(
+            _uri('/api/session'),
+            headers: const {'content-type': 'application/json'},
+            body: '{}',
+          )
+          .timeout(_requestTimeout);
+      final data = _decode(response);
+      final token = (data['token'] ?? '').toString();
+      if (token.isEmpty) {
+        throw const SaidHereException('Could not start an anonymous session.');
+      }
+      await prefs.setString(_sessionKey, token);
+      return token;
+    } on TimeoutException {
+      throw const SaidHereException('The Wall is taking too long to respond. Try again.');
     }
-    await prefs.setString(_sessionKey, token);
-    return token;
+  }
+
+  Future<void> _resetSession() async {
+    _sessionFuture = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_sessionKey);
   }
 
   Uri _uri(String path) => Uri.parse('${AppConfig.apiBaseUrl}$path');
 
-  Future<Map<String, String>> _headers() async => {
-        'content-type': 'application/json',
-        'authorization': 'Bearer ${await _sessionToken()}',
-      };
+  Future<http.Response> _authorized(
+    Future<http.Response> Function(Map<String, String> headers) request,
+  ) async {
+    for (var attempt = 0; attempt < 2; attempt += 1) {
+      final token = await _sessionToken();
+      try {
+        final response = await request({
+          'content-type': 'application/json',
+          'authorization': 'Bearer $token',
+        }).timeout(_requestTimeout);
+        if (response.statusCode != 401 || attempt == 1) return response;
+        await _resetSession();
+      } on TimeoutException {
+        throw const SaidHereException('The Wall is taking too long to respond. Try again.');
+      }
+    }
+    throw const SaidHereException('Could not restore your anonymous session.');
+  }
 
   dynamic _decode(http.Response response) {
     dynamic data;
@@ -73,28 +112,34 @@ class SaidHereService {
   }
 
   Future<Wall> claimWallVisit(String tagToken) async {
-    final response = await _http.post(
-      _uri('/api/tags/open'),
-      headers: await _headers(),
-      body: jsonEncode({'token': tagToken}),
+    final response = await _authorized(
+      (headers) => _http.post(
+        _uri('/api/tags/open'),
+        headers: headers,
+        body: jsonEncode({'token': tagToken}),
+      ),
     );
     final data = _decode(response);
     return Wall.fromMap(Map<String, dynamic>.from(data as Map));
   }
 
   Future<Wall> getWallBySlug(String slug) async {
-    final response = await _http.get(
-      _uri('/api/walls/${Uri.encodeComponent(slug)}'),
-      headers: await _headers(),
+    final response = await _authorized(
+      (headers) => _http.get(
+        _uri('/api/walls/${Uri.encodeComponent(slug)}'),
+        headers: headers,
+      ),
     );
     final data = _decode(response);
     return Wall.fromMap(Map<String, dynamic>.from(data as Map));
   }
 
   Future<List<WallPost>> getPosts(String wallId) async {
-    final response = await _http.get(
-      _uri('/api/walls/${Uri.encodeComponent(wallId)}/posts'),
-      headers: await _headers(),
+    final response = await _authorized(
+      (headers) => _http.get(
+        _uri('/api/walls/${Uri.encodeComponent(wallId)}/posts'),
+        headers: headers,
+      ),
     );
     final data = _decode(response);
     if (data is! List) return [];
@@ -108,31 +153,34 @@ class SaidHereService {
     required String body,
     String? parentId,
   }) async {
-    final response = await _http.post(
-      _uri('/api/walls/${Uri.encodeComponent(wallId)}/posts'),
-      headers: await _headers(),
-      body: jsonEncode({
-        'body': body.trim(),
-        'parent_id': parentId,
-      }),
+    final response = await _authorized(
+      (headers) => _http.post(
+        _uri('/api/walls/${Uri.encodeComponent(wallId)}/posts'),
+        headers: headers,
+        body: jsonEncode({
+          'body': body.trim(),
+          'parent_id': parentId,
+        }),
+      ),
     );
     final data = _decode(response);
     return WallPost.fromMap(Map<String, dynamic>.from(data as Map));
   }
 
   Future<void> reportPost(String postId) async {
-    final response = await _http.post(
-      _uri('/api/posts/${Uri.encodeComponent(postId)}/report'),
-      headers: await _headers(),
-      body: '{}',
+    final response = await _authorized(
+      (headers) => _http.post(
+        _uri('/api/posts/${Uri.encodeComponent(postId)}/report'),
+        headers: headers,
+        body: '{}',
+      ),
     );
     _decode(response);
   }
 
   Future<List<Wall>> getMyWalls() async {
-    final response = await _http.get(
-      _uri('/api/walls'),
-      headers: await _headers(),
+    final response = await _authorized(
+      (headers) => _http.get(_uri('/api/walls'), headers: headers),
     );
     final data = _decode(response);
     if (data is! List) return [];
