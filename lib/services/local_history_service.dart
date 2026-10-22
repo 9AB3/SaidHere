@@ -7,14 +7,26 @@ import '../models/wall.dart';
 class LocalHistoryService {
   static const _key = 'saidhere_recent_walls';
 
+  Future<List<dynamic>> _loadItems(SharedPreferences prefs) async {
+    final raw = prefs.getString(_key);
+    if (raw == null || raw.isEmpty) return <dynamic>[];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List<dynamic>) return decoded;
+    } catch (_) {
+      // A partial/corrupt local write should never make the history screen unusable.
+    }
+    await prefs.remove(_key);
+    return <dynamic>[];
+  }
+
   Future<void> rememberWall({
     required String slug,
     required String displayName,
     required String locationHint,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
-    final List<dynamic> items = raw == null ? [] : jsonDecode(raw) as List<dynamic>;
+    final items = await _loadItems(prefs);
 
     items.removeWhere((item) => item is Map && item['slug'] == slug);
     items.insert(0, {
@@ -24,21 +36,16 @@ class LocalHistoryService {
       'visitedAt': DateTime.now().toUtc().toIso8601String(),
     });
 
-    if (items.length > 30) {
-      items.removeRange(30, items.length);
-    }
-
+    if (items.length > 30) items.removeRange(30, items.length);
     await prefs.setString(_key, jsonEncode(items));
   }
 
   Future<List<Map<String, dynamic>>> recentWalls() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
-    if (raw == null) return [];
-
-    final decoded = jsonDecode(raw) as List<dynamic>;
+    final decoded = await _loadItems(prefs);
     return decoded
-        .whereType<Map<String, dynamic>>()
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
         .toList(growable: false);
   }
 
