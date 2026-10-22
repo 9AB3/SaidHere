@@ -1,51 +1,32 @@
 # Deploy SaidHere / The Wall on Render
 
-The Wall uses a Render Node web service plus Render Postgres. The root `render.yaml` defines both resources as a Blueprint.
+The Wall runs as a Node/Express service on Render with Render Postgres. The root `render.yaml` defines both resources.
 
-## Production architecture
+## Production resources
 
 - Web service: `saidhere-api-9ab3`
-- Custom host: `https://saidhere.app`
+- Custom domain: `https://saidhere.app`
 - Database: `saidhere-db-9ab3`
 - Region: Singapore
-- Database public access: disabled (`ipAllowList: []`)
-- API health check: `/health`
-- Public storefront: `/`
-- Plaque shop: `/shop`
-- Customer owner portal: `/my-walls`
+- Database public access: disabled
+- Health check: `/health`
+- Store: `/shop`
+- Customer portal: `/my-walls`
 - Platform admin: `/admin`
-- Orders / fulfilment: `/admin/fulfillment`
+- Orders: `/admin/orders`
 - Stripe webhook: `/api/stripe/webhook`
 
-The API receives the database's private Render connection string through `DATABASE_URL` automatically.
-
-## Deploy
-
-1. In Render, choose **New > Blueprint**.
-2. Connect the GitHub repository `9AB3/SaidHere`.
-3. Render detects the root `render.yaml`.
-4. Review the resources and apply the Blueprint.
-5. Add the required secret environment values listed below.
-6. Wait for the database and web service to finish deploying.
-7. Open `https://saidhere.app/health` (or the Render service health URL during DNS cutover).
-
-Expected response:
-
-```json
-{"ok":true,"service":"saidhere-api"}
-```
-
-The web service starts with:
+The deploy starts with:
 
 ```text
 npm run migrate && npm start
 ```
 
-so the Postgres tables are created or upgraded automatically on deployment. `npm start` also generates the production runtime that mounts the Stripe webhook before body parsers and adds the storefront, commerce, customer-owner and browser-admin routes.
+Migrations are idempotent. The production server runs the reviewed source modules directly; the small generated customer-portal file is an exact copy retained only for filename compatibility.
 
-## Required commerce environment values
+## Required Render secrets
 
-The Blueprint declares the keys but intentionally does not store secrets in GitHub. Confirm these values exist in the Render service before enabling public checkout:
+These keys are declared with `sync: false` and must be entered in Render:
 
 ```text
 STRIPE_SECRET_KEY
@@ -56,7 +37,7 @@ SMTP_PASSWORD
 ORDER_NOTIFICATION_EMAIL
 ```
 
-The Blueprint supplies these non-secret defaults:
+The Blueprint supplies the non-secret defaults:
 
 ```text
 PUBLIC_APP_URL=https://saidhere.app
@@ -69,19 +50,25 @@ CUSTOMER_REPLY_TO=orders@saidhere.app
 ORDER_EMAIL_FROM=The Wall <orders@saidhere.app>
 ```
 
-`WALL_PLAQUE_DISPLAY_PRICE` is display text only. The actual amount charged comes from the Stripe Price referenced by `STRIPE_PRICE_WALL_PLAQUE`; keep those two amounts aligned.
+The display-price variable is only website text. The actual charge comes from the Stripe Price referenced by `STRIPE_PRICE_WALL_PLAQUE`; verify that Price is also A$15.00 before going live.
 
-## Stripe configuration
+## Stripe
 
-Create a normal one-time Stripe Price for the physical Wall plaque and put its `price_...` ID in `STRIPE_PRICE_WALL_PLAQUE`.
+Use a normal one-time Stripe Price for the physical Wall. This Stripe account currently has Managed Payments enabled by default, so The Wall explicitly sends:
 
-Create a Stripe webhook endpoint at:
+```text
+managed_payments[enabled]=false
+```
+
+for its Checkout Session. This is required so Stripe accepts shipping-address collection for this physical product.
+
+Configure the webhook endpoint:
 
 ```text
 https://saidhere.app/api/stripe/webhook
 ```
 
-Subscribe it to:
+Subscribe to all four events:
 
 ```text
 checkout.session.completed
@@ -90,26 +77,26 @@ checkout.session.async_payment_failed
 checkout.session.expired
 ```
 
-Copy that endpoint's signing secret (`whsec_...`) into Render as `STRIPE_WEBHOOK_SECRET`.
+Copy that endpoint's `whsec_...` signing secret into `STRIPE_WEBHOOK_SECRET`.
 
-The checkout session is created server-side. The Stripe secret key never goes to Flutter or browser JavaScript. Checkout uses the internal order UUID as both `client_reference_id` and metadata so webhook events reconcile to the correct order.
+Checkout creation is server-side, uses an idempotency key tied to the internal order UUID, collects the shipping address, and never exposes the Stripe secret to Flutter or browser code. Webhook signatures are checked against the untouched raw request body and processed event IDs are recorded to make retries safe.
 
-The app deliberately uses ordinary Stripe Checkout for this physical product. Do not enable Stripe Managed Payments for the plaque flow; Managed Payments is a separate merchant-of-record product aimed at digital products and is unnecessary for collecting the plaque shipping address.
+The Stripe success page also re-checks the Checkout Session directly. This gives the purchase flow a recovery path if webhook delivery is delayed.
 
-## SMTP2GO and order email
+## Email
 
-Outgoing order mail is sent by Nodemailer through SMTP2GO using `SMTP_USERNAME` and `SMTP_PASSWORD`.
+Transactional mail is sent through SMTP2GO using Nodemailer. After payment:
 
-After Stripe confirms payment:
+1. The order is linked to the purchaser account.
+2. The purchaser receives a branded order confirmation with quantity, total, shipping details and an owner-account link.
+3. `ORDER_NOTIFICATION_EMAIL` receives the internal order notification.
+4. Delivery attempts, provider errors and message IDs are recorded on the order and visible in Admin → Orders.
 
-1. The order is marked paid and linked to a customer account.
-2. The purchaser receives a branded confirmation from `orders@saidhere.app` with quantity, total, shipping details and an **Activate My Walls** / **Manage My Walls** link.
-3. `ORDER_NOTIFICATION_EMAIL` receives the separate internal new-order notification used for packing/fulfilment.
-4. The purchaser can activate their owner account immediately; the Wall itself appears after the physical plaque is assigned during fulfilment.
+If the customer email does not arrive, the paid order is still usable: the first physical NFC scan can verify the purchase email and activate the owner account.
 
-SMTP2GO handles outbound delivery only. If replies to `orders@saidhere.app` should arrive in a normal Gmail inbox, configure that separately as an incoming forwarding address with the domain/DNS provider and test it independently.
+SMTP2GO is outbound only. Incoming forwarding for `orders@saidhere.app` is configured separately at the domain provider and must be tested separately.
 
-## Browser admin portal
+## Admin bootstrap
 
 Open:
 
@@ -117,105 +104,54 @@ Open:
 https://saidhere.app/admin
 ```
 
-On the first deployment that contains the database-backed admin system, the migration creates this Main Admin account if no admin users already exist:
+On a brand-new production database, the migration creates the Main Admin user `admin`. It does **not** use the public default password `password` in production. If `INITIAL_ADMIN_PASSWORD` is not supplied, a random temporary password is printed once in the Render deploy logs. The admin is forced to change that temporary password before using the rest of the admin console.
 
-```text
-Username: admin
-Password: password
-```
+For local/non-production databases only, the bootstrap fallback remains `admin/password`.
 
-The account is marked as using a temporary password. Change it after the first login.
+Changing or resetting an admin password revokes the user's other admin sessions.
 
-The platform admin supports:
+## Paid-order fulfilment
 
-- Main Admin and per-Wall Moderator accounts;
-- database-backed login sessions;
-- password changes and resets;
-- creating and managing Walls;
-- editing Wall names and locations;
-- deactivating/reactivating Walls;
-- replacing NFC URLs while preserving Wall history;
-- clearing messages and reviewing reports;
-- audit history;
-- viewing paid orders and customers;
-- assigning purchased physical plaques to paid orders;
-- generating/recovering customer activation links.
+The normal workflow is deliberately small:
 
-Customer Wall owners use the separate `/my-walls` portal and do not receive platform-admin access.
+1. Stripe confirms payment.
+2. Open **Admin → Orders**.
+3. Click **Assign next NFC** for each purchased Wall.
+4. Program the one-time HTTPS URL shown into the physical NFC tag.
+5. If the URL is lost before shipping, click **Replace NFC**; the old URL is invalidated and a new one-time URL is issued.
+6. Pack the Wall and click **Mark shipped**.
+7. The customer receives it and scans the Wall for the first time.
+8. First scan lets the purchaser choose the Wall name and location. If their owner account is not active yet, the same physical scan can verify the purchase email and create the password.
+9. Later name/location changes and reported-post moderation are available through `/my-walls`.
 
-Passwords are never stored as plain text. They are salted and hashed with Node's `scrypt`. Browser sessions use random HttpOnly cookies and only token hashes are stored in Postgres.
+The raw NFC secret is never stored in Postgres. Only its SHA-256 hash is retained.
 
-`ADMIN_KEY` remains separate for programmatic admin API calls and is not the browser password.
+## Customer owner permissions
 
-## Purchased plaque fulfilment
-
-Once an order is paid:
-
-1. Open **Admin → Orders** (`/admin/fulfillment`).
-2. Assign the next plaque for the order.
-3. Enter the physical serial code (or allow a generated one), initial Wall name and optional location.
-4. The server creates the Wall, NFC tag hash, plaque record and customer ownership in one transaction.
-5. Copy the one-time NFC URL shown by the admin page and program that exact URL into the physical plaque.
-6. Test it before permanently write-locking the tag.
-7. Repeat for each item if the customer ordered multiple plaques.
-
-The raw NFC token is returned only during creation/assignment or replacement. It is never stored in Postgres. If it is lost before programming the plaque, replace the NFC token rather than trying to recover the original.
-
-## Database groups
-
-The same Postgres database stores the anonymous Wall system, platform administration and commerce ownership.
-
-Anonymous Wall/app tables include:
-
-- `walls`
-- `wall_tags`
-- `wall_posts`
-- `wall_visits`
-- `visitor_sessions`
-- `post_reports`
-
-Platform-admin tables include:
-
-- `admin_users`
-- `admin_sessions`
-- `admin_audit_log`
-
-Commerce/customer tables include:
-
-- `customer_accounts`
-- `customer_sessions`
-- `commerce_orders`
-- `commerce_order_items`
-- `stripe_webhook_events`
-- `plaques`
-- `wall_ownerships`
-- `customer_claim_tokens`
-- `customer_audit_log`
-
-## Flutter API URL
-
-The app can use the canonical host:
-
-```text
-https://saidhere.app
-```
-
-Codemagic already passes that as `API_BASE_URL`. The Render service URL remains useful for infrastructure diagnostics during custom-domain changes.
+A Wall owner can change their Wall name/location, deactivate/reactivate it, see aggregate activity, and review reported posts. They are not shown which anonymous visitor authored a post. They can keep a reported post or remove it; ordinary unreported posts cannot be removed through the owner moderation UI.
 
 ## Security notes
 
 - Render Postgres is private-only in the Blueprint.
 - Phones never connect directly to Postgres.
-- Anonymous app sessions use opaque random bearer tokens stored locally on the device.
-- NFC secrets are hashed before storage.
-- Admin/customer passwords are salted and scrypt-hashed.
-- Admin/customer browser sessions are random opaque tokens; only token hashes are stored.
-- Admin/customer state-changing browser actions use CSRF protection.
-- Stripe webhook signatures are verified against the untouched raw request body.
-- Processed Stripe event IDs are recorded so duplicate webhook deliveries do not repeat checkout side effects.
-- Stripe Checkout creation uses an idempotency key tied to the internal order.
-- A valid plaque URL grants 15 minutes of server-enforced write access to that Wall.
+- NFC secrets and browser/session tokens are stored only as hashes.
+- Admin and owner passwords are salted and scrypt-hashed.
+- Browser state-changing actions use CSRF protection.
+- Customer/admin login and setup endpoints are rate-limited.
+- A physical scan grants 15 minutes of server-enforced anonymous write access.
+- Deactivating a Wall blocks new writes immediately, even if a visitor previously had time remaining.
 - Six posts per minute per anonymous session are allowed before temporary blocking.
-- Three distinct reports automatically hide a message.
+- Three distinct reports automatically hide a post until reviewed.
 
-A normal static NFC tag can still have its URL copied and replayed. Permanent write-locking stops rewriting, not cloning. For stronger physical-presence proof later, use a cryptographic tag such as NTAG 424 DNA and verify its dynamic authentication server-side.
+A static NFC URL can still be copied and replayed. Permanent write-locking prevents rewriting the chip, not cloning the URL. A future higher-security option is a cryptographic dynamic tag such as NTAG 424 DNA with server-side verification.
+
+## Release checks
+
+Before calling a deployment production-ready, verify:
+
+- Render is running the intended Git commit and `/health` succeeds.
+- The Stripe Price amount matches the website price.
+- All four webhook events are subscribed and test deliveries return 2xx.
+- One complete Stripe test-mode order reaches paid status, sends both emails, activates My Walls, assigns/replaces NFC, marks shipped and completes first-scan setup.
+- A reply to `orders@saidhere.app` reaches the intended forwarding inbox.
+- The production Android `assetlinks.json` is deployed using the real release/Google Play signing SHA-256 before Android App Links are relied on.
