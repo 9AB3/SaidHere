@@ -1,7 +1,12 @@
+import { mountAdminMultiwall } from './admin_multiwall.js';
 import { mountAdminOrdersV2 } from './admin_orders_v2.js';
 import { mountAdminWallSafety } from './admin_wall_safety.js';
 
 export function mountOwnershipAdminNav(app) {
+  // Multi-Wall moderator assignments and the mobile admin fixes are mounted
+  // before the legacy portal so they can safely intercept the routes they own.
+  mountAdminMultiwall(app);
+
   // Paid Wall fulfilment is deliberately simple: assign the physical NFC,
   // mark the Wall shipped, and leave Wall naming/location to the customer.
   mountAdminOrdersV2(app);
