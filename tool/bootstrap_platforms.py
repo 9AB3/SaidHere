@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Create Flutter platform folders and apply SaidHere deep-link/NFC configuration."""
+"""Create Flutter platform folders and apply SaidHere deep-link/NFC/map configuration."""
 from __future__ import annotations
 
 import argparse
+import os
 import plistlib
 import shutil
 import subprocess
@@ -50,22 +51,40 @@ def extract_ui_assets() -> None:
     print(f'Extracted {len(SAFE_UI_ASSETS)} safe reusable UI assets')
 
 
-def patch_android(host: str) -> None:
+def patch_android(host: str, maps_key: str) -> None:
     manifest = ROOT / 'android/app/src/main/AndroidManifest.xml'
     text = manifest.read_text(encoding='utf-8')
     text = text.replace('android:label="said_here"', 'android:label="The Wall"')
     text = text.replace('android:label="SaidHere"', 'android:label="The Wall"')
+
+    manifest_end = text.find('>', text.find('<manifest'))
+    permissions = ''
+    if 'android.permission.ACCESS_COARSE_LOCATION' not in text:
+        permissions += '\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />'
+    if 'android.permission.ACCESS_FINE_LOCATION' not in text:
+        permissions += '\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />'
+    if permissions and manifest_end >= 0:
+        text = text[:manifest_end + 1] + permissions + text[manifest_end + 1:]
+
     marker = 'android:name="io.flutter.embedding.android.NormalTheme"'
     if 'flutter_deeplinking_enabled' not in text and marker in text:
         meta_end = text.find('/>', text.find(marker)) + 2
         text = text[:meta_end] + '\n            <meta-data android:name="flutter_deeplinking_enabled" android:value="true" />' + text[meta_end:]
+
+    if maps_key and 'com.google.android.geo.API_KEY' not in text:
+        app_start = text.find('<application')
+        app_open_end = text.find('>', app_start)
+        if app_start >= 0 and app_open_end >= 0:
+            maps_meta = f'\n        <meta-data android:name="com.google.android.geo.API_KEY" android:value="{maps_key}" />'
+            text = text[:app_open_end + 1] + maps_meta + text[app_open_end + 1:]
+
     if 'SAIDHERE_APP_LINK' not in text:
         intent = f'''\n            <!-- SAIDHERE_APP_LINK -->\n            <intent-filter android:autoVerify="true">\n                <action android:name="android.intent.action.VIEW" />\n                <category android:name="android.intent.category.DEFAULT" />\n                <category android:name="android.intent.category.BROWSABLE" />\n                <data android:scheme="https" android:host="{host}" android:pathPrefix="/t/" />\n                <data android:scheme="https" android:host="{host}" android:pathPrefix="/w/" />\n            </intent-filter>\n'''
         text = text.replace('</activity>', intent + '        </activity>', 1)
     manifest.write_text(text, encoding='utf-8')
 
 
-def patch_ios(host: str) -> None:
+def patch_ios(host: str, maps_key: str) -> None:
     plist_path = ROOT / 'ios/Runner/Info.plist'
     with plist_path.open('rb') as handle:
         info = plistlib.load(handle)
@@ -75,11 +94,14 @@ def patch_ios(host: str) -> None:
     info['CFBundleURLTypes'] = [{'CFBundleURLName': 'com.9ab3.saidhere', 'CFBundleURLSchemes': ['saidhere']}]
     info['ITSAppUsesNonExemptEncryption'] = False
     info['NFCReaderUsageDescription'] = 'The Wall uses NFC to program physical Wall tags during order fulfilment.'
+    info['NSLocationWhenInUseUsageDescription'] = 'The Wall can save where you discover a Wall so only your Found map can remember that place.'
+    if maps_key:
+        info['GMSApiKey'] = maps_key
+    else:
+        info.pop('GMSApiKey', None)
     with plist_path.open('wb') as handle:
         plistlib.dump(info, handle, sort_keys=False)
 
-    # Apple's current NFC entitlement uses TAG. The older NDEF entitlement value
-    # is deprecated on current SDKs and can invalidate App Store archives.
     entitlements = ROOT / 'ios/Runner/Runner.entitlements'
     with entitlements.open('wb') as handle:
         plistlib.dump({
@@ -90,7 +112,16 @@ def patch_ios(host: str) -> None:
     app_delegate_template = ROOT / 'tool/ios_app_delegate.swift'
     if not app_delegate_template.exists():
         raise RuntimeError(f'Missing iOS NFC writer template: {app_delegate_template}')
-    shutil.copyfile(app_delegate_template, ROOT / 'ios/Runner/AppDelegate.swift')
+    app_delegate_path = ROOT / 'ios/Runner/AppDelegate.swift'
+    shutil.copyfile(app_delegate_template, app_delegate_path)
+    swift = app_delegate_path.read_text(encoding='utf-8')
+    if 'import GoogleMaps' not in swift:
+        swift = swift.replace('import Foundation\n', 'import Foundation\nimport GoogleMaps\n')
+    maps_bootstrap = '''    if let mapsKey = Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String, !mapsKey.isEmpty {\n      GMSServices.provideAPIKey(mapsKey)\n    }\n'''
+    marker = '  ) -> Bool {\n    GeneratedPluginRegistrant.register(with: self)\n'
+    if 'GMSServices.provideAPIKey' not in swift and marker in swift:
+        swift = swift.replace(marker, '  ) -> Bool {\n' + maps_bootstrap + '    GeneratedPluginRegistrant.register(with: self)\n', 1)
+    app_delegate_path.write_text(swift, encoding='utf-8')
 
     project = ROOT / 'ios/Runner.xcodeproj/project.pbxproj'
     text = project.read_text(encoding='utf-8')
@@ -126,6 +157,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('--host', default='nfc.saidhere.app')
     args = parser.parse_args()
+    maps_key = os.environ.get('GOOGLE_MAPS_API_KEY', '').strip()
 
     extract_ui_assets()
 
@@ -139,12 +171,13 @@ def main() -> None:
             shutil.copytree(temp / name, ROOT / name)
         shutil.rmtree(temp)
 
-    patch_android(args.host)
-    patch_ios(args.host)
+    patch_android(args.host, maps_key)
+    patch_ios(args.host, maps_key)
     write_domain_templates(args.host)
     run('python3', 'tool/generate_brand_assets.py')
     print(f'The Wall platform configuration ready for {args.host}')
     print(f'iOS bundle identifier: {IOS_BUNDLE_ID}')
+    print('Google Maps key: configured' if maps_key else 'Google Maps key: NOT configured (Found list works; map remains disabled)')
 
 
 if __name__ == '__main__':
