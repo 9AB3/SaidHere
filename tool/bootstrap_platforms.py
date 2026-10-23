@@ -33,11 +33,6 @@ def run(*args: str) -> None:
 
 
 def extract_ui_assets() -> None:
-    """Extract only reusable/generic art from the uploaded UI asset ZIP.
-
-    Assets containing baked wall names, dates or countdown values are deliberately
-    not extracted so dynamic app data can never be replaced by stale artwork text.
-    """
     archive = ROOT / 'the_wall_ui_assets.zip'
     destination = ROOT / 'lib/assets/ui'
     if not archive.exists():
@@ -78,9 +73,6 @@ def patch_ios(host: str) -> None:
     info['CFBundleDisplayName'] = 'The Wall'
     info['CFBundleName'] = 'The Wall'
     info['CFBundleURLTypes'] = [{'CFBundleURLName': 'com.9ab3.saidhere', 'CFBundleURLSchemes': ['saidhere']}]
-    # The app only uses exempt encryption provided by the operating system
-    # (for example normal HTTPS networking). Declaring this prevents App Store
-    # Connect from asking the export-compliance encryption questions on every build.
     info['ITSAppUsesNonExemptEncryption'] = False
     with plist_path.open('wb') as handle:
         plistlib.dump(info, handle, sort_keys=False)
@@ -115,13 +107,13 @@ def patch_ios(host: str) -> None:
 def write_domain_templates(host: str) -> None:
     well_known = ROOT / 'web/.well-known'
     well_known.mkdir(parents=True, exist_ok=True)
-    (well_known / 'apple-app-site-association').write_text(f'''{{\n  "applinks": {{\n    "details": [\n      {{\n        "appIDs": ["{APPLE_TEAM_ID}.{IOS_BUNDLE_ID}"],\n        "components": [\n          {{ "/": "/t/*" }},\n          {{ "/": "/w/*" }}\n        ]\n      }}\n    ]\n  }}\n}}\n''', encoding='utf-8')
+    (well_known / 'apple-app-site-association').write_text(f'''{{\n  "applinks": {{\n    "apps": [],\n    "details": [\n      {{\n        "appID": "{APPLE_TEAM_ID}.{IOS_BUNDLE_ID}",\n        "paths": ["/t/*", "/w/*"]\n      }}\n    ]\n  }}\n}}\n''', encoding='utf-8')
     (well_known / 'assetlinks.json').write_text('''[\n  {\n    "relation": ["delegate_permission/common.handle_all_urls"],\n    "target": {\n      "namespace": "android_app",\n      "package_name": "app.saidhere.said_here",\n      "sha256_cert_fingerprints": ["YOUR_ANDROID_SHA256_FINGERPRINT"]\n    }\n  }\n]\n''', encoding='utf-8')
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--host', default='saidhere.app')
+    parser.add_argument('--host', default='nfc.saidhere.app')
     args = parser.parse_args()
 
     extract_ui_assets()
