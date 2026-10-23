@@ -20,6 +20,7 @@ projects:
             healthCheckPath: /health
             domains:
               - saidhere.app
+              - nfc.saidhere.app
             envVars:
               - key: NODE_ENV
                 value: production
@@ -28,9 +29,9 @@ projects:
                   name: saidhere-db-9ab3
                   property: connectionString
               - key: PUBLIC_APP_URL
-                value: https://saidhere.app
+                value: https://nfc.saidhere.app
               - key: CORS_ORIGIN
-                value: https://saidhere.app,https://www.saidhere.app,https://saidhere-api-9ab3.onrender.com
+                value: https://saidhere.app,https://www.saidhere.app,https://nfc.saidhere.app,https://saidhere-api-9ab3.onrender.com
               - key: STRIPE_SECRET_KEY
                 sync: false
               - key: STRIPE_PRICE_WALL_PLAQUE
