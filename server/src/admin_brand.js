@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { mountAdminWallsMonitor } from './admin_walls_monitor.js';
+import { mountAdminWallsOverview } from './admin_walls_overview.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const plaquePath = path.resolve(here, '../../lib/267ABF9F-A613-4DD2-B026-87B6C2B6AEBD.png');
@@ -36,7 +37,7 @@ function injectBrand(html) {
   output = addPreloadClass(output);
   output = output.replace(
     '</head>',
-    `${preloadCss}<script src="/admin/ui.js" defer></script><script src="/admin/orders-native-writer.js?v=20261024-4" defer></script><script src="/admin/walls-shell-fix.js?v=20261024-1" defer></script></head>`,
+    `${preloadCss}<script src="/admin/walls-overview.js?v=20261024-1" defer></script><script src="/admin/ui.js" defer></script><script src="/admin/orders-native-writer.js?v=20261024-4" defer></script><script src="/admin/walls-shell-fix.js?v=20261024-1" defer></script></head>`,
   );
   return output;
 }
@@ -76,8 +77,8 @@ export function mountAdminBrand(app) {
     return next();
   });
 
-  // Register the new read-only Walls surface after the shared branding middleware
-  // but before the legacy admin portal is mounted from index.js. This makes these
-  // routes authoritative while retaining the shared admin navigation/chrome.
+  // These routes must be registered before the generic /admin/walls/:wallId
+  // monitor route and before the legacy admin portal mounted from index.js.
+  mountAdminWallsOverview(app);
   mountAdminWallsMonitor(app);
 }
