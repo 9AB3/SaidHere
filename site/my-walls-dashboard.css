@@ -1,0 +1,76 @@
+:root{--mw-ink:#171411;--mw-paper:#fffaf1;--mw-line:#c9bdab;--mw-muted:#756d62;--mw-green:#4e6847;--mw-amber:#946b1f;--mw-red:#963c33}
+body.my-walls-dashboard .shade{background:rgba(236,226,207,.72)}
+body.my-walls-dashboard .shell{max-width:980px;padding:12px 12px 56px}
+body.my-walls-dashboard .top{padding:10px 12px;border-radius:12px;box-shadow:0 7px 20px rgba(0,0,0,.14)}
+body.my-walls-dashboard .brand{gap:9px}
+body.my-walls-dashboard .brand img{width:38px;height:38px;border-radius:7px}
+body.my-walls-dashboard .brand strong{font-size:18px;line-height:1}
+body.my-walls-dashboard .brand small{font-size:8px;letter-spacing:1.6px;margin-top:4px}
+body.my-walls-dashboard .linkbtn{font-size:12px}
+body.my-walls-dashboard .pagehead{margin:15px 0 9px;align-items:center}
+body.my-walls-dashboard .pagehead h1{font-size:27px;line-height:1}
+body.my-walls-dashboard .pagehead .eyebrow{font-size:8px;letter-spacing:1.2px;margin-bottom:4px;max-width:58vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.my-walls-dashboard .pagehead>.button{min-height:36px;padding:7px 11px;border-radius:8px;font-size:12px}
+.mw-overview{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:8px 0 10px}
+.mw-stat{background:rgba(255,252,246,.92);border:1px solid var(--mw-line);border-radius:10px;padding:9px 8px;min-width:0}
+.mw-stat strong{display:block;font-size:19px;line-height:1;margin-bottom:4px}
+.mw-stat span{display:block;font-size:7px;text-transform:uppercase;letter-spacing:.7px;font-weight:900;color:var(--mw-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mw-tools{display:flex;gap:7px;align-items:center;margin:0 0 9px;overflow-x:auto;padding-bottom:1px;scrollbar-width:none}
+.mw-tools::-webkit-scrollbar{display:none}
+.mw-search{min-width:130px;flex:1;height:38px;border:1px solid #9f9382;border-radius:9px;background:#fffdf8;padding:0 11px;font:inherit;font-size:13px}
+.mw-filter{height:36px;flex:0 0 auto;border:1px solid #9f9382;border-radius:999px;background:#fffaf1;padding:0 11px;color:var(--mw-ink);font-size:11px;font-weight:850}
+.mw-filter.is-active{background:var(--mw-ink);color:#fff;border-color:var(--mw-ink)}
+body.my-walls-dashboard .card.wallrow{margin:0 0 7px;padding:11px 11px 10px;border-radius:11px;grid-template-columns:minmax(0,1fr) auto;gap:9px;box-shadow:0 3px 10px rgba(45,36,27,.05)}
+body.my-walls-dashboard .card.wallrow.mw-attention{border-left:4px solid var(--mw-amber);padding-left:8px}
+body.my-walls-dashboard .card.wallrow.mw-reports{border-left:4px solid var(--mw-red);padding-left:8px}
+body.my-walls-dashboard .wallrow h2{font-size:17px;line-height:1.05;margin:5px 0 2px}
+body.my-walls-dashboard .wallrow .sub{font-size:12px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+body.my-walls-dashboard .wallrow .metrics{margin-top:7px;gap:14px}
+body.my-walls-dashboard .wallrow .metric{display:flex;align-items:baseline;gap:4px}
+body.my-walls-dashboard .wallrow .metric strong{font-size:14px;line-height:1}
+body.my-walls-dashboard .wallrow .metric span{font-size:7px}
+body.my-walls-dashboard .badge{padding:3px 6px;font-size:7px;letter-spacing:.55px}
+body.my-walls-dashboard .wallrow>.button{min-height:36px;padding:7px 10px;font-size:11px;border-radius:8px;align-self:center}
+.mw-action-note{font-size:10px;color:var(--mw-amber);font-weight:800;margin-top:5px}
+.mw-hidden{display:none!important}
+body.my-walls-dashboard .orders-section{margin-top:13px;border-top:1px solid rgba(100,88,72,.25);padding-top:8px}
+body.my-walls-dashboard .orders-section .pagehead{margin:4px 0 7px}
+body.my-walls-dashboard .orders-section .pagehead h1{font-size:17px!important}
+body.my-walls-dashboard .orders-section .card.order{padding:9px 11px;margin-bottom:6px;border-radius:10px;min-height:0;flex-direction:row;align-items:center}
+body.my-walls-dashboard .orders-section .card.order strong{font-size:13px}
+body.my-walls-dashboard .orders-section .card.order .sub{font-size:11px}
+.mw-orders-toggle{border:0;background:transparent;text-decoration:underline;color:var(--mw-ink);font-size:11px;font-weight:800;padding:5px}
+.mw-empty-filter{padding:22px;text-align:center;color:var(--mw-muted);font-size:13px}
+/* Manage page */
+body.my-wall-manage .shell{max-width:760px;padding:12px 12px 55px}
+body.my-wall-manage .top{padding:10px 12px;border-radius:12px}
+body.my-wall-manage .brand img{width:38px;height:38px}
+body.my-wall-manage .brand strong{font-size:18px}
+body.my-wall-manage .back{margin:12px 0 3px;font-size:12px}
+body.my-wall-manage .pagehead{margin:13px 0 8px;align-items:center}
+body.my-wall-manage .pagehead h1{font-size:26px}
+body.my-wall-manage .pagehead .sub{font-size:12px}
+body.my-wall-manage .card{padding:13px;border-radius:11px;margin-bottom:8px}
+body.my-wall-manage .card>h2{font-size:18px;margin-bottom:4px!important}
+body.my-wall-manage .help{font-size:12px;line-height:1.4;margin:5px 0 10px}
+body.my-wall-manage .field{margin-bottom:8px;gap:4px}
+body.my-wall-manage .field label{font-size:8px}
+body.my-wall-manage .field input{min-height:42px;padding:8px 10px;font-size:13px}
+body.my-wall-manage .button,body.my-wall-manage button.button{min-height:38px;padding:8px 11px;font-size:11px}
+body.my-wall-manage .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:9px 0}
+body.my-wall-manage .metric{background:#f2ece2;border-radius:8px;padding:8px}
+body.my-wall-manage .metric strong{font-size:14px;line-height:1.1}
+body.my-wall-manage .metric span{font-size:7px}
+body.my-wall-manage .divider{margin:10px 0}
+body.my-wall-manage .report blockquote{font-size:14px;margin:7px 0 9px}
+body.my-wall-manage .actions{gap:6px}
+.mw-manage-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 9px}
+.mw-manage-summary .mw-stat{padding:8px}
+@media(max-width:520px){
+  .mw-overview{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}.mw-stat{padding:8px 6px}.mw-stat strong{font-size:17px}.mw-stat span{font-size:6px;letter-spacing:.45px}
+  body.my-walls-dashboard .pagehead h1{font-size:24px}
+  body.my-walls-dashboard .card.wallrow{padding:10px 9px}
+  body.my-walls-dashboard .wallrow>.button{padding:6px 9px;min-width:62px}
+  .mw-tools{gap:5px}.mw-filter{padding:0 9px;font-size:10px}.mw-search{font-size:12px}
+  body.my-wall-manage .pagehead h1{font-size:23px}
+}
