@@ -6,6 +6,7 @@ import 'screens/configuration_screen.dart';
 import 'screens/discovered_walls_screen.dart';
 import 'screens/first_scan_setup_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/nfc_write_screen.dart';
 import 'screens/tag_entry_screen.dart';
 import 'screens/wall_screen.dart';
 import 'services/local_history_service.dart';
@@ -28,11 +29,15 @@ String? normalizeCustomSchemeLocation(Uri uri) {
     path = '/$host/${segments.first}';
   } else if (host == 'found') {
     path = '/found';
+  } else if (host == 'write-nfc') {
+    path = '/write-nfc';
   } else if (host.isEmpty && segments.isNotEmpty) {
     if ((segments.first == 't' || segments.first == 'w') && segments.length >= 2) {
       path = '/${segments.first}/${segments[1]}';
     } else if (segments.first == 'found') {
       path = '/found';
+    } else if (segments.first == 'write-nfc') {
+      path = '/write-nfc';
     }
   }
 
@@ -91,6 +96,12 @@ class _SaidHereAppState extends State<SaidHereApp> {
             builder: (_, _) => DiscoveredWallsScreen(
               service: service,
               localHistory: history,
+            ),
+          ),
+          GoRoute(
+            path: '/write-nfc',
+            builder: (_, state) => NfcWriteScreen(
+              url: state.uri.queryParameters['value'] ?? '',
             ),
           ),
         ],
