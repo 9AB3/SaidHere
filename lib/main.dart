@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'config/app_config.dart';
 import 'screens/configuration_screen.dart';
 import 'screens/discovered_walls_screen.dart';
+import 'screens/first_scan_setup_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/tag_entry_screen.dart';
 import 'screens/wall_screen.dart';
@@ -28,7 +29,6 @@ String? normalizeCustomSchemeLocation(Uri uri) {
   } else if (host == 'found') {
     path = '/found';
   } else if (host.isEmpty && segments.isNotEmpty) {
-    // Also accept saidhere:/t/<token> and similar single-slash forms.
     if ((segments.first == 't' || segments.first == 'w') && segments.length >= 2) {
       path = '/${segments.first}/${segments[1]}';
     } else if (segments.first == 'found') {
@@ -65,6 +65,14 @@ class _SaidHereAppState extends State<SaidHereApp> {
           GoRoute(
             path: '/t/:token',
             builder: (_, state) => TagEntryScreen(
+              tagToken: state.pathParameters['token']!,
+              service: service,
+              localHistory: history,
+            ),
+          ),
+          GoRoute(
+            path: '/setup/:token',
+            builder: (_, state) => FirstScanSetupScreen(
               tagToken: state.pathParameters['token']!,
               service: service,
               localHistory: history,
