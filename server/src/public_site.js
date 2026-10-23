@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 
 import { installCommerceEmailPolish, mountCommercePolish } from './commerce_polish.js';
+import { installOrderReferenceEmailPatch } from './email_order_ref_patch.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const publicRoot = path.resolve(here, '..', 'public');
@@ -52,6 +53,7 @@ function renderAppFallback(res, appHref) {
 
 export function mountCanonicalWebRedirect(app) {
   installCommerceEmailPolish();
+  installOrderReferenceEmailPatch();
 
   app.use((req, res, next) => {
     const host = String(req.hostname || '').toLowerCase();
