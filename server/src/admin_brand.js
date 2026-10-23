@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { mountAdminCustomers } from './admin_customers.js';
 import { mountAdminWallsMonitor } from './admin_walls_monitor.js';
 import { mountAdminWallsOverview } from './admin_walls_overview.js';
+import { mountNfcWriteReceipts } from './nfc_write_receipts.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const plaquePath = path.resolve(here, '../../lib/267ABF9F-A613-4DD2-B026-87B6C2B6AEBD.png');
@@ -38,7 +39,7 @@ function injectBrand(html) {
   output = addPreloadClass(output);
   output = output.replace(
     '</head>',
-    `${preloadCss}<script src="/admin/walls-overview.js?v=20261024-1" defer></script><script src="/admin/ui.js" defer></script><script src="/admin/orders-native-writer.js?v=20261024-4" defer></script><script src="/admin/walls-shell-fix.js?v=20261024-1" defer></script></head>`,
+    `${preloadCss}<script src="/admin/walls-overview.js?v=20261024-1" defer></script><script src="/admin/ui.js" defer></script><script src="/admin/orders-native-writer.js?v=20261024-5" defer></script><script src="/admin/walls-shell-fix.js?v=20261024-1" defer></script></head>`,
   );
   return output;
 }
@@ -71,6 +72,10 @@ export function mountAdminBrand(app) {
     res.setHeader('Cache-Control', 'no-store, max-age=0');
     return res.sendFile(wallsShellFixPath);
   });
+
+  // Authenticated write-ticket creation and the receipt redemption endpoint are
+  // mounted before the legacy admin portal routes.
+  mountNfcWriteReceipts(app);
 
   app.use('/admin', (_req, res, next) => {
     const originalSend = res.send.bind(res);
