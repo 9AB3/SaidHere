@@ -95,6 +95,9 @@ workflows:
           grep -q 'private var nfcWriterChannel' ios/Runner/AppDelegate.swift
           grep -q 'installNfcWriterChannelIfPossible' ios/Runner/AppDelegate.swift
           grep -q 'activeFlutterViewController' ios/Runner/AppDelegate.swift
+          grep -q 'confirmNfcWriteReceipt' ios/Runner/AppDelegate.swift
+          grep -q 'api/fulfilment/nfc-written' ios/Runner/AppDelegate.swift
+          grep -q 'pendingNfcReceipt' ios/Runner/AppDelegate.swift
           grep -q '^CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements$' ios/Flutter/Release.xcconfig
       - name: Configure iOS signing
         script: |
