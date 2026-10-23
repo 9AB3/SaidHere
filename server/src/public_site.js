@@ -9,6 +9,19 @@ const indexPath = path.join(publicRoot, 'index.html');
 const fallbackPath = path.join(publicRoot, 'fallback.html');
 const CANONICAL_HOST = 'saidhere.app';
 const RENDER_HOST = 'saidhere-api-9ab3.onrender.com';
+const APPLE_APP_SITE_ASSOCIATION = {
+  applinks: {
+    details: [
+      {
+        appIDs: ['7MB2M6PX4Y.com.9ab3.saidhere'],
+        components: [
+          { '/': '/t/*' },
+          { '/': '/w/*' },
+        ],
+      },
+    ],
+  },
+};
 
 function noStore(res) {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -20,6 +33,11 @@ function noStore(res) {
 function sendIndex(_req, res) {
   noStore(res);
   return res.sendFile(indexPath);
+}
+
+function sendAppleAssociation(res) {
+  res.set('Cache-Control', 'public, max-age=3600');
+  return res.status(200).type('application/json').send(JSON.stringify(APPLE_APP_SITE_ASSOCIATION));
 }
 
 function renderAppFallback(res, appHref) {
@@ -66,19 +84,13 @@ export function mountCanonicalWebRedirect(app) {
 }
 
 export function mountPublicSite(app) {
-  // Apple must be able to fetch this file directly over HTTPS with no redirect.
-  app.get('/.well-known/apple-app-site-association', (_req, res) => {
-    res.type('application/json');
-    res.set('Cache-Control', 'public, max-age=3600');
-    return res.sendFile(path.join(publicRoot, '.well-known', 'apple-app-site-association'));
-  });
+  // Apple must be able to fetch this document directly over HTTPS with no redirect.
+  // Serve it from code rather than a copied runtime file so a deployment cannot
+  // accidentally omit the association document.
+  app.get('/.well-known/apple-app-site-association', (_req, res) => sendAppleAssociation(res));
 
   // Also support Apple's legacy root lookup location.
-  app.get('/apple-app-site-association', (_req, res) => {
-    res.type('application/json');
-    res.set('Cache-Control', 'public, max-age=3600');
-    return res.sendFile(path.join(publicRoot, '.well-known', 'apple-app-site-association'));
-  });
+  app.get('/apple-app-site-association', (_req, res) => sendAppleAssociation(res));
 
   // Public HTML should always reflect the currently deployed build. These pages
   // change frequently during launch, so browsers and proxies must not retain an
