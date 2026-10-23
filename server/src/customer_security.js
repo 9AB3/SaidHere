@@ -2,10 +2,20 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 
 import { hashToken } from './auth.js';
+import { mountCustomerPasswordReset } from './customer_password_reset.js';
 import { pool } from './db.js';
 
 function clean(value) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
 }
 
 function activeAccountPage() {
@@ -42,7 +52,34 @@ async function blockClaimForActiveAccount(req, res, next) {
   }
 }
 
+function decorateLoginPage(req, res, next) {
+  const originalSend = res.send.bind(res);
+  res.send = (body) => {
+    if (typeof body !== 'string' || !body.includes('action="/my-walls/login"')) {
+      return originalSend(body);
+    }
+    let html = body;
+    const notice = clean(req.query?.notice);
+    if (notice && !html.includes('data-password-notice')) {
+      const marker = '<form method="post" action="/my-walls/login">';
+      html = html.replace(marker, `<div class="notice" data-password-notice>${escapeHtml(notice)}</div>${marker}`);
+    }
+    if (!html.includes('/my-walls/forgot-password')) {
+      html = html.replace(
+        '</form><p class="help"',
+        '</form><p style="text-align:center;margin:14px 0 0"><a href="/my-walls/forgot-password" style="color:#171411;font-weight:900">Forgot password?</a></p><p class="help"',
+      );
+    }
+    return originalSend(html);
+  };
+  return next();
+}
+
 export function mountCustomerSecurity(app) {
+  // Recovery routes live outside the authenticated customer portal and are
+  // mounted before the login/claim middleware below.
+  mountCustomerPasswordReset(app);
+
   const router = express.Router();
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -64,6 +101,7 @@ export function mountCustomerSecurity(app) {
   });
 
   router.post('/login', loginLimiter, (_req, _res, next) => next());
+  router.use('/login', decorateLoginPage);
   router.get('/claim/:token', blockClaimForActiveAccount);
   router.post('/claim/:token', claimLimiter, blockClaimForActiveAccount);
   router.post('/setup/:token', setupLimiter, (_req, _res, next) => next());
