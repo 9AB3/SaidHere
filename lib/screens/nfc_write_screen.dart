@@ -39,6 +39,24 @@ class _NfcWriteScreenState extends State<NfcWriteScreen> {
     });
   }
 
+  Future<bool?> _invokeNativeWriter() async {
+    const attempts = 8;
+    for (var attempt = 0; attempt < attempts; attempt += 1) {
+      try {
+        return await _channel.invokeMethod<bool>(
+          'writeUrl',
+          <String, Object?>{'url': widget.url},
+        );
+      } on MissingPluginException {
+        if (attempt == attempts - 1) rethrow;
+        await Future<void>.delayed(
+          Duration(milliseconds: 120 + (attempt * 80)),
+        );
+      }
+    }
+    return false;
+  }
+
   Future<void> _write() async {
     if (_writing) return;
     _started = true;
@@ -57,10 +75,7 @@ class _NfcWriteScreenState extends State<NfcWriteScreen> {
     });
 
     try {
-      final written = await _channel.invokeMethod<bool>(
-        'writeUrl',
-        <String, Object?>{'url': widget.url},
-      );
+      final written = await _invokeNativeWriter();
       if (!mounted) return;
       setState(() {
         _writing = false;
@@ -79,7 +94,7 @@ class _NfcWriteScreenState extends State<NfcWriteScreen> {
       setState(() {
         _writing = false;
         _success = false;
-        _error = 'Native NFC writing is not available in this build.';
+        _error = 'The native NFC writer did not start. Close The Wall, reopen it, and try Write NFC again.';
       });
     }
   }
@@ -147,7 +162,7 @@ class _NfcWriteScreenState extends State<NfcWriteScreen> {
                         _success
                             ? 'The Wall link has been written successfully. Return to Orders and tick Tagged.'
                             : _writing
-                                ? 'Hold the top of this iPhone against the blank NFC tag when the native NFC sheet appears.'
+                                ? 'The native writer is starting. When the iPhone NFC sheet appears, hold the top of this iPhone against the blank NFC tag.'
                                 : (_error ?? 'Tap below to start the native iPhone NFC writer.'),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
