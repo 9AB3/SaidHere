@@ -33,7 +33,7 @@ function injectBrand(html) {
   output = addPreloadClass(output);
   output = output.replace(
     '</head>',
-    `${preloadCss}<script src="/admin/ui.js" defer></script><script src="/admin/orders-native-writer.js" defer></script></head>`,
+    `${preloadCss}<script src="/admin/ui.js" defer></script><script src="/admin/orders-native-writer.js?v=20261024-2" defer></script></head>`,
   );
   return output;
 }
@@ -57,7 +57,7 @@ export function mountAdminBrand(app) {
 
   app.get('/admin/orders-native-writer.js', (_req, res) => {
     res.type('application/javascript');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
     return res.sendFile(ordersNativeWriterPath);
   });
 
