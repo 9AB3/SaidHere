@@ -142,13 +142,7 @@ import UIKit
     didInvalidateWithError error: Error
   ) {
     guard pendingNfcResult != nil else { return }
-    let nsError = error as NSError
-    if nsError.domain == NFCReaderError.errorDomain,
-       nsError.code == NFCReaderError.readerSessionInvalidationErrorUserCanceled.rawValue {
-      failResult("NFC writing was cancelled.")
-    } else {
-      failResult(error.localizedDescription)
-    }
+    failResult(error.localizedDescription)
   }
 
   private func failNfc(_ session: NFCNDEFReaderSession, message: String) {
