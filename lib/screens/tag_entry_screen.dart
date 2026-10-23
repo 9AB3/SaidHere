@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../services/discovery_location_service.dart';
 import '../services/local_history_service.dart';
 import '../services/said_here_service.dart';
 import '../theme/app_theme.dart';
@@ -53,6 +56,14 @@ class _TagEntryScreenState extends State<TagEntryScreen> {
         displayName: wall.displayName,
         locationHint: wall.locationHint,
       );
+
+      // Location is deliberately optional and is recorded only after a genuine
+      // NFC-backed Wall visit has succeeded. Do not delay opening the Wall while
+      // GPS permission/fix/network work completes.
+      unawaited(
+        const DiscoveryLocationService().captureForWall(wallId: wall.id),
+      );
+
       if (!mounted) return;
       context.go('/w/${wall.slug}?fresh=1');
     } on SaidHereException catch (error) {
