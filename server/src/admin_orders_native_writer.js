@@ -3,16 +3,17 @@
 
   function addNativeWriters(root = document) {
     root.querySelectorAll?.('.ov3-copy[data-copy]').forEach((copyButton) => {
-      const tag = copyButton.closest('.ov3-tag');
-      if (!tag || tag.querySelector('.ov3-native-write')) return;
+      const item = copyButton.closest('.ov3-item');
+      const actions = item?.querySelector('.ov3-item-actions');
+      if (!item || !actions || actions.querySelector('.ov3-native-write')) return;
 
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = 'ov3-copy ov3-native-write';
+      button.className = 'ov3-small ov3-native-write';
       button.textContent = 'Write NFC';
       button.dataset.write = String(copyButton.dataset.copy || '');
-      button.setAttribute('aria-label', 'Write this Wall NFC tag with the SaidHere app');
-      tag.appendChild(button);
+      button.setAttribute('aria-label', 'Write this Wall NFC tag with The Wall app');
+      actions.prepend(button);
     });
   }
 
@@ -55,18 +56,15 @@
     return params;
   }
 
-  // One delegated writer handler works for both server-rendered and fallback-added buttons.
   document.addEventListener('click', (event) => {
     const button = event.target.closest?.('.ov3-native-write');
     if (!button) return;
     event.preventDefault();
     event.stopPropagation();
-    const fallback = button.closest('.ov3-tag')?.querySelector('.ov3-copy[data-copy]')?.dataset.copy || '';
+    const fallback = button.closest('.ov3-item')?.querySelector('.ov3-copy[data-copy]')?.dataset.copy || '';
     openNativeWriter(button.dataset.write || fallback);
   }, true);
 
-  // Capture this before the older Orders listener. Save without a page reload so
-  // the order remains expanded while the operator works down each physical Wall.
   document.addEventListener('change', async (event) => {
     const checkbox = event.target.closest?.('.ov3-tag-form input[type="checkbox"]');
     if (!checkbox) return;
@@ -92,8 +90,6 @@
         },
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      // Prepare the opposite value for the next click and update the order UI.
       if (taggedInput) taggedInput.value = checkbox.checked ? 'false' : 'true';
       updateOrderProgress(order);
     } catch (error) {
@@ -107,8 +103,6 @@
     }
   }, true);
 
-  // The shared admin shell can restructure page content during startup. Run the
-  // fallback enhancement immediately, again at DOM ready, and watch for replaced rows.
   addNativeWriters();
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => addNativeWriters(), { once: true });
