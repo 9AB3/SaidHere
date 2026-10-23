@@ -90,6 +90,8 @@ workflows:
           grep -q '<string>TAG</string>' ios/Runner/Runner.entitlements
           grep -q 'NFCReaderUsageDescription' ios/Runner/Info.plist
           grep -q 'CoreNFC' ios/Runner/AppDelegate.swift
+          grep -q 'nfcTarget(fromDeepLink' ios/Runner/AppDelegate.swift
+          grep -q 'beginQueuedNfcWriteIfPossible' ios/Runner/AppDelegate.swift
           grep -q '^CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements$' ios/Flutter/Release.xcconfig
       - name: Configure iOS signing
         script: |
