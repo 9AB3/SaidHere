@@ -8,39 +8,13 @@ import UIKit
   private var pendingNfcURL: URL?
   private var pendingNfcResult: FlutterResult?
   private var queuedDeepLinkNfcURL: URL?
+  private var nfcWriterChannel: FlutterMethodChannel?
 
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
-
-    if let controller = window?.rootViewController as? FlutterViewController {
-      let channel = FlutterMethodChannel(
-        name: "saidhere/nfc_writer",
-        binaryMessenger: controller.binaryMessenger
-      )
-      channel.setMethodCallHandler { [weak self] call, result in
-        guard let self else { return }
-        guard call.method == "writeUrl" else {
-          result(FlutterMethodNotImplemented)
-          return
-        }
-        guard
-          let arguments = call.arguments as? [String: Any],
-          let value = arguments["url"] as? String,
-          let url = URL(string: value)
-        else {
-          result(FlutterError(
-            code: "INVALID_URL",
-            message: "This is not a valid The Wall NFC URL.",
-            details: nil
-          ))
-          return
-        }
-        self.startNfcWrite(url: url, result: result)
-      }
-    }
 
     var forwardedLaunchOptions = launchOptions
     if let launchURL = launchOptions?[.url] as? URL,
@@ -52,8 +26,20 @@ import UIKit
       forwardedLaunchOptions?.removeValue(forKey: .url)
     }
 
+    // Flutter's root view controller is not guaranteed to exist until after the
+    // FlutterAppDelegate has completed launch (especially with the modern scene
+    // lifecycle). Registering the MethodChannel before this point can silently do
+    // nothing and Flutter then reports MissingPluginException.
     let started = super.application(application, didFinishLaunchingWithOptions: forwardedLaunchOptions)
+    installNfcWriterChannelIfPossible()
     DispatchQueue.main.async { [weak self] in
+      self?.installNfcWriterChannelIfPossible()
+      self?.beginQueuedNfcWriteIfPossible()
+    }
+    // One short retry covers scene/window creation that finishes just after the
+    // app delegate launch callback.
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+      self?.installNfcWriterChannelIfPossible()
       self?.beginQueuedNfcWriteIfPossible()
     }
     return started
@@ -61,6 +47,7 @@ import UIKit
 
   override func applicationDidBecomeActive(_ application: UIApplication) {
     super.applicationDidBecomeActive(application)
+    installNfcWriterChannelIfPossible()
     beginQueuedNfcWriteIfPossible()
   }
 
@@ -72,11 +59,84 @@ import UIKit
     if let target = nfcTarget(fromDeepLink: url) {
       queuedDeepLinkNfcURL = target
       DispatchQueue.main.async { [weak self] in
+        self?.installNfcWriterChannelIfPossible()
         self?.beginQueuedNfcWriteIfPossible()
       }
       return true
     }
     return super.application(app, open: url, options: options)
+  }
+
+  private func installNfcWriterChannelIfPossible() {
+    guard nfcWriterChannel == nil else { return }
+    guard let controller = activeFlutterViewController() else { return }
+
+    let channel = FlutterMethodChannel(
+      name: "saidhere/nfc_writer",
+      binaryMessenger: controller.binaryMessenger
+    )
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard let self else {
+        result(FlutterError(code: "NFC_WRITER_GONE", message: "The NFC writer is unavailable.", details: nil))
+        return
+      }
+      guard call.method == "writeUrl" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      guard
+        let arguments = call.arguments as? [String: Any],
+        let value = arguments["url"] as? String,
+        let url = URL(string: value)
+      else {
+        result(FlutterError(
+          code: "INVALID_URL",
+          message: "This is not a valid The Wall NFC URL.",
+          details: nil
+        ))
+        return
+      }
+      self.startNfcWrite(url: url, result: result)
+    }
+    nfcWriterChannel = channel
+  }
+
+  private func activeFlutterViewController() -> FlutterViewController? {
+    if let controller = findFlutterViewController(in: window?.rootViewController) {
+      return controller
+    }
+
+    for scene in UIApplication.shared.connectedScenes {
+      guard let windowScene = scene as? UIWindowScene else { continue }
+      for sceneWindow in windowScene.windows {
+        if let controller = findFlutterViewController(in: sceneWindow.rootViewController) {
+          return controller
+        }
+      }
+    }
+    return nil
+  }
+
+  private func findFlutterViewController(in controller: UIViewController?) -> FlutterViewController? {
+    guard let controller else { return nil }
+    if let flutter = controller as? FlutterViewController { return flutter }
+
+    if let navigation = controller as? UINavigationController,
+       let flutter = findFlutterViewController(in: navigation.visibleViewController) {
+      return flutter
+    }
+    if let tab = controller as? UITabBarController,
+       let flutter = findFlutterViewController(in: tab.selectedViewController) {
+      return flutter
+    }
+    if let presented = controller.presentedViewController,
+       let flutter = findFlutterViewController(in: presented) {
+      return flutter
+    }
+    for child in controller.children {
+      if let flutter = findFlutterViewController(in: child) { return flutter }
+    }
+    return nil
   }
 
   private func nfcTarget(fromDeepLink url: URL) -> URL? {
