@@ -1,13 +1,21 @@
 import CoreNFC
 import Flutter
+import Foundation
 import UIKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, NFCNDEFReaderSessionDelegate {
+  private struct NfcWriteRequest {
+    let url: URL
+    let receipt: String?
+  }
+
   private var nfcSession: NFCNDEFReaderSession?
   private var pendingNfcURL: URL?
+  private var pendingNfcReceipt: String?
   private var pendingNfcResult: FlutterResult?
   private var queuedDeepLinkNfcURL: URL?
+  private var queuedDeepLinkNfcReceipt: String?
   private var nfcWriterChannel: FlutterMethodChannel?
 
   override func application(
@@ -18,8 +26,9 @@ import UIKit
 
     var forwardedLaunchOptions = launchOptions
     if let launchURL = launchOptions?[.url] as? URL,
-       let target = nfcTarget(fromDeepLink: launchURL) {
-      queuedDeepLinkNfcURL = target
+       let request = nfcTarget(fromDeepLink: launchURL) {
+      queuedDeepLinkNfcURL = request.url
+      queuedDeepLinkNfcReceipt = request.receipt
       // The native writer owns this one custom-scheme launch. Do not also feed it
       // into Flutter deep-link routing, otherwise the Flutter writer screen can
       // start a second NFC session while the native sheet is already opening.
@@ -56,8 +65,9 @@ import UIKit
     open url: URL,
     options: [UIApplication.OpenURLOptionsKey: Any] = [:]
   ) -> Bool {
-    if let target = nfcTarget(fromDeepLink: url) {
-      queuedDeepLinkNfcURL = target
+    if let request = nfcTarget(fromDeepLink: url) {
+      queuedDeepLinkNfcURL = request.url
+      queuedDeepLinkNfcReceipt = request.receipt
       DispatchQueue.main.async { [weak self] in
         self?.installNfcWriterChannelIfPossible()
         self?.beginQueuedNfcWriteIfPossible()
@@ -96,7 +106,8 @@ import UIKit
         ))
         return
       }
-      self.startNfcWrite(url: url, result: result)
+      let receipt = (arguments["receipt"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+      self.startNfcWrite(url: url, receipt: receipt?.isEmpty == false ? receipt : nil, result: result)
     }
     nfcWriterChannel = channel
   }
@@ -139,7 +150,7 @@ import UIKit
     return nil
   }
 
-  private func nfcTarget(fromDeepLink url: URL) -> URL? {
+  private func nfcTarget(fromDeepLink url: URL) -> NfcWriteRequest? {
     guard url.scheme?.lowercased() == "saidhere" else { return nil }
     let host = (url.host ?? "").lowercased()
     let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")).lowercased()
@@ -150,7 +161,11 @@ import UIKit
       let target = URL(string: value),
       validWallNfcURL(target)
     else { return nil }
-    return target
+    let receipt = components.queryItems?
+      .first(where: { $0.name == "receipt" })?
+      .value?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    return NfcWriteRequest(url: target, receipt: receipt?.isEmpty == false ? receipt : nil)
   }
 
   private func validWallNfcURL(_ url: URL) -> Bool {
@@ -163,11 +178,13 @@ import UIKit
     guard UIApplication.shared.applicationState == .active else { return }
     guard nfcSession == nil, pendingNfcURL == nil else { return }
     guard let target = queuedDeepLinkNfcURL else { return }
+    let receipt = queuedDeepLinkNfcReceipt
     queuedDeepLinkNfcURL = nil
-    startNfcWrite(url: target, result: nil)
+    queuedDeepLinkNfcReceipt = nil
+    startNfcWrite(url: target, receipt: receipt, result: nil)
   }
 
-  private func startNfcWrite(url: URL, result: FlutterResult?) {
+  private func startNfcWrite(url: URL, receipt: String?, result: FlutterResult?) {
     guard validWallNfcURL(url) else {
       result?(FlutterError(
         code: "INVALID_URL",
@@ -194,6 +211,7 @@ import UIKit
     }
 
     pendingNfcURL = url
+    pendingNfcReceipt = receipt
     pendingNfcResult = result
     let session = NFCNDEFReaderSession(
       delegate: self,
@@ -261,12 +279,58 @@ import UIKit
             self.failNfc(session, message: error.localizedDescription)
             return
           }
-          session.alertMessage = "The Wall NFC tag was written successfully."
-          self.finishNfc(true)
-          session.invalidate()
+
+          let receipt = self.pendingNfcReceipt
+          guard let receipt, !receipt.isEmpty else {
+            session.alertMessage = "The Wall NFC tag was written successfully."
+            self.finishNfc(true)
+            session.invalidate()
+            return
+          }
+
+          session.alertMessage = "NFC written. Confirming Tagged status…"
+          self.confirmNfcWriteReceipt(receipt) { [weak self] confirmed in
+            guard let self else { return }
+            DispatchQueue.main.async {
+              session.alertMessage = confirmed
+                ? "The Wall NFC tag was written and marked Tagged."
+                : "The NFC tag was written. Return to Orders and tick Tagged manually."
+              self.finishNfc(true)
+              session.invalidate()
+            }
+          }
         }
       }
     }
+  }
+
+  private func confirmNfcWriteReceipt(_ receipt: String, completion: @escaping (Bool) -> Void) {
+    guard let endpoint = URL(string: "https://saidhere.app/api/fulfilment/nfc-written") else {
+      completion(false)
+      return
+    }
+    var request = URLRequest(url: endpoint)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+    request.timeoutInterval = 12
+    do {
+      request.httpBody = try JSONSerialization.data(withJSONObject: ["receipt": receipt], options: [])
+    } catch {
+      completion(false)
+      return
+    }
+
+    URLSession.shared.dataTask(with: request) { _, response, error in
+      guard error == nil,
+            let http = response as? HTTPURLResponse,
+            (200..<300).contains(http.statusCode)
+      else {
+        completion(false)
+        return
+      }
+      completion(true)
+    }.resume()
   }
 
   func readerSession(
@@ -286,6 +350,7 @@ import UIKit
     let result = pendingNfcResult
     pendingNfcResult = nil
     pendingNfcURL = nil
+    pendingNfcReceipt = nil
     nfcSession = nil
     DispatchQueue.main.async {
       result?(value)
@@ -296,6 +361,7 @@ import UIKit
     let result = pendingNfcResult
     pendingNfcResult = nil
     pendingNfcURL = nil
+    pendingNfcReceipt = nil
     nfcSession = nil
     DispatchQueue.main.async {
       result?(FlutterError(code: "NFC_WRITE_FAILED", message: message, details: nil))
