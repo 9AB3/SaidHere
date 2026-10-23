@@ -32,6 +32,7 @@ async function requireAdmin(req, res, next) {
     );
     if (result.rowCount === 0) return res.sendStatus(401);
     req.wallsOverviewAdmin = result.rows[0];
+    req.wallsOverviewCsrf = hashToken(`admin-csrf:${raw}`);
     return next();
   } catch (error) { return next(error); }
 }
@@ -95,14 +96,33 @@ const clientScript = String.raw`(() => {
     }).format(Number(cents || 0) / 100);
   }
 
+  function ensureLogout(csrf) {
+    const profile = document.querySelector('.admin-profile');
+    if (!profile || profile.querySelector('form[action="/admin/logout"]') || !csrf) return;
+    const form = document.createElement('form');
+    form.method = 'post';
+    form.action = '/admin/logout';
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = '_csrf';
+    input.value = csrf;
+    const button = document.createElement('button');
+    button.type = 'submit';
+    button.textContent = 'Log out';
+    form.append(input, button);
+    profile.append(form);
+  }
+
   async function addOverview() {
-    if (!document.querySelector('.wm') || document.querySelector('.wm-overview-kpis')) return;
+    if (!document.querySelector('.wm')) return;
     try {
       const response = await fetch('/admin/walls/overview-data', { credentials: 'same-origin' });
       if (!response.ok) return;
       const data = await response.json();
+      ensureLogout(data.csrf);
+      if (document.querySelector('.wm-overview-kpis')) return;
       const host = document.querySelector('.admin-content .wm') || document.querySelector('.wm');
-      if (!host || document.querySelector('.wm-overview-kpis')) return;
+      if (!host) return;
       const row = document.createElement('div');
       row.className = 'wm-overview-kpis';
       row.innerHTML = [
@@ -134,7 +154,11 @@ export function mountAdminWallsOverview(app) {
   });
 
   app.get('/admin/walls/overview-data', requireAdmin, async (req, res, next) => {
-    try { return res.json(await summaryFor(req.wallsOverviewAdmin)); }
-    catch (error) { return next(error); }
+    try {
+      return res.json({
+        ...(await summaryFor(req.wallsOverviewAdmin)),
+        csrf: req.wallsOverviewCsrf,
+      });
+    } catch (error) { return next(error); }
   });
 }
