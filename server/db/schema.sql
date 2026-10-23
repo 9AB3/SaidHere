@@ -190,6 +190,19 @@ create table if not exists commerce_order_items (
   unique(order_id, ordinal)
 );
 
+-- A Write NFC action receives a short-lived single-use receipt. The native app
+-- can redeem it only after Core NFC confirms a successful write. This lets the
+-- server mark the exact fulfilment item Tagged without trusting order/item IDs.
+create table if not exists nfc_write_receipts (
+  id uuid primary key default gen_random_uuid(),
+  order_item_id uuid not null references commerce_order_items(id) on delete cascade,
+  token_hash text not null unique,
+  nfc_value_hash text not null,
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
 -- The serial code is printed/engraved on the physical plaque or its packing
 -- label. The runtime NFC credential itself remains represented by wall_tags.token_hash.
 create table if not exists plaques (
@@ -232,6 +245,18 @@ create table if not exists customer_claim_tokens (
   created_at timestamptz not null default now()
 );
 
+-- Password reset tokens also cover customers who bought a Wall but never
+-- completed their initial activation. They are single-use and intentionally
+-- separate from purchase claim tokens.
+create table if not exists customer_password_reset_tokens (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid not null references customer_accounts(id) on delete cascade,
+  token_hash text not null unique,
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists customer_audit_log (
   id uuid primary key default gen_random_uuid(),
   customer_id uuid references customer_accounts(id) on delete set null,
@@ -261,5 +286,9 @@ create index if not exists idx_commerce_orders_status on commerce_orders(status,
 create index if not exists idx_stripe_webhook_events_received on stripe_webhook_events(received_at desc);
 create index if not exists idx_stripe_webhook_events_unprocessed on stripe_webhook_events(received_at) where processed_at is null;
 create unique index if not exists idx_commerce_order_items_reserved_wall on commerce_order_items(reserved_wall_id) where reserved_wall_id is not null;
+create index if not exists idx_nfc_write_receipts_item on nfc_write_receipts(order_item_id, created_at desc);
+create index if not exists idx_nfc_write_receipts_expiry on nfc_write_receipts(expires_at) where used_at is null;
 create index if not exists idx_customer_claim_tokens_customer on customer_claim_tokens(customer_id, created_at desc);
+create index if not exists idx_customer_password_reset_tokens_customer on customer_password_reset_tokens(customer_id, created_at desc);
+create index if not exists idx_customer_password_reset_tokens_expiry on customer_password_reset_tokens(expires_at) where used_at is null;
 create index if not exists idx_customer_audit_customer on customer_audit_log(customer_id, created_at desc);
