@@ -7,6 +7,7 @@ import UIKit
   private var nfcSession: NFCNDEFReaderSession?
   private var pendingNfcURL: URL?
   private var pendingNfcResult: FlutterResult?
+  private var queuedDeepLinkNfcURL: URL?
 
   override func application(
     _ application: UIApplication,
@@ -25,29 +26,10 @@ import UIKit
           result(FlutterMethodNotImplemented)
           return
         }
-        guard NFCNDEFReaderSession.readingAvailable else {
-          result(FlutterError(
-            code: "NFC_UNAVAILABLE",
-            message: "NFC writing is not available on this iPhone.",
-            details: nil
-          ))
-          return
-        }
-        guard self.pendingNfcResult == nil else {
-          result(FlutterError(
-            code: "NFC_BUSY",
-            message: "An NFC writing session is already open.",
-            details: nil
-          ))
-          return
-        }
         guard
           let arguments = call.arguments as? [String: Any],
           let value = arguments["url"] as? String,
-          let url = URL(string: value),
-          url.scheme?.lowercased() == "https",
-          url.host?.lowercased() == "nfc.saidhere.app",
-          url.path.hasPrefix("/t/")
+          let url = URL(string: value)
         else {
           result(FlutterError(
             code: "INVALID_URL",
@@ -56,21 +38,106 @@ import UIKit
           ))
           return
         }
-
-        self.pendingNfcURL = url
-        self.pendingNfcResult = result
-        let session = NFCNDEFReaderSession(
-          delegate: self,
-          queue: nil,
-          invalidateAfterFirstRead: false
-        )
-        session.alertMessage = "Hold the top of your iPhone near the blank Wall NFC tag."
-        self.nfcSession = session
-        session.begin()
+        self.startNfcWrite(url: url, result: result)
       }
     }
 
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    if let launchURL = launchOptions?[.url] as? URL,
+       let target = nfcTarget(fromDeepLink: launchURL) {
+      queuedDeepLinkNfcURL = target
+    }
+
+    let started = super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    DispatchQueue.main.async { [weak self] in
+      self?.beginQueuedNfcWriteIfPossible()
+    }
+    return started
+  }
+
+  override func applicationDidBecomeActive(_ application: UIApplication) {
+    super.applicationDidBecomeActive(application)
+    beginQueuedNfcWriteIfPossible()
+  }
+
+  override func application(
+    _ app: UIApplication,
+    open url: URL,
+    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
+  ) -> Bool {
+    if let target = nfcTarget(fromDeepLink: url) {
+      queuedDeepLinkNfcURL = target
+      DispatchQueue.main.async { [weak self] in
+        self?.beginQueuedNfcWriteIfPossible()
+      }
+      return true
+    }
+    return super.application(app, open: url, options: options)
+  }
+
+  private func nfcTarget(fromDeepLink url: URL) -> URL? {
+    guard url.scheme?.lowercased() == "saidhere" else { return nil }
+    let host = (url.host ?? "").lowercased()
+    let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")).lowercased()
+    guard host == "write-nfc" || path == "write-nfc" else { return nil }
+    guard
+      let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+      let value = components.queryItems?.first(where: { $0.name == "value" })?.value,
+      let target = URL(string: value),
+      validWallNfcURL(target)
+    else { return nil }
+    return target
+  }
+
+  private func validWallNfcURL(_ url: URL) -> Bool {
+    url.scheme?.lowercased() == "https" &&
+      url.host?.lowercased() == "nfc.saidhere.app" &&
+      url.path.hasPrefix("/t/")
+  }
+
+  private func beginQueuedNfcWriteIfPossible() {
+    guard UIApplication.shared.applicationState == .active else { return }
+    guard nfcSession == nil, pendingNfcURL == nil else { return }
+    guard let target = queuedDeepLinkNfcURL else { return }
+    queuedDeepLinkNfcURL = nil
+    startNfcWrite(url: target, result: nil)
+  }
+
+  private func startNfcWrite(url: URL, result: FlutterResult?) {
+    guard validWallNfcURL(url) else {
+      result?(FlutterError(
+        code: "INVALID_URL",
+        message: "This is not a valid The Wall NFC URL.",
+        details: nil
+      ))
+      return
+    }
+    guard NFCNDEFReaderSession.readingAvailable else {
+      result?(FlutterError(
+        code: "NFC_UNAVAILABLE",
+        message: "NFC writing is not available on this iPhone.",
+        details: nil
+      ))
+      return
+    }
+    guard nfcSession == nil, pendingNfcURL == nil else {
+      result?(FlutterError(
+        code: "NFC_BUSY",
+        message: "An NFC writing session is already open.",
+        details: nil
+      ))
+      return
+    }
+
+    pendingNfcURL = url
+    pendingNfcResult = result
+    let session = NFCNDEFReaderSession(
+      delegate: self,
+      queue: nil,
+      invalidateAfterFirstRead: false
+    )
+    session.alertMessage = "Hold the top of your iPhone near the blank Wall NFC tag."
+    nfcSession = session
+    session.begin()
   }
 
   func readerSessionDidBecomeActive(_ session: NFCNDEFReaderSession) {}
@@ -79,7 +146,7 @@ import UIKit
     _ session: NFCNDEFReaderSession,
     didDetectNDEFs messages: [NFCNDEFMessage]
   ) {
-    // The read/write delegate callback below is used instead.
+    // The read/write tag callback below is used instead.
   }
 
   func readerSession(
@@ -141,7 +208,7 @@ import UIKit
     _ session: NFCNDEFReaderSession,
     didInvalidateWithError error: Error
   ) {
-    guard pendingNfcResult != nil else { return }
+    guard pendingNfcURL != nil else { return }
     failResult(error.localizedDescription)
   }
 
