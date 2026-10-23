@@ -8,6 +8,7 @@ const plaquePath = path.resolve(here, '../../lib/267ABF9F-A613-4DD2-B026-87B6C2B
 const wallBackgroundPath = path.resolve(here, '../../lib/12CA723C-705E-4593-834A-72D72424FC4F.png');
 const adminUiPath = path.resolve(here, 'admin_ui.js');
 const ordersNativeWriterPath = path.resolve(here, 'admin_orders_native_writer.js');
+const wallsShellFixPath = path.resolve(here, 'admin_walls_shell_fix.js');
 
 // The legacy admin pages still provide the forms/routes. The replacement UI runs
 // before the page is revealed so users never see the legacy layout flash first.
@@ -35,7 +36,7 @@ function injectBrand(html) {
   output = addPreloadClass(output);
   output = output.replace(
     '</head>',
-    `${preloadCss}<script src="/admin/ui.js" defer></script><script src="/admin/orders-native-writer.js?v=20261024-4" defer></script></head>`,
+    `${preloadCss}<script src="/admin/ui.js" defer></script><script src="/admin/orders-native-writer.js?v=20261024-4" defer></script><script src="/admin/walls-shell-fix.js?v=20261024-1" defer></script></head>`,
   );
   return output;
 }
@@ -61,6 +62,12 @@ export function mountAdminBrand(app) {
     res.type('application/javascript');
     res.setHeader('Cache-Control', 'no-store, max-age=0');
     return res.sendFile(ordersNativeWriterPath);
+  });
+
+  app.get('/admin/walls-shell-fix.js', (_req, res) => {
+    res.type('application/javascript');
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    return res.sendFile(wallsShellFixPath);
   });
 
   app.use('/admin', (_req, res, next) => {
