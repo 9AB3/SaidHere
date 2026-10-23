@@ -3,6 +3,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 
+import { installCommerceEmailPolish, mountCommercePolish } from './commerce_polish.js';
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const publicRoot = path.resolve(here, '..', 'public');
 const indexPath = path.join(publicRoot, 'index.html');
@@ -49,6 +51,13 @@ function renderAppFallback(res, appHref) {
 }
 
 export function mountCanonicalWebRedirect(app) {
+  // Mount the polished commerce routes before the legacy commerce module is added
+  // in index.js. Express uses first match, so these become the customer-facing
+  // checkout and success pages while the existing webhook/reconciliation code
+  // remains the source of truth for payment completion.
+  installCommerceEmailPolish();
+  mountCommercePolish(app);
+
   app.use((req, res, next) => {
     const host = String(req.hostname || '').toLowerCase();
     const pathName = req.path || '/';
