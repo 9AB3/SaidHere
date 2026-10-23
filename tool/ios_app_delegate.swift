@@ -42,12 +42,17 @@ import UIKit
       }
     }
 
+    var forwardedLaunchOptions = launchOptions
     if let launchURL = launchOptions?[.url] as? URL,
        let target = nfcTarget(fromDeepLink: launchURL) {
       queuedDeepLinkNfcURL = target
+      // The native writer owns this one custom-scheme launch. Do not also feed it
+      // into Flutter deep-link routing, otherwise the Flutter writer screen can
+      // start a second NFC session while the native sheet is already opening.
+      forwardedLaunchOptions?.removeValue(forKey: .url)
     }
 
-    let started = super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    let started = super.application(application, didFinishLaunchingWithOptions: forwardedLaunchOptions)
     DispatchQueue.main.async { [weak self] in
       self?.beginQueuedNfcWriteIfPossible()
     }
