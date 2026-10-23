@@ -6,9 +6,10 @@ import '../theme/app_theme.dart';
 import '../widgets/wall_background.dart';
 
 class NfcWriteScreen extends StatefulWidget {
-  const NfcWriteScreen({required this.url, super.key});
+  const NfcWriteScreen({required this.url, this.receipt, super.key});
 
   final String url;
+  final String? receipt;
 
   @override
   State<NfcWriteScreen> createState() => _NfcWriteScreenState();
@@ -31,6 +32,8 @@ class _NfcWriteScreenState extends State<NfcWriteScreen> {
         uri.pathSegments.first == 't';
   }
 
+  bool get _hasReceipt => (widget.receipt ?? '').trim().isNotEmpty;
+
   @override
   void initState() {
     super.initState();
@@ -45,7 +48,10 @@ class _NfcWriteScreenState extends State<NfcWriteScreen> {
       try {
         return await _channel.invokeMethod<bool>(
           'writeUrl',
-          <String, Object?>{'url': widget.url},
+          <String, Object?>{
+            'url': widget.url,
+            if (_hasReceipt) 'receipt': widget.receipt!.trim(),
+          },
         );
       } on MissingPluginException {
         if (attempt == attempts - 1) rethrow;
@@ -160,7 +166,9 @@ class _NfcWriteScreenState extends State<NfcWriteScreen> {
                       const SizedBox(height: 9),
                       Text(
                         _success
-                            ? 'The Wall link has been written successfully. Return to Orders and tick Tagged.'
+                            ? (_hasReceipt
+                                ? 'The Wall link has been written successfully. Orders will mark this Wall Tagged automatically.'
+                                : 'The Wall link has been written successfully. Return to Orders and tick Tagged.')
                             : _writing
                                 ? 'The native writer is starting. When the iPhone NFC sheet appears, hold the top of this iPhone against the blank NFC tag.'
                                 : (_error ?? 'Tap below to start the native iPhone NFC writer.'),
