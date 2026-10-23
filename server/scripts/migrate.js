@@ -94,10 +94,13 @@ try {
     }
   }
 
-  // Keep long-running production databases from accumulating expired auth state.
+  // Keep long-running production databases from accumulating expired auth and
+  // one-time fulfilment state.
   await pool.query(`delete from admin_sessions where expires_at <= now()`);
   await pool.query(`delete from customer_sessions where expires_at <= now()`);
   await pool.query(`delete from customer_claim_tokens where expires_at <= now()`);
+  await pool.query(`delete from customer_password_reset_tokens where expires_at <= now()`);
+  await pool.query(`delete from nfc_write_receipts where expires_at <= now()`);
   console.log('SaidHere database schema is up to date.');
 } finally {
   await pool.end();
