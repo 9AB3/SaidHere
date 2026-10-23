@@ -92,6 +92,9 @@ workflows:
           grep -q 'CoreNFC' ios/Runner/AppDelegate.swift
           grep -q 'nfcTarget(fromDeepLink' ios/Runner/AppDelegate.swift
           grep -q 'beginQueuedNfcWriteIfPossible' ios/Runner/AppDelegate.swift
+          grep -q 'private var nfcWriterChannel' ios/Runner/AppDelegate.swift
+          grep -q 'installNfcWriterChannelIfPossible' ios/Runner/AppDelegate.swift
+          grep -q 'activeFlutterViewController' ios/Runner/AppDelegate.swift
           grep -q '^CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements$' ios/Flutter/Release.xcconfig
       - name: Configure iOS signing
         script: |
