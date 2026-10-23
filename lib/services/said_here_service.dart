@@ -8,6 +8,26 @@ import '../config/app_config.dart';
 import '../models/wall.dart';
 import '../models/wall_post.dart';
 
+class FirstScanSetup {
+  const FirstScanSetup({
+    required this.setupRequired,
+    required this.accountActive,
+    this.serialCode,
+  });
+
+  final bool setupRequired;
+  final bool accountActive;
+  final String? serialCode;
+
+  factory FirstScanSetup.fromMap(Map<String, dynamic> map) {
+    return FirstScanSetup(
+      setupRequired: map['setup_required'] == true,
+      accountActive: map['account_active'] == true,
+      serialCode: map['serial_code']?.toString(),
+    );
+  }
+}
+
 class SaidHereService {
   SaidHereService({http.Client? client}) : _http = client ?? http.Client();
 
@@ -120,6 +140,42 @@ class SaidHereService {
         _uri('/api/tags/open'),
         headers: headers,
         body: jsonEncode({'token': tagToken}),
+      ),
+    );
+    final data = _decode(response);
+    return Wall.fromMap(Map<String, dynamic>.from(data as Map));
+  }
+
+  Future<FirstScanSetup> getFirstScanSetup(String tagToken) async {
+    final response = await _authorized(
+      (headers) => _http.post(
+        _uri('/api/tags/setup/status'),
+        headers: headers,
+        body: jsonEncode({'token': tagToken}),
+      ),
+    );
+    final data = _decode(response);
+    return FirstScanSetup.fromMap(Map<String, dynamic>.from(data as Map));
+  }
+
+  Future<Wall> completeFirstScanSetup({
+    required String tagToken,
+    required String displayName,
+    required String locationHint,
+    required String email,
+    required String password,
+  }) async {
+    final response = await _authorized(
+      (headers) => _http.post(
+        _uri('/api/tags/setup'),
+        headers: headers,
+        body: jsonEncode({
+          'token': tagToken,
+          'display_name': displayName.trim(),
+          'location_hint': locationHint.trim(),
+          'email': email.trim(),
+          'password': password,
+        }),
       ),
     );
     final data = _decode(response);
