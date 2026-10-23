@@ -10,15 +10,17 @@
       button.type = 'button';
       button.className = 'ov3-copy ov3-native-write';
       button.textContent = 'Write NFC';
+      button.dataset.write = String(copyButton.dataset.copy || '');
       button.setAttribute('aria-label', 'Write this Wall NFC tag with the SaidHere app');
-      button.addEventListener('click', () => {
-        const raw = String(copyButton.dataset.copy || '').trim();
-        if (!raw) return;
-        const url = /^https:\/\//i.test(raw) ? raw : `https://${raw}`;
-        window.location.href = `saidhere://write-nfc?value=${encodeURIComponent(url)}`;
-      });
       tag.appendChild(button);
     });
+  }
+
+  function openNativeWriter(rawValue) {
+    const raw = String(rawValue || '').trim();
+    if (!raw) return;
+    const url = /^https:\/\//i.test(raw) ? raw : `https://${raw}`;
+    window.location.href = `saidhere://write-nfc?value=${encodeURIComponent(url)}`;
   }
 
   function updateOrderProgress(order) {
@@ -52,6 +54,16 @@
     });
     return params;
   }
+
+  // One delegated writer handler works for both server-rendered and fallback-added buttons.
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest?.('.ov3-native-write');
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const fallback = button.closest('.ov3-tag')?.querySelector('.ov3-copy[data-copy]')?.dataset.copy || '';
+    openNativeWriter(button.dataset.write || fallback);
+  }, true);
 
   // Capture this before the older Orders listener. Save without a page reload so
   // the order remains expanded while the operator works down each physical Wall.
@@ -96,7 +108,7 @@
   }, true);
 
   // The shared admin shell can restructure page content during startup. Run the
-  // writer enhancement immediately, again at DOM ready, and watch for replaced rows.
+  // fallback enhancement immediately, again at DOM ready, and watch for replaced rows.
   addNativeWriters();
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => addNativeWriters(), { once: true });
