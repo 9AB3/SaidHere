@@ -38,6 +38,10 @@ try {
 
   await pool.query(`alter table commerce_order_items add column if not exists nfc_assigned_at timestamptz`);
   await pool.query(`alter table commerce_order_items add column if not exists shipped_at timestamptz`);
+  // Fulfilment needs to remember the exact NDEF value until the physical tag is
+  // written, and track that physical tagging separately from shipping.
+  await pool.query(`alter table commerce_order_items add column if not exists nfc_write_value text`);
+  await pool.query(`alter table commerce_order_items add column if not exists tagged_at timestamptz`);
 
   // Normalize the old admin role and, importantly, fix the legacy default of
   // 'admin', which conflicts with the current owner/moderator check constraint.
