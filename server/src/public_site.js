@@ -51,12 +51,7 @@ function renderAppFallback(res, appHref) {
 }
 
 export function mountCanonicalWebRedirect(app) {
-  // Mount the polished commerce routes before the legacy commerce module is added
-  // in index.js. Express uses first match, so these become the customer-facing
-  // checkout and success pages while the existing webhook/reconciliation code
-  // remains the source of truth for payment completion.
   installCommerceEmailPolish();
-  mountCommercePolish(app);
 
   app.use((req, res, next) => {
     const host = String(req.hostname || '').toLowerCase();
@@ -83,6 +78,11 @@ export function mountCanonicalWebRedirect(app) {
     }
     return next();
   });
+
+  // These routes are deliberately registered before the legacy commerce and
+  // purchase-success mounts in index.js, so they become the customer-facing flow
+  // while the existing Stripe webhook remains the payment source of truth.
+  mountCommercePolish(app);
 }
 
 export function mountPublicSite(app) {
