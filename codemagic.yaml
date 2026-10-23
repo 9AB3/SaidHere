@@ -86,6 +86,10 @@ workflows:
           flutter pub get
           grep -q 'com.9ab3.saidhere' ios/Runner.xcodeproj/project.pbxproj
           grep -q 'applinks:nfc.saidhere.app' ios/Runner/Runner.entitlements
+          grep -q 'com.apple.developer.nfc.readersession.formats' ios/Runner/Runner.entitlements
+          grep -q '<string>TAG</string>' ios/Runner/Runner.entitlements
+          grep -q 'NFCReaderUsageDescription' ios/Runner/Info.plist
+          grep -q 'CoreNFC' ios/Runner/AppDelegate.swift
           grep -q '^CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements$' ios/Flutter/Release.xcconfig
       - name: Configure iOS signing
         script: |
@@ -101,10 +105,20 @@ workflows:
             echo 'FAIL: provisioning profile does not authorize Associated Domains'
             exit 1
           fi
+          if /usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.nfc.readersession.formats' /tmp/saidhere-profile.plist > /tmp/saidhere-profile-nfc.txt 2>/dev/null; then
+            cat /tmp/saidhere-profile-nfc.txt
+            grep -q 'TAG' /tmp/saidhere-profile-nfc.txt || { echo 'FAIL: provisioning profile NFC entitlement is missing TAG'; exit 1; }
+            echo 'PASS: provisioning profile authorizes NFC Tag Reading'
+          else
+            echo 'FAIL: provisioning profile does not authorize NFC Tag Reading. Enable NFC Tag Reading on the SaidHere App ID and regenerate the profile.'
+            exit 1
+          fi
           echo '--- Requested SaidHere entitlements ---'
           cat ios/Runner/Runner.entitlements
           /usr/libexec/PlistBuddy -c 'Print :com.apple.developer.associated-domains:0' ios/Runner/Runner.entitlements | tee /tmp/requested-domain.txt
           grep -qx 'applinks:nfc.saidhere.app' /tmp/requested-domain.txt || { echo 'FAIL: Runner.entitlements is missing applinks:nfc.saidhere.app'; exit 1; }
+          /usr/libexec/PlistBuddy -c 'Print :com.apple.developer.nfc.readersession.formats' ios/Runner/Runner.entitlements | tee /tmp/requested-nfc.txt
+          grep -q 'TAG' /tmp/requested-nfc.txt || { echo 'FAIL: Runner.entitlements is missing NFC TAG access'; exit 1; }
           echo '--- Release CODE_SIGN_ENTITLEMENTS build setting ---'
           xcodebuild -project ios/Runner.xcodeproj -scheme Runner -configuration Release -showBuildSettings | grep 'CODE_SIGN_ENTITLEMENTS' | tee /tmp/code-sign-entitlements.txt
           grep -q 'Runner/Runner.entitlements' /tmp/code-sign-entitlements.txt || { echo 'FAIL: Xcode Release build is not using Runner.entitlements'; exit 1; }
@@ -126,6 +140,8 @@ workflows:
           cat /tmp/saidhere-signed-entitlements.plist
           /usr/libexec/PlistBuddy -c 'Print :com.apple.developer.associated-domains' /tmp/saidhere-signed-entitlements.plist | tee /tmp/saidhere-signed-domains.txt
           grep -q 'applinks:nfc.saidhere.app' /tmp/saidhere-signed-domains.txt || { echo 'FAIL: final signed app is missing applinks:nfc.saidhere.app'; exit 1; }
+          /usr/libexec/PlistBuddy -c 'Print :com.apple.developer.nfc.readersession.formats' /tmp/saidhere-signed-entitlements.plist | tee /tmp/saidhere-signed-nfc.txt
+          grep -q 'TAG' /tmp/saidhere-signed-nfc.txt || { echo 'FAIL: final signed app is missing NFC TAG entitlement'; exit 1; }
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
