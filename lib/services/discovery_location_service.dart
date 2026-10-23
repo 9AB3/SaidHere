@@ -2,13 +2,12 @@ import 'dart:async';
 
 import 'package:geolocator/geolocator.dart';
 
-import 'said_here_service.dart';
+import 'discovery_api_service.dart';
 
 class DiscoveryLocationService {
   const DiscoveryLocationService();
 
   Future<bool> captureForWall({
-    required SaidHereService service,
     required String wallId,
   }) async {
     try {
@@ -30,7 +29,7 @@ class DiscoveryLocationService {
         ),
       );
 
-      await service.recordDiscoveryLocation(
+      await DiscoveryApiService().record(
         wallId: wallId,
         latitude: position.latitude,
         longitude: position.longitude,
