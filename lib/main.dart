@@ -102,6 +102,7 @@ class _SaidHereAppState extends State<SaidHereApp> {
             path: '/write-nfc',
             builder: (_, state) => NfcWriteScreen(
               url: state.uri.queryParameters['value'] ?? '',
+              receipt: state.uri.queryParameters['receipt'],
             ),
           ),
         ],
