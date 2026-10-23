@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { mountAdminCustomers } from './admin_customers.js';
 import { mountAdminWallsMonitor } from './admin_walls_monitor.js';
 import { mountAdminWallsOverview } from './admin_walls_overview.js';
 
@@ -77,8 +78,8 @@ export function mountAdminBrand(app) {
     return next();
   });
 
-  // These routes must be registered before the generic /admin/walls/:wallId
-  // monitor route and before the legacy admin portal mounted from index.js.
+  // These routes must be registered before the legacy admin portal mounted from index.js.
+  mountAdminCustomers(app);
   mountAdminWallsOverview(app);
   mountAdminWallsMonitor(app);
 }
