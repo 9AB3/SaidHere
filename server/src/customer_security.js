@@ -3,6 +3,7 @@ import rateLimit from 'express-rate-limit';
 
 import { hashToken } from './auth.js';
 import { mountCustomerPasswordReset } from './customer_password_reset.js';
+import { mountWallDiscoveryLocations } from './wall_discovery_locations.js';
 import { pool } from './db.js';
 
 function clean(value) {
@@ -39,7 +40,6 @@ async function blockClaimForActiveAccount(req, res, next) {
     );
     if (result.rowCount === 0 || !result.rows[0].password_hash) return next();
 
-    // Retire any legacy unused links left from older multi-order purchases.
     await pool.query(
       `update customer_claim_tokens
           set used_at = coalesce(used_at, now())
@@ -76,9 +76,8 @@ function decorateLoginPage(req, res, next) {
 }
 
 export function mountCustomerSecurity(app) {
-  // Recovery routes live outside the authenticated customer portal and are
-  // mounted before the login/claim middleware below.
   mountCustomerPasswordReset(app);
+  mountWallDiscoveryLocations(app);
 
   const router = express.Router();
   const loginLimiter = rateLimit({
