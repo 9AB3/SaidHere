@@ -16,6 +16,31 @@ void main() {
   runApp(const SaidHereApp());
 }
 
+String? normalizeCustomSchemeLocation(Uri uri) {
+  if (uri.scheme.toLowerCase() != 'saidhere') return null;
+
+  final host = uri.host.toLowerCase();
+  final segments = uri.pathSegments.where((segment) => segment.isNotEmpty).toList();
+  String? path;
+
+  if ((host == 't' || host == 'w') && segments.isNotEmpty) {
+    path = '/$host/${segments.first}';
+  } else if (host == 'found') {
+    path = '/found';
+  } else if (host.isEmpty && segments.isNotEmpty) {
+    // Also accept saidhere:/t/<token> and similar single-slash forms.
+    if ((segments.first == 't' || segments.first == 'w') && segments.length >= 2) {
+      path = '/${segments.first}/${segments[1]}';
+    } else if (segments.first == 'found') {
+      path = '/found';
+    }
+  }
+
+  if (path == null) return '/';
+  if (uri.query.isEmpty) return path;
+  return '$path?${uri.query}';
+}
+
 class SaidHereApp extends StatefulWidget {
   const SaidHereApp({super.key});
 
@@ -34,6 +59,7 @@ class _SaidHereAppState extends State<SaidHereApp> {
       final history = LocalHistoryService();
 
       _router = GoRouter(
+        redirect: (_, state) => normalizeCustomSchemeLocation(state.uri),
         routes: [
           GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
           GoRoute(
