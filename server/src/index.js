@@ -13,6 +13,7 @@ import { mountOwnershipAdminNav } from './admin_ownership_nav.js';
 import { mountCommerce, mountStripeWebhook } from './commerce.js';
 import { mountPurchaseActivation } from './purchase_activation.js';
 import { mountCustomerSecurity } from './customer_security.js';
+import { mountAppFirstSetup } from './app_first_setup.js';
 import { mountPlaqueSetup } from './plaque_setup.js';
 import { mountSetupGuard } from './setup_guard.js';
 import { mountCustomerPortal } from './customer_portal.runtime.js';
@@ -109,7 +110,9 @@ mountOwnershipAdminNav(app);
 mountPurchaseActivation(app);
 mountCommerce(app);
 mountCustomerSecurity(app);
-// First-scan setup must intercept /api/tags/open and /t/:token before the normal handlers.
+// The native app completes first-scan setup without handing the user to a browser.
+mountAppFirstSetup(app);
+// Browser first-scan setup and the setup-required guard remain as a fallback for users without the app.
 mountPlaqueSetup(app);
 mountSetupGuard(app);
 mountCustomerPortal(app);
