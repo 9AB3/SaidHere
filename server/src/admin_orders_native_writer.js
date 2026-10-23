@@ -1,6 +1,9 @@
 (() => {
   'use strict';
 
+  const PENDING_KEY = 'saidhere:nfc-write-pending';
+  let pageWasHiddenForWriter = false;
+
   function addNativeWriters(root = document) {
     root.querySelectorAll?.('.ov3-copy[data-copy]').forEach((copyButton) => {
       const item = copyButton.closest('.ov3-item');
@@ -11,17 +14,46 @@
       button.type = 'button';
       button.className = 'ov3-small ov3-native-write';
       button.textContent = 'Write NFC';
-      button.dataset.write = String(copyButton.dataset.copy || '');
       button.setAttribute('aria-label', 'Write this Wall NFC tag with The Wall app');
       actions.prepend(button);
     });
   }
 
-  function openNativeWriter(rawValue) {
-    const raw = String(rawValue || '').trim();
-    if (!raw) return;
-    const url = /^https:\/\//i.test(raw) ? raw : `https://${raw}`;
-    window.location.href = `saidhere://write-nfc?value=${encodeURIComponent(url)}`;
+  function writerContext(button) {
+    const item = button.closest('.ov3-item');
+    if (!item) return null;
+    const form = item.querySelector('.ov3-tag-form') || item.querySelector('form[action*="/items/"]');
+    const action = String(form?.action || '');
+    const match = action.match(/\/admin\/orders\/([^/]+)\/items\/([^/]+)\//i);
+    const csrf = form?.querySelector('input[name="_csrf"]')?.value || '';
+    if (!match || !csrf) return null;
+    return {
+      ticketUrl: `/admin/orders/${encodeURIComponent(match[1])}/items/${encodeURIComponent(match[2])}/write-ticket`,
+      csrf,
+    };
+  }
+
+  async function openNativeWriter(button) {
+    const context = writerContext(button);
+    if (!context) throw new Error('Could not identify this Wall fulfilment item. Refresh Orders and try again.');
+
+    const response = await fetch(context.ticketUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: new URLSearchParams({ _csrf: context.csrf }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.deep_link) {
+      throw new Error(data.error || `Could not start NFC writing (HTTP ${response.status}).`);
+    }
+
+    sessionStorage.setItem(PENDING_KEY, '1');
+    pageWasHiddenForWriter = false;
+    window.location.href = data.deep_link;
   }
 
   function updateOrderProgress(order) {
@@ -42,7 +74,7 @@
     if (help) {
       help.textContent = ready
         ? 'All NFC tags are confirmed. Ship the complete order together.'
-        : 'Tick each Wall after you physically write its NFC tag.';
+        : 'Write each NFC tag. Successful native writes are marked Tagged automatically.';
     }
     if (shipButton) shipButton.disabled = !ready;
   }
@@ -56,13 +88,23 @@
     return params;
   }
 
-  document.addEventListener('click', (event) => {
+  document.addEventListener('click', async (event) => {
     const button = event.target.closest?.('.ov3-native-write');
     if (!button) return;
     event.preventDefault();
     event.stopPropagation();
-    const fallback = button.closest('.ov3-item')?.querySelector('.ov3-copy[data-copy]')?.dataset.copy || '';
-    openNativeWriter(button.dataset.write || fallback);
+    if (button.disabled) return;
+    const oldText = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Opening…';
+    try {
+      await openNativeWriter(button);
+    } catch (error) {
+      console.error('[orders] NFC writer launch failed', error);
+      button.disabled = false;
+      button.textContent = oldText;
+      window.alert(error?.message || 'Could not start NFC writing.');
+    }
   }, true);
 
   document.addEventListener('change', async (event) => {
@@ -102,6 +144,17 @@
       checkbox.disabled = false;
     }
   }, true);
+
+  document.addEventListener('visibilitychange', () => {
+    if (sessionStorage.getItem(PENDING_KEY) !== '1') return;
+    if (document.hidden) {
+      pageWasHiddenForWriter = true;
+      return;
+    }
+    if (!pageWasHiddenForWriter) return;
+    sessionStorage.removeItem(PENDING_KEY);
+    setTimeout(() => window.location.reload(), 350);
+  });
 
   addNativeWriters();
   if (document.readyState === 'loading') {
