@@ -11,13 +11,11 @@ const CANONICAL_HOST = 'saidhere.app';
 const RENDER_HOST = 'saidhere-api-9ab3.onrender.com';
 const APPLE_APP_SITE_ASSOCIATION = {
   applinks: {
+    apps: [],
     details: [
       {
-        appIDs: ['7MB2M6PX4Y.com.9ab3.saidhere'],
-        components: [
-          { '/': '/t/*' },
-          { '/': '/w/*' },
-        ],
+        appID: '7MB2M6PX4Y.com.9ab3.saidhere',
+        paths: ['/t/*', '/w/*'],
       },
     ],
   },
@@ -36,7 +34,7 @@ function sendIndex(_req, res) {
 }
 
 function sendAppleAssociation(res) {
-  res.set('Cache-Control', 'public, max-age=3600');
+  res.set('Cache-Control', 'public, max-age=300');
   return res.status(200).type('application/json').send(JSON.stringify(APPLE_APP_SITE_ASSOCIATION));
 }
 
@@ -55,8 +53,6 @@ export function mountCanonicalWebRedirect(app) {
     const host = String(req.hostname || '').toLowerCase();
     const pathName = req.path || '/';
 
-    // Account, order and admin pages can contain customer details or a one-time
-    // NFC URL. Never leave those responses in a browser/proxy cache.
     if (
       pathName === '/admin' || pathName.startsWith('/admin/') ||
       pathName === '/my-walls' || pathName.startsWith('/my-walls/') ||
@@ -66,9 +62,6 @@ export function mountCanonicalWebRedirect(app) {
       noStore(res);
     }
 
-    // During the custom-domain cutover the old static saidhere.app service still
-    // forwards /admin to the Render service. Keep /admin and API traffic on the
-    // Render hostname when explicitly addressed there so old builds remain valid.
     const keepLegacyHost =
       pathName === '/health' ||
       pathName === '/api' ||
@@ -84,17 +77,9 @@ export function mountCanonicalWebRedirect(app) {
 }
 
 export function mountPublicSite(app) {
-  // Apple must be able to fetch this document directly over HTTPS with no redirect.
-  // Serve it from code rather than a copied runtime file so a deployment cannot
-  // accidentally omit the association document.
   app.get('/.well-known/apple-app-site-association', (_req, res) => sendAppleAssociation(res));
-
-  // Also support Apple's legacy root lookup location.
   app.get('/apple-app-site-association', (_req, res) => sendAppleAssociation(res));
 
-  // Public HTML should always reflect the currently deployed build. These pages
-  // change frequently during launch, so browsers and proxies must not retain an
-  // older copy after a Render deploy.
   app.get('/', sendIndex);
   app.get(['/privacy', '/privacy/'], (_req, res) => {
     noStore(res);
