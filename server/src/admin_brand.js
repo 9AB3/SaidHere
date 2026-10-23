@@ -24,25 +24,16 @@ function addPreloadClass(html) {
   });
 }
 
-function addServerRenderedNfcWriter(html) {
-  if (!html.includes('class="ov3-copy"')) return html;
-  return html.replace(
-    /(<button type="button" class="ov3-copy" data-copy="([^"]+)">Copy<\/button>)/g,
-    (match, copyButton, value) => `${copyButton}<button type="button" class="ov3-copy ov3-native-write" data-write="${value}" aria-label="Write this Wall NFC tag with the SaidHere app">Write NFC</button>`,
-  );
-}
-
 function injectBrand(html) {
   if (typeof html !== 'string' || !html.includes('</head>')) return html;
   let output = html.replaceAll(
     '<div class="mark">TW</div>',
     '<img class="plaque-logo" src="/admin/plaque.png" alt="SaidHere plaque">',
   );
-  output = addServerRenderedNfcWriter(output);
   output = addPreloadClass(output);
   output = output.replace(
     '</head>',
-    `${preloadCss}<script src="/admin/ui.js" defer></script><script src="/admin/orders-native-writer.js?v=20261024-3" defer></script></head>`,
+    `${preloadCss}<script src="/admin/ui.js" defer></script><script src="/admin/orders-native-writer.js?v=20261024-4" defer></script></head>`,
   );
   return output;
 }
