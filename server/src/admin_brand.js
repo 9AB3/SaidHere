@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { mountAdminWallsMonitor } from './admin_walls_monitor.js';
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const plaquePath = path.resolve(here, '../../lib/267ABF9F-A613-4DD2-B026-87B6C2B6AEBD.png');
 const wallBackgroundPath = path.resolve(here, '../../lib/12CA723C-705E-4593-834A-72D72424FC4F.png');
@@ -66,4 +68,9 @@ export function mountAdminBrand(app) {
     res.send = (body) => originalSend(injectBrand(body));
     return next();
   });
+
+  // Register the new read-only Walls surface after the shared branding middleware
+  // but before the legacy admin portal is mounted from index.js. This makes these
+  // routes authoritative while retaining the shared admin navigation/chrome.
+  mountAdminWallsMonitor(app);
 }
