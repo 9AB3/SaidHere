@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create Flutter platform folders and apply SaidHere deep-link configuration."""
+"""Create Flutter platform folders and apply SaidHere deep-link/NFC configuration."""
 from __future__ import annotations
 
 import argparse
@@ -74,12 +74,23 @@ def patch_ios(host: str) -> None:
     info['CFBundleName'] = 'The Wall'
     info['CFBundleURLTypes'] = [{'CFBundleURLName': 'com.9ab3.saidhere', 'CFBundleURLSchemes': ['saidhere']}]
     info['ITSAppUsesNonExemptEncryption'] = False
+    info['NFCReaderUsageDescription'] = 'The Wall uses NFC to program physical Wall tags during order fulfilment.'
     with plist_path.open('wb') as handle:
         plistlib.dump(info, handle, sort_keys=False)
 
+    # Apple's current NFC entitlement uses TAG. The older NDEF entitlement value
+    # is deprecated on current SDKs and can invalidate App Store archives.
     entitlements = ROOT / 'ios/Runner/Runner.entitlements'
     with entitlements.open('wb') as handle:
-        plistlib.dump({'com.apple.developer.associated-domains': [f'applinks:{host}']}, handle, sort_keys=False)
+        plistlib.dump({
+            'com.apple.developer.associated-domains': [f'applinks:{host}'],
+            'com.apple.developer.nfc.readersession.formats': ['TAG'],
+        }, handle, sort_keys=False)
+
+    app_delegate_template = ROOT / 'tool/ios_app_delegate.swift'
+    if not app_delegate_template.exists():
+        raise RuntimeError(f'Missing iOS NFC writer template: {app_delegate_template}')
+    shutil.copyfile(app_delegate_template, ROOT / 'ios/Runner/AppDelegate.swift')
 
     project = ROOT / 'ios/Runner.xcodeproj/project.pbxproj'
     text = project.read_text(encoding='utf-8')
