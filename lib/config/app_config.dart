@@ -7,7 +7,9 @@ class AppConfig {
     'APP_HOST',
     defaultValue: 'saidhere.app',
   );
+  static const googleMapsApiKey = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
   static const demoTagToken = String.fromEnvironment('DEMO_TAG_TOKEN');
 
   static bool get isConfigured => apiBaseUrl.trim().isNotEmpty;
+  static bool get hasGoogleMaps => googleMapsApiKey.trim().isNotEmpty;
 }
