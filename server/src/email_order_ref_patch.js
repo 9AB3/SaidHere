@@ -9,6 +9,23 @@ function orderReference(value) {
   return compact ? `TW-${compact.slice(0, 10)}` : '';
 }
 
+function preserveAdminRecipients(message) {
+  if (!String(message.subject || '').startsWith('New The Wall order')) return;
+  if (typeof message.to !== 'string') return;
+
+  // The commerce email polish layer suppresses an admin recipient when it exactly
+  // matches the purchaser address. We intentionally want both emails during normal
+  // operation and testing, even when the purchaser is also the admin. Supplying the
+  // same mailbox as a normal display-address keeps delivery unchanged while making
+  // the admin notification distinct from the customer-recipient comparison.
+  message.to = message.to
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map((value) => value.includes('<') ? value : `The Wall Admin <${value}>`)
+    .join(', ');
+}
+
 export function installOrderReferenceEmailPatch() {
   if (installed) return;
   installed = true;
@@ -17,6 +34,8 @@ export function installOrderReferenceEmailPatch() {
     const transport = previousCreateTransport(...args);
     const previousSendMail = transport.sendMail.bind(transport);
     transport.sendMail = async (message = {}) => {
+      preserveAdminRecipients(message);
+
       const subject = String(message.subject || '');
       const uuid = subject.match(UUID_RE)?.[0] || '';
       const ref = orderReference(uuid);
