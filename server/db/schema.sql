@@ -181,13 +181,17 @@ create table if not exists commerce_order_items (
   reserved_wall_id uuid references walls(id) on delete set null,
   created_at timestamptz not null default now(),
   nfc_assigned_at timestamptz,
+  -- Temporary fulfilment value shown only to authenticated Main Admin so the
+  -- physical tag can be written; runtime validation still uses wall_tags.token_hash.
+  nfc_write_value text,
+  tagged_at timestamptz,
   shipped_at timestamptz,
   fulfilled_at timestamptz,
   unique(order_id, ordinal)
 );
 
 -- The serial code is printed/engraved on the physical plaque or its packing
--- label. The NFC URL itself remains represented by the hashed wall_tags token.
+-- label. The runtime NFC credential itself remains represented by wall_tags.token_hash.
 create table if not exists plaques (
   id uuid primary key default gen_random_uuid(),
   serial_code text not null unique,
