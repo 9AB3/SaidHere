@@ -5,7 +5,7 @@ workflows:
     environment:
       flutter: stable
       vars:
-        APP_HOST: saidhere.app
+        APP_HOST: nfc.saidhere.app
         API_BASE_URL: https://saidhere.app
     scripts:
       - name: Generate Flutter platform projects
@@ -44,20 +44,48 @@ workflows:
       flutter: stable
       xcode: latest
       vars:
-        APP_HOST: saidhere.app
+        APP_HOST: nfc.saidhere.app
         API_BASE_URL: https://saidhere.app
       ios_signing:
         provisioning_profiles:
           - profile: saidhere_app_store
             environment_variable: SAIDHERE_PROFILE
     scripts:
+      - name: Verify live NFC Universal Link origin
+        script: |
+          set -euo pipefail
+          HOST="$APP_HOST"
+          ORIGIN="https://${HOST}/.well-known/apple-app-site-association"
+          CDN="https://app-site-association.cdn-apple.com/a/v1/${HOST}"
+          echo '--- SaidHere NFC origin AASA ---'
+          curl --fail --silent --show-error --max-redirs 0 -D /tmp/aasa-origin.headers "$ORIGIN" -o /tmp/aasa-origin.json
+          cat /tmp/aasa-origin.headers
+          cat /tmp/aasa-origin.json
+          python3 - <<'PY'
+          import json
+          j=json.load(open('/tmp/aasa-origin.json'))
+          details=j.get('applinks',{}).get('details',[])
+          ok=any(d.get('appID')=='7MB2M6PX4Y.com.9ab3.saidhere' and '/t/*' in d.get('paths',[]) and '/w/*' in d.get('paths',[]) for d in details)
+          if not ok: raise SystemExit('FAIL: live NFC AASA does not authorize SaidHere /t/* and /w/* links')
+          print('PASS: live NFC origin AASA authorizes SaidHere links')
+          PY
+          grep -qi '^content-type:.*application/json' /tmp/aasa-origin.headers || { echo 'FAIL: NFC AASA Content-Type is not application/json'; exit 1; }
+          echo '--- Apple Associated Domains CDN for NFC host ---'
+          CDN_CODE=$(curl --silent --show-error -D /tmp/aasa-cdn.headers -o /tmp/aasa-cdn.body -w '%{http_code}' "$CDN" || true)
+          cat /tmp/aasa-cdn.headers || true
+          cat /tmp/aasa-cdn.body || true
+          if [ "$CDN_CODE" = '200' ]; then
+            echo 'PASS: Apple CDN already has the SaidHere NFC association.'
+          else
+            echo "INFO: Apple CDN is not cached yet (HTTP $CDN_CODE). First dedicated-domain build can continue so Apple can register it."
+          fi
       - name: Generate SaidHere iOS project
         script: |
           set -euo pipefail
           python3 tool/bootstrap_platforms.py --host "$APP_HOST"
           flutter pub get
           grep -q 'com.9ab3.saidhere' ios/Runner.xcodeproj/project.pbxproj
-          grep -q 'applinks:saidhere.app' ios/Runner/Runner.entitlements
+          grep -q 'applinks:nfc.saidhere.app' ios/Runner/Runner.entitlements
           grep -q '^CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements$' ios/Flutter/Release.xcconfig
       - name: Configure iOS signing
         script: |
@@ -76,7 +104,7 @@ workflows:
           echo '--- Requested SaidHere entitlements ---'
           cat ios/Runner/Runner.entitlements
           /usr/libexec/PlistBuddy -c 'Print :com.apple.developer.associated-domains:0' ios/Runner/Runner.entitlements | tee /tmp/requested-domain.txt
-          grep -qx 'applinks:saidhere.app' /tmp/requested-domain.txt || { echo 'FAIL: Runner.entitlements is missing applinks:saidhere.app'; exit 1; }
+          grep -qx 'applinks:nfc.saidhere.app' /tmp/requested-domain.txt || { echo 'FAIL: Runner.entitlements is missing applinks:nfc.saidhere.app'; exit 1; }
           echo '--- Release CODE_SIGN_ENTITLEMENTS build setting ---'
           xcodebuild -project ios/Runner.xcodeproj -scheme Runner -configuration Release -showBuildSettings | grep 'CODE_SIGN_ENTITLEMENTS' | tee /tmp/code-sign-entitlements.txt
           grep -q 'Runner/Runner.entitlements' /tmp/code-sign-entitlements.txt || { echo 'FAIL: Xcode Release build is not using Runner.entitlements'; exit 1; }
@@ -97,7 +125,7 @@ workflows:
           echo '--- Final signed SaidHere entitlements ---'
           cat /tmp/saidhere-signed-entitlements.plist
           /usr/libexec/PlistBuddy -c 'Print :com.apple.developer.associated-domains' /tmp/saidhere-signed-entitlements.plist | tee /tmp/saidhere-signed-domains.txt
-          grep -q 'applinks:saidhere.app' /tmp/saidhere-signed-domains.txt || { echo 'FAIL: final signed app is missing applinks:saidhere.app'; exit 1; }
+          grep -q 'applinks:nfc.saidhere.app' /tmp/saidhere-signed-domains.txt || { echo 'FAIL: final signed app is missing applinks:nfc.saidhere.app'; exit 1; }
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
