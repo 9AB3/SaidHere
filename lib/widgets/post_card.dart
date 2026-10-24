@@ -9,6 +9,7 @@ class PostCard extends StatelessWidget {
   const PostCard({
     required this.post,
     required this.onReport,
+    required this.onBlock,
     this.onReply,
     this.depth = 0,
     super.key,
@@ -17,6 +18,7 @@ class PostCard extends StatelessWidget {
   final WallPost post;
   final VoidCallback? onReply;
   final VoidCallback onReport;
+  final VoidCallback onBlock;
   final int depth;
 
   @override
@@ -157,12 +159,40 @@ class PostCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                        IconButton(
-                          tooltip: 'Report',
-                          onPressed: onReport,
-                          icon: const Icon(Icons.more_horiz, size: 19),
-                          color: marker.withValues(alpha: .58),
-                          visualDensity: VisualDensity.compact,
+                        PopupMenuButton<String>(
+                          tooltip: 'Message options',
+                          onSelected: (value) {
+                            if (value == 'report') onReport();
+                            if (value == 'block') onBlock();
+                          },
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(
+                              value: 'report',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.flag_outlined, size: 19),
+                                  SizedBox(width: 10),
+                                  Text('Report message'),
+                                ],
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'block',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.block_outlined, size: 19),
+                                  SizedBox(width: 10),
+                                  Text('Block this poster'),
+                                ],
+                              ),
+                            ),
+                          ],
+                          padding: EdgeInsets.zero,
+                          icon: Icon(
+                            Icons.more_horiz,
+                            size: 19,
+                            color: marker.withValues(alpha: .58),
+                          ),
                         ),
                       ],
                     ),
