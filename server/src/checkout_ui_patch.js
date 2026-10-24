@@ -56,6 +56,11 @@ export function installCheckoutUiPatch(app) {
     const originalSend = res.send.bind(res);
     res.send = (body) => {
       if (typeof body === 'string' && body.includes('id="quantity"')) {
+        // The owner no longer assigns a global Wall location during setup.
+        body = body
+          .replace('Name and location are set on the first scan.', 'Name your Wall on the first scan.')
+          .replace('its first NFC scan lets you choose the name and location.', 'its first NFC scan lets you choose the Wall name.');
+
         // Remove the original inline checkout script, which Helmet correctly blocks,
         // then load the CSP-safe server-served script instead.
         body = body.replace(/<script>\(\(\)=>\{[\s\S]*?<\/script>/, '');
