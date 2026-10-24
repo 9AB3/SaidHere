@@ -21,7 +21,6 @@ function wallJson(row) {
     id: row.id,
     slug: row.slug,
     display_name: row.display_name,
-    location_hint: row.location_hint || '',
     first_discovered_at: row.first_discovered_at || null,
     last_visited_at: row.last_visited_at || null,
     write_access_until: row.write_access_until || null,
@@ -31,7 +30,7 @@ function wallJson(row) {
 async function setupRecord(client, token, { forUpdate = false } = {}) {
   const lock = forUpdate ? 'for update of w, c' : '';
   const result = await client.query(
-    `select w.id, w.slug, w.display_name, w.location_hint, w.setup_required,
+    `select w.id, w.slug, w.display_name, w.setup_required,
             c.id as customer_id, c.email as customer_email,
             c.password_hash as customer_password_hash, c.active as customer_active,
             p.serial_code
@@ -88,16 +87,12 @@ export function mountAppFirstSetup(app) {
   router.post('/', requireSession, async (req, res, next) => {
     const token = clean(req.body?.token);
     const displayName = clean(req.body?.display_name);
-    const location = clean(req.body?.location_hint);
     const email = clean(req.body?.email).toLowerCase();
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
 
     if (!validToken(token)) return res.status(400).json({ error: 'Invalid Wall token.' });
     if (!displayName || displayName.length > 80) {
       return res.status(400).json({ error: 'Wall name must be between 1 and 80 characters.' });
-    }
-    if (!location || location.length > 120) {
-      return res.status(400).json({ error: 'Location must be between 1 and 120 characters.' });
     }
     if (!email || !email.includes('@')) {
       return res.status(400).json({ error: 'Enter the email used to purchase this Wall.' });
@@ -152,12 +147,12 @@ export function mountAppFirstSetup(app) {
       const updated = await client.query(
         `update walls
             set display_name = $2,
-                location_hint = $3,
+                location_hint = '',
                 setup_required = false,
                 setup_completed_at = now()
           where id = $1
-          returning id, slug, display_name, location_hint`,
-        [record.id, displayName, location],
+          returning id, slug, display_name`,
+        [record.id, displayName],
       );
       const wall = updated.rows[0];
 
@@ -170,7 +165,7 @@ export function mountAppFirstSetup(app) {
           record.customer_email,
           wall.id,
           wall.display_name,
-          JSON.stringify({ location_hint: wall.location_hint, source: 'app_physical_scan' }),
+          JSON.stringify({ source: 'app_physical_scan' }),
         ],
       );
 
