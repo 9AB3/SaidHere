@@ -62,4 +62,9 @@ class LocalHistoryService {
       );
     }).where((wall) => wall.slug.isNotEmpty).toList(growable: false);
   }
+
+  Future<void> clear() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_key);
+  }
 }
