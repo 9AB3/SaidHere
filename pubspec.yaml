@@ -13,6 +13,7 @@ dependencies:
   go_router: ^18.1.0
   google_maps_flutter: ^2.19.0
   geolocator: ^14.1.2
+  geocoding: ^5.0.0
   http: ^1.6.0
   shared_preferences: ^2.5.6
   intl: ^0.20.2
