@@ -25,7 +25,6 @@ class FirstScanSetupScreen extends StatefulWidget {
 class _FirstScanSetupScreenState extends State<FirstScanSetupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
-  final _location = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _confirmPassword = TextEditingController();
@@ -45,7 +44,6 @@ class _FirstScanSetupScreenState extends State<FirstScanSetupScreen> {
   @override
   void dispose() {
     _name.dispose();
-    _location.dispose();
     _email.dispose();
     _password.dispose();
     _confirmPassword.dispose();
@@ -104,7 +102,6 @@ class _FirstScanSetupScreenState extends State<FirstScanSetupScreen> {
       final wall = await widget.service.completeFirstScanSetup(
         tagToken: widget.tagToken,
         displayName: _name.text,
-        locationHint: _location.text,
         email: _email.text,
         password: _password.text,
       );
@@ -234,7 +231,7 @@ class _FirstScanSetupScreenState extends State<FirstScanSetupScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   const Text(
-                                    'This is the first physical scan. Name the Wall, set its location, then start posting immediately.',
+                                    'This is the first physical scan. Give the Wall a name, then start posting immediately.',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(height: 1.4),
                                   ),
@@ -261,19 +258,6 @@ class _FirstScanSetupScreenState extends State<FirstScanSetupScreen> {
                                     ),
                                     validator: (value) => (value ?? '').trim().isEmpty
                                         ? 'Enter a Wall name.'
-                                        : null,
-                                  ),
-                                  const SizedBox(height: 10),
-                                  TextFormField(
-                                    controller: _location,
-                                    textInputAction: TextInputAction.next,
-                                    maxLength: 120,
-                                    decoration: _decoration(
-                                      'Location',
-                                      hint: 'Singleton NSW',
-                                    ),
-                                    validator: (value) => (value ?? '').trim().isEmpty
-                                        ? 'Enter the Wall location.'
                                         : null,
                                   ),
                                   const SizedBox(height: 10),
