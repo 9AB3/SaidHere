@@ -8,6 +8,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'lib/267ABF9F-A613-4DD2-B026-87B6C2B6AEBD.png'
+MAP_MARKER = ROOT / 'lib/assets/ui/map_marker.png'
+DISCOVERED_WALLS_SCREEN = ROOT / 'lib/screens/discovered_walls_screen.dart'
 PNG_SIGNATURE = b'\x89PNG\r\n\x1a\n'
 DOOR = (203, 190, 166)
 
@@ -206,11 +208,28 @@ def replace_pngs(folder: Path, source_width: int, source_height: int, source: by
     return count
 
 
+def prepare_map_marker(source_width: int, source_height: int, source: bytearray) -> None:
+    """Create a small dedicated marker instead of asking Google Maps to decode the full plaque artwork."""
+    MAP_MARKER.parent.mkdir(parents=True, exist_ok=True)
+    marker = resize_cover(source, source_width, source_height, 120, 120)
+    write_png(MAP_MARKER, 120, 120, marker)
+
+    if DISCOVERED_WALLS_SCREEN.exists():
+        text = DISCOVERED_WALLS_SCREEN.read_text(encoding='utf-8')
+        old = "'lib/267ABF9F-A613-4DD2-B026-87B6C2B6AEBD.png'"
+        new = "'lib/assets/ui/map_marker.png'"
+        if old in text:
+            DISCOVERED_WALLS_SCREEN.write_text(text.replace(old, new), encoding='utf-8')
+    print(f'Generated Google Maps Wall marker: {MAP_MARKER.relative_to(ROOT)}')
+
+
 def main() -> None:
     if not SOURCE.exists():
         raise RuntimeError(f'Missing The Wall plaque artwork: {SOURCE}')
 
     source_width, source_height, source = read_png(SOURCE)
+    prepare_map_marker(source_width, source_height, source)
+
     count = 0
     count += replace_pngs(
         ROOT / 'ios/Runner/Assets.xcassets/AppIcon.appiconset',
