@@ -16,14 +16,15 @@
   <p>The Wall is designed around anonymous, place-based conversations. People reading and posting on a Wall do not create public profiles, usernames, follower lists or a social graph.</p>
 
   <h2>Anonymous Wall use</h2>
-  <p>When you use the app, The Wall creates an anonymous session identifier so the service can remember which Walls you have discovered, enforce temporary write access, apply abuse controls and prevent duplicate reports. The service stores the Walls visited by that anonymous session, messages and replies submitted, reports made, and technical request information needed to operate and secure the service.</p>
+  <p>When you use the app, The Wall creates an anonymous session identifier so the service can remember which Walls you have discovered, enforce temporary write access, apply abuse controls and prevent duplicate reports. The service stores the Walls visited by that anonymous session, messages and replies submitted, reports made, blocking choices, and technical request information needed to operate and secure the service.</p>
 
   <h2>Physical Wall discovery and location</h2>
   <p>A Wall is discovered by opening its NFC link. A valid physical scan temporarily unlocks writing for that Wall. GPS location is not required to prove that you are at the Wall; the NFC interaction is the presence check.</p>
   <p>If you choose to allow location access, the app may save the coordinates and accuracy of the place where your anonymous session scanned a Wall. Those scan locations are used to build your private Found Walls map and to derive a nearby suburb label. A Wall owner does not set a global Wall location, and other visitors do not receive your scan locations. Different visitors may therefore see different suburb labels for the same physical Wall based on where they personally scanned it.</p>
 
-  <h2>Posts and anonymity</h2>
+  <h2>Posts, filtering and anonymity</h2>
   <p>Posts are intentionally anonymous to other users and to the Wall owner. Wall owners can see Wall activity and reported posts, but they are not given the identity of the person who posted a message. Internal anonymous session identifiers are retained only for service operation, abuse prevention and moderation.</p>
+  <p>Messages are checked before publication for a limited set of clearly abusive or unsafe content. Context-dependent material can also be reported after publication. A visitor can block an anonymous poster; posts from that anonymous session are then hidden from that visitor without revealing either person's identity.</p>
 
   <h2>Wall purchases and owner accounts</h2>
   <p>If you buy a Wall, the service stores information needed to process and fulfil the order, including your purchase email, order status, quantity, shipping name and address supplied through checkout, Stripe order/payment identifiers, and the Wall ownership records created from that purchase. A Wall owner account stores your email, optional display name, a securely hashed password, login sessions and an audit history of owner actions.</p>
@@ -32,16 +33,21 @@
   <p>Payments are processed through Stripe. The Wall does not store full payment-card numbers. Stripe returns payment and checkout identifiers, payment status, totals, customer details and shipping information needed to verify and fulfil the order. Transactional order and activation email is sent through the configured SMTP email provider. Those providers process the information necessary to perform those services under their own privacy terms.</p>
 
   <h2>Moderation</h2>
-  <p>Users can report inappropriate content. Repeated reports may automatically hide a post while it waits for review. A Wall owner can review reported posts and choose to keep or remove them without being shown who authored the post. Platform administrators may also moderate content and investigate operational issues.</p>
+  <p>Users can report inappropriate content and block anonymous posters. Repeated reports may automatically hide a post while it waits for review. A Wall owner can review reported posts and choose to keep or remove them without being shown who authored the post. Platform administrators may also moderate content and investigate operational issues.</p>
 
   <h2>Local device data</h2>
   <p>The app may keep a small local cache of Walls you have previously discovered so your history remains useful during temporary connection problems. This cache is stored on your device.</p>
 
   <h2>Retention and deletion</h2>
-  <p>Wall content is intended to preserve the history of a physical place and may remain available until it is moderated, cleared or the Wall is deleted. Order and ownership records may be retained as needed for fulfilment, support, accounting, fraud prevention and legal obligations. Expired authenticated browser sessions are periodically removed.</p>
+  <p>The app's Privacy &amp; Support screen lets you permanently delete the current anonymous app identity. Deleting it removes the server-side anonymous session and data connected to it, including discovered Wall visits, saved scan locations, posts, replies, reports and blocking records, and clears the local Found Walls cache.</p>
+  <p>Wall purchasers can also initiate deletion of their owner account from Privacy &amp; Support. Owner-account deletion disables and anonymises the login account, removes active owner sessions and activation/reset tokens, ends current ownership access and deactivates Walls currently owned by that account. Order and shipping records may be retained where needed for fulfilment, support, accounting, fraud prevention and legal obligations.</p>
+  <p>Wall content is intended to preserve the history of a physical place, but content associated with an anonymous identity is removed when that anonymous identity is deleted. Other Wall content may remain available until it is moderated, cleared or the Wall is deleted or deactivated.</p>
 
   <h2>What The Wall does not provide</h2>
-  <p>The public conversation product does not require public names, profile photos, followers, likes or direct messages. The current Wall conversation is text-only.</p>
+  <p>The public conversation product does not require public names, profile photos, followers, likes, stranger matching or direct messages. The current Wall conversation is text-only and tied to physical NFC Walls.</p>
+
+  <h2>Contact</h2>
+  <p>Privacy, account and moderation questions can be sent to <a href="mailto:orders@saidhere.app">orders@saidhere.app</a>.</p>
 
   <h2>Changes</h2>
   <p>This page will be updated if The Wall materially changes the information it collects or how the service works.</p>
