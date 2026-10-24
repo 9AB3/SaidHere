@@ -2,6 +2,7 @@ import express from 'express';
 
 import { requireSession } from './auth.js';
 import { pool } from './db.js';
+import { mountUgcSafety } from './ugc_safety.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -19,6 +20,10 @@ function clean(value) {
 }
 
 export function mountWallDiscoveryLocations(app) {
+  // This module is already mounted ahead of the legacy core post routes, so the
+  // UGC safeguards can safely replace those routes without changing link/NFC flow.
+  mountUgcSafety(app);
+
   const router = express.Router();
 
   router.post('/walls/:wallId/location', requireSession, async (req, res, next) => {
