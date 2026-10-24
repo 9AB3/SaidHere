@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
 import '../models/wall.dart';
 import '../models/wall_post.dart';
+import 'discovery_location_service.dart';
 
 class FirstScanSetup {
   const FirstScanSetup({
@@ -32,9 +33,6 @@ class SaidHereService {
   SaidHereService({http.Client? client}) : _http = client ?? http.Client();
 
   static const _sessionKey = 'saidhere_api_session';
-  // Render's free service can take well over 50 seconds to wake from sleep.
-  // A shorter timeout makes the first app request look broken even though the
-  // service is only cold-starting.
   static const _requestTimeout = Duration(seconds: 75);
 
   final http.Client _http;
@@ -179,7 +177,9 @@ class SaidHereService {
       ),
     );
     final data = _decode(response);
-    return Wall.fromMap(Map<String, dynamic>.from(data as Map));
+    final wall = Wall.fromMap(Map<String, dynamic>.from(data as Map));
+    unawaited(const DiscoveryLocationService().captureForWall(wallId: wall.id));
+    return wall;
   }
 
   Future<Wall> getWallBySlug(String slug) async {
