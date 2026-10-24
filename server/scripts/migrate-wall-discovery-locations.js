@@ -9,8 +9,13 @@ try {
       latitude double precision not null check (latitude between -90 and 90),
       longitude double precision not null check (longitude between -180 and 180),
       accuracy_metres double precision check (accuracy_metres is null or accuracy_metres between 0 and 5000),
+      suburb text not null default '',
       scanned_at timestamptz not null default now()
     )
+  `);
+  await pool.query(`
+    alter table wall_scan_locations
+      add column if not exists suburb text not null default ''
   `);
   await pool.query(`
     create index if not exists idx_wall_scan_locations_session_wall_time
