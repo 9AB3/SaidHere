@@ -92,7 +92,8 @@ async function orderLinksFor(admin) {
             o.id as order_id,
             o.quantity as order_quantity,
             o.purchaser_email,
-            item.ordinal as order_item_ordinal
+            item.ordinal as order_item_ordinal,
+            item.nfc_write_value as current_nfc_tag
        from walls w
        ${accessJoin}
        left join wall_ownerships wo
@@ -100,7 +101,7 @@ async function orderLinksFor(admin) {
         and wo.ended_at is null
        left join commerce_orders o on o.id = wo.order_id
        left join lateral (
-         select i.id, i.ordinal
+         select i.id, i.ordinal, i.nfc_write_value
            from commerce_order_items i
           where i.order_id = o.id
             and (i.wall_id = w.id or i.reserved_wall_id = w.id)
@@ -127,6 +128,7 @@ async function orderLinksFor(admin) {
     order_quantity: row.order_quantity == null ? null : Number(row.order_quantity),
     order_item_ordinal: row.order_item_ordinal == null ? null : Number(row.order_item_ordinal),
     purchaser_email: row.purchaser_email || null,
+    current_nfc_tag: row.current_nfc_tag || null,
     can_open_order: admin.role === 'owner',
   }));
 }
@@ -157,14 +159,14 @@ const clientScript = String.raw`(() => {
   }
 
   function esc(value) {
-    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    return String(value ?? '').replace(/[&<>\"']/g, (char) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;',
     })[char]);
   }
 
   function ensureLogout(csrf) {
     const profile = document.querySelector('.admin-profile');
-    if (!profile || profile.querySelector('form[action="/admin/logout"]') || !csrf) return;
+    if (!profile || profile.querySelector('form[action=\"/admin/logout\"]') || !csrf) return;
     const form = document.createElement('form');
     form.method = 'post';
     form.action = '/admin/logout';
@@ -183,13 +185,30 @@ const clientScript = String.raw`(() => {
     if (document.getElementById('wm-order-link-style')) return;
     const style = document.createElement('style');
     style.id = 'wm-order-link-style';
-    style.textContent = '.wm-name .wm-idline{display:block;margin-top:4px;color:#7b828c;font-size:7px;font-weight:800;letter-spacing:.25px}.wm-order-detail{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:12px 0 0}.wm-order-detail>div{padding:10px;border:1px solid #e6e9ed;border-radius:8px;background:#fafbfc;min-width:0}.wm-order-detail span{display:block;color:#7b828c;font-size:7px;text-transform:uppercase;letter-spacing:.55px;font-weight:900}.wm-order-detail b,.wm-order-detail a{display:block;margin-top:4px;color:#20242a;font-size:10px;font-weight:850;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wm-order-detail a:hover{text-decoration:underline}@media(max-width:620px){.wm-order-detail{grid-template-columns:1fr}.wm-name .wm-idline{white-space:normal}}';
+    style.textContent = '.wm-name .wm-idline{display:block;margin-top:4px;color:#7b828c;font-size:7px;font-weight:800;letter-spacing:.25px}.wm-name .wm-nfcline{display:block;margin-top:3px;color:#59616c;font:7px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:normal;overflow-wrap:anywhere}.wm-order-detail{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:12px 0 0}.wm-order-detail>div{padding:10px;border:1px solid #e6e9ed;border-radius:8px;background:#fafbfc;min-width:0}.wm-order-detail span{display:block;color:#7b828c;font-size:7px;text-transform:uppercase;letter-spacing:.55px;font-weight:900}.wm-order-detail b,.wm-order-detail a,.wm-order-detail code{display:block;margin-top:4px;color:#20242a;font-size:10px;font-weight:850;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wm-order-detail code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:700}.wm-order-detail a:hover{text-decoration:underline}.wm-nfc-actions{display:flex;align-items:center;gap:6px;margin-top:5px;min-width:0}.wm-nfc-actions code{margin-top:0;flex:1;min-width:0}.wm-nfc-copy{flex:0 0 auto;border:1px solid #d8dde3;background:#fff;color:#30343a;border-radius:6px;padding:4px 7px;font-size:7px;font-weight:900;cursor:pointer}.wm-nfc-copy:hover{background:#f1f3f5}@media(max-width:760px){.wm-order-detail{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:620px){.wm-order-detail{grid-template-columns:1fr}.wm-name .wm-idline{white-space:normal}}';
     document.head.append(style);
   }
 
   function wallIdFromHref(href) {
-    const match = String(href || '').match(/\/admin\/walls\/([0-9a-f-]{36})(?:$|[?#])/i);
+    const match = String(href || '').match(/\\/admin\\/walls\\/([0-9a-f-]{36})(?:$|[?#])/i);
     return match ? match[1].toLowerCase() : '';
+  }
+
+  function normaliseNfc(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    return /^https?:\\/\\//i.test(raw) ? raw : 'https://' + raw;
+  }
+
+  async function copyText(value, button) {
+    try {
+      await navigator.clipboard.writeText(value);
+      const oldText = button.textContent;
+      button.textContent = 'Copied';
+      setTimeout(() => { button.textContent = oldText; }, 1200);
+    } catch (_) {
+      window.prompt('Copy current NFC tag:', value);
+    }
   }
 
   function addListLinks(byWall) {
@@ -208,14 +227,20 @@ const clientScript = String.raw`(() => {
         line.textContent = bits.join(' · ');
         name.append(line);
       }
+      if (meta.current_nfc_tag) {
+        const nfc = document.createElement('span');
+        nfc.className = 'wm-nfcline';
+        nfc.textContent = 'NFC ' + normaliseNfc(meta.current_nfc_tag);
+        name.append(nfc);
+      }
       const existing = row.dataset.search || '';
-      row.dataset.search = [existing, meta.serial_code, meta.order_ref, meta.purchaser_email]
+      row.dataset.search = [existing, meta.serial_code, meta.order_ref, meta.purchaser_email, meta.current_nfc_tag]
         .filter(Boolean).join(' ').toLowerCase();
     });
   }
 
   function addDetailLink(byWall) {
-    const match = location.pathname.match(/^\/admin\/walls\/([0-9a-f-]{36})\/?$/i);
+    const match = location.pathname.match(/^\\/admin\\/walls\\/([0-9a-f-]{36})\\/?$/i);
     if (!match) return;
     const meta = byWall.get(match[1].toLowerCase());
     if (!meta) return;
@@ -228,13 +253,20 @@ const clientScript = String.raw`(() => {
       : '—';
     const orderValue = meta.order_ref || 'No purchase order';
     const orderHtml = meta.order_id && meta.can_open_order
-      ? '<a href="/admin/orders?q=' + encodeURIComponent(meta.order_id) + '">' + esc(orderValue) + '</a>'
+      ? '<a href=\"/admin/orders?q=' + encodeURIComponent(meta.order_id) + '\">' + esc(orderValue) + '</a>'
       : '<b>' + esc(orderValue) + '</b>';
+    const nfcValue = normaliseNfc(meta.current_nfc_tag);
+    const nfcHtml = nfcValue
+      ? '<div class=\"wm-nfc-actions\"><code title=\"' + esc(nfcValue) + '\">' + esc(nfcValue) + '</code><button type=\"button\" class=\"wm-nfc-copy\">Copy</button></div>'
+      : '<b>Not available</b>';
     const detail = document.createElement('div');
     detail.className = 'wm-order-detail';
     detail.innerHTML = '<div><span>Wall ID</span><b>' + esc(meta.serial_code || '—') + '</b></div>' +
       '<div><span>Purchase order</span>' + orderHtml + '</div>' +
-      '<div><span>Wall in order</span><b>' + esc(itemText) + '</b></div>';
+      '<div><span>Wall in order</span><b>' + esc(itemText) + '</b></div>' +
+      '<div><span>Current NFC tag</span>' + nfcHtml + '</div>';
+    const copyButton = detail.querySelector('.wm-nfc-copy');
+    if (copyButton && nfcValue) copyButton.addEventListener('click', () => copyText(nfcValue, copyButton));
     title.insertAdjacentElement('afterend', detail);
   }
 
@@ -267,7 +299,7 @@ const clientScript = String.raw`(() => {
         ['Total Walls', String(data.total_walls ?? 0)],
         ['Active Walls', String(data.active_walls ?? 0)],
         ['$ Sold', money(data.sold_cents, data.currency)],
-      ].map(([label, value]) => '<div class="wm-overview-kpi"><b>'+value+'</b><span>'+label+'</span></div>').join('');
+      ].map(([label, value]) => '<div class=\"wm-overview-kpi\"><b>'+value+'</b><span>'+label+'</span></div>').join('');
       host.prepend(row);
 
       if (!document.getElementById('wm-overview-style')) {
