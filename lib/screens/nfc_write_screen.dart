@@ -167,11 +167,11 @@ class _NfcWriteScreenState extends State<NfcWriteScreen> {
                       Text(
                         _success
                             ? (_hasReceipt
-                                ? 'The Wall link has been written successfully. Orders will mark this Wall Tagged automatically.'
+                                ? 'The Wall link has been written successfully. If automatic Tagged confirmation fails, mark it manually in Orders.'
                                 : 'The Wall link has been written successfully. Return to Orders and tick Tagged.')
                             : _writing
-                                ? 'The native writer is starting. When the iPhone NFC sheet appears, hold the top of this iPhone against the blank NFC tag.'
-                                : (_error ?? 'Tap below to start the native iPhone NFC writer.'),
+                                ? 'The NFC writer is ready. Hold the NFC area of this phone against the blank Wall tag until the write completes.'
+                                : (_error ?? 'Tap below to start the NFC writer.'),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: SaidHereTheme.ink,
