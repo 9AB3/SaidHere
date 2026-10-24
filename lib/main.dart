@@ -7,6 +7,7 @@ import 'screens/discovered_walls_screen.dart';
 import 'screens/first_scan_setup_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/nfc_write_screen.dart';
+import 'screens/settings_screen.dart';
 import 'screens/tag_entry_screen.dart';
 import 'screens/wall_screen.dart';
 import 'services/local_history_service.dart';
@@ -94,6 +95,13 @@ class _SaidHereAppState extends State<SaidHereApp> {
           GoRoute(
             path: '/found',
             builder: (_, _) => DiscoveredWallsScreen(
+              service: service,
+              localHistory: history,
+            ),
+          ),
+          GoRoute(
+            path: '/settings',
+            builder: (_, _) => SettingsScreen(
               service: service,
               localHistory: history,
             ),
