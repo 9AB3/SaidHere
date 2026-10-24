@@ -94,7 +94,12 @@ def patch_ios(host: str, maps_key: str) -> None:
     info['CFBundleURLTypes'] = [{'CFBundleURLName': 'com.9ab3.saidhere', 'CFBundleURLSchemes': ['saidhere']}]
     info['ITSAppUsesNonExemptEncryption'] = False
     info['NFCReaderUsageDescription'] = 'The Wall uses NFC to program physical Wall tags during order fulfilment.'
-    info['NSLocationWhenInUseUsageDescription'] = 'The Wall can save where you discover a Wall so only your Found map can remember that place.'
+    location_purpose = 'The Wall only uses location while you are using the app to remember where you found a Wall on your private Found Walls map.'
+    info['NSLocationWhenInUseUsageDescription'] = location_purpose
+    # Some location SDK symbols trigger Apple's static privacy check even though
+    # SaidHere never requests background/Always location. Supplying this key keeps
+    # App Store validation satisfied without changing the app's permission request.
+    info['NSLocationAlwaysAndWhenInUseUsageDescription'] = location_purpose
     if maps_key:
         info['GMSApiKey'] = maps_key
     else:
