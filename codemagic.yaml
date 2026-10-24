@@ -21,16 +21,19 @@ workflows:
           flutter build web --release
           --dart-define=API_BASE_URL="$API_BASE_URL"
           --dart-define=APP_HOST="$APP_HOST"
+          --dart-define=GOOGLE_MAPS_API_KEY="${GOOGLE_MAPS_API_KEY:-}"
       - name: Build Android debug APK
         script: >-
           flutter build apk --debug
           --dart-define=API_BASE_URL="$API_BASE_URL"
           --dart-define=APP_HOST="$APP_HOST"
+          --dart-define=GOOGLE_MAPS_API_KEY="${GOOGLE_MAPS_API_KEY:-}"
       - name: Compile iOS without signing
         script: >-
           flutter build ios --release --no-codesign
           --dart-define=API_BASE_URL="$API_BASE_URL"
           --dart-define=APP_HOST="$APP_HOST"
+          --dart-define=GOOGLE_MAPS_API_KEY="${GOOGLE_MAPS_API_KEY:-}"
     artifacts:
       - build/web/**
       - build/app/outputs/flutter-apk/*.apk
@@ -82,6 +85,7 @@ workflows:
       - name: Generate SaidHere iOS project
         script: |
           set -euo pipefail
+          test -n "${GOOGLE_MAPS_API_KEY:-}" || { echo 'FAIL: Add GOOGLE_MAPS_API_KEY as a secure Codemagic environment variable before building the Found map.'; exit 1; }
           python3 tool/bootstrap_platforms.py --host "$APP_HOST"
           flutter pub get
           grep -q 'com.9ab3.saidhere' ios/Runner.xcodeproj/project.pbxproj
@@ -89,7 +93,11 @@ workflows:
           grep -q 'com.apple.developer.nfc.readersession.formats' ios/Runner/Runner.entitlements
           grep -q '<string>TAG</string>' ios/Runner/Runner.entitlements
           grep -q 'NFCReaderUsageDescription' ios/Runner/Info.plist
+          grep -q 'NSLocationWhenInUseUsageDescription' ios/Runner/Info.plist
+          grep -q 'GMSApiKey' ios/Runner/Info.plist
           grep -q 'CoreNFC' ios/Runner/AppDelegate.swift
+          grep -q 'GoogleMaps' ios/Runner/AppDelegate.swift
+          grep -q 'GMSServices.provideAPIKey' ios/Runner/AppDelegate.swift
           grep -q 'nfcTarget(fromDeepLink' ios/Runner/AppDelegate.swift
           grep -q 'beginQueuedNfcWriteIfPossible' ios/Runner/AppDelegate.swift
           grep -q 'private var nfcWriterChannel' ios/Runner/AppDelegate.swift
@@ -136,11 +144,13 @@ workflows:
         script: |
           set -euo pipefail
           test -n "${PROJECT_BUILD_NUMBER:-}"
+          test -n "${GOOGLE_MAPS_API_KEY:-}"
           flutter build ipa --release \
             --build-number="$PROJECT_BUILD_NUMBER" \
             --export-options-plist=/Users/builder/export_options.plist \
             --dart-define=API_BASE_URL="$API_BASE_URL" \
-            --dart-define=APP_HOST="$APP_HOST"
+            --dart-define=APP_HOST="$APP_HOST" \
+            --dart-define=GOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY"
           APP_PATH=$(find build/ios/archive/Runner.xcarchive/Products/Applications -maxdepth 1 -name '*.app' | head -1)
           test -n "$APP_PATH"
           codesign -d --entitlements :- "$APP_PATH" > /tmp/saidhere-signed-entitlements.plist 2>/dev/null
