@@ -148,8 +148,17 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    TextButton.icon(
+                      onPressed: () => context.push('/settings'),
+                      icon: const Icon(Icons.info_outline),
+                      label: const Text(
+                        'PRIVACY & SUPPORT',
+                        style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: .5),
+                      ),
+                    ),
                     if (AppConfig.demoTagToken.isNotEmpty) ...[
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 10),
                       TextButton(
                         onPressed: () => context.push('/t/${AppConfig.demoTagToken}'),
                         child: const Text('OPEN DEMO WALL'),
