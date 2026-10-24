@@ -159,7 +159,6 @@ class SaidHereService {
   Future<Wall> completeFirstScanSetup({
     required String tagToken,
     required String displayName,
-    required String locationHint,
     required String email,
     required String password,
   }) async {
@@ -170,7 +169,6 @@ class SaidHereService {
         body: jsonEncode({
           'token': tagToken,
           'display_name': displayName.trim(),
-          'location_hint': locationHint.trim(),
           'email': email.trim(),
           'password': password,
         }),
