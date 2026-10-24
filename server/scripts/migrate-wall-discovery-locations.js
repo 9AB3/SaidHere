@@ -25,7 +25,20 @@ try {
     create index if not exists idx_wall_scan_locations_wall_time
       on wall_scan_locations(wall_id, scanned_at desc)
   `);
-  console.log('Wall discovery location schema is up to date.');
+  await pool.query(`
+    create table if not exists visitor_blocks (
+      blocker_session_id uuid not null references visitor_sessions(id) on delete cascade,
+      blocked_session_id uuid not null references visitor_sessions(id) on delete cascade,
+      created_at timestamptz not null default now(),
+      primary key (blocker_session_id, blocked_session_id),
+      check (blocker_session_id <> blocked_session_id)
+    )
+  `);
+  await pool.query(`
+    create index if not exists idx_visitor_blocks_blocked
+      on visitor_blocks(blocked_session_id, blocker_session_id)
+  `);
+  console.log('Wall discovery location and anonymous blocking schema is up to date.');
 } finally {
   await pool.end();
 }
