@@ -101,7 +101,8 @@ export function installPurchaseSuccessUiPatch(app) {
       const lastAttempt = order.customer_confirmation_last_attempt_at
         ? new Date(order.customer_confirmation_last_attempt_at).getTime()
         : 0;
-      if (lastAttempt && Date.now() - lastAttempt < 60 * 1000) {
+      const previousDeliveryFailed = Boolean(clean(order.customer_confirmation_error));
+      if (!previousDeliveryFailed && lastAttempt && Date.now() - lastAttempt < 60 * 1000) {
         return res.redirect(303, `/purchase/success?session_id=${encodeURIComponent(sessionId)}&resent=recent`);
       }
 
