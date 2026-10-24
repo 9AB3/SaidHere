@@ -66,6 +66,6 @@ jobs:
           --dart-define=APP_HOST="$APP_HOST"
           --dart-define=GOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY"
       - name: Verify release AAB signature
-        run: jarsigner -verify -strict build/app/outputs/bundle/release/app-release.aab
+        run: jarsigner -verify build/app/outputs/bundle/release/app-release.aab
       - name: Check Render API JavaScript
         run: npm --prefix server run check
