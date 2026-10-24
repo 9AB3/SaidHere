@@ -26,6 +26,28 @@ function preserveAdminRecipients(message) {
     .join(', ');
 }
 
+function clarifyFirstTimeActivation(message) {
+  const textNeedsActivation = typeof message.text === 'string' && message.text.includes('Activate My Walls:');
+  const htmlNeedsActivation = typeof message.html === 'string' && message.html.includes('>Activate My Walls</a>');
+  if (!textNeedsActivation && !htmlNeedsActivation) return;
+
+  if (textNeedsActivation) {
+    message.text = message.text.replace(
+      '\n\nActivate My Walls:',
+      '\n\nCREATE YOUR MY WALLS PASSWORD\nYou do not have a My Walls login yet. Use the secure link below to create your password. After that, you can sign in normally and manage this Wall and any future Walls you buy.\n\nCreate My Walls password:',
+    );
+  }
+
+  if (htmlNeedsActivation) {
+    message.html = message.html
+      .replace(
+        '<p style="margin:28px 0 18px"><a ',
+        '<div style="margin:24px 0 16px;padding:16px;background:#f1e8da;border-left:4px solid #171411"><div style="font-size:11px;letter-spacing:1.5px;font-weight:800;margin-bottom:7px">CREATE YOUR MY WALLS PASSWORD</div><p style="margin:0;color:#5f584f;font-size:13px;line-height:1.55"><strong>You do not have a My Walls login yet.</strong> Use the button below to create your password. After that, you can sign in normally and manage this Wall and any future Walls you buy.</p></div><p style="margin:28px 0 18px"><a ',
+      )
+      .replace('>Activate My Walls</a>', '>Create My Walls password</a>');
+  }
+}
+
 export function installOrderReferenceEmailPatch() {
   if (installed) return;
   installed = true;
@@ -41,6 +63,7 @@ export function installOrderReferenceEmailPatch() {
       const ref = orderReference(uuid);
 
       if (subject.startsWith('The Wall order confirmed')) {
+        clarifyFirstTimeActivation(message);
         if (uuid && ref) {
           message.subject = `Order ${ref} confirmed`;
           if (typeof message.text === 'string') message.text = message.text.replaceAll(uuid, ref);
