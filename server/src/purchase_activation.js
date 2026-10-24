@@ -66,7 +66,7 @@ function page({ order = null, reconcileError = '' }) {
       : emailSent
         ? '<p>Use the activation link in your confirmation email to create your Wall owner login.</p><a class="button" href="/my-walls/login">Go to My Walls</a>'
         : '<p>You do not need the email to use your order. When your Wall arrives, its first NFC scan can verify the purchase email and activate your owner account securely.</p><a class="button" href="/my-walls/login">Go to My Walls</a>';
-    body = `<div class="status paid">Payment confirmed</div><h1>Your Wall order is in.</h1>${emailBlock}<div class="summary"><div><span>Order</span><b>${escapeHtml(order.id)}</b></div><div><span>Walls</span><b>${escapeHtml(order.quantity)}</b></div><div><span>Total</span><b>${escapeHtml(money(order.amount_total, order.currency))}</b></div></div>${next}<p class="help">We’ll link the NFC before shipping. You choose the Wall name and location on the first scan.</p>`;
+    body = `<div class="status paid">Payment confirmed</div><h1>Your Wall order is in.</h1>${emailBlock}<div class="summary"><div><span>Order</span><b>${escapeHtml(order.id)}</b></div><div><span>Walls</span><b>${escapeHtml(order.quantity)}</b></div><div><span>Total</span><b>${escapeHtml(money(order.amount_total, order.currency))}</b></div></div>${next}<p class="help">We’ll link the NFC before shipping. You choose the Wall name on the first scan.</p>`;
   }
 
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Order confirmed · The Wall</title><style>
@@ -95,8 +95,5 @@ export function mountPurchaseActivation(app) {
     }
   });
 
-  // Account activation is deliberately not accepted from the Stripe success URL.
-  // A Checkout Session ID can appear in browser history. Activation instead uses
-  // the one-time emailed claim token or possession of the physical Wall on first scan.
   app.use('/purchase', router);
 }
