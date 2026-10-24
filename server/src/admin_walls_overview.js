@@ -159,14 +159,14 @@ const clientScript = String.raw`(() => {
   }
 
   function esc(value) {
-    return String(value ?? '').replace(/[&<>\"']/g, (char) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;',
+    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
     })[char]);
   }
 
   function ensureLogout(csrf) {
     const profile = document.querySelector('.admin-profile');
-    if (!profile || profile.querySelector('form[action=\"/admin/logout\"]') || !csrf) return;
+    if (!profile || profile.querySelector('form[action="/admin/logout"]') || !csrf) return;
     const form = document.createElement('form');
     form.method = 'post';
     form.action = '/admin/logout';
@@ -190,14 +190,14 @@ const clientScript = String.raw`(() => {
   }
 
   function wallIdFromHref(href) {
-    const match = String(href || '').match(/\\/admin\\/walls\\/([0-9a-f-]{36})(?:$|[?#])/i);
+    const match = String(href || '').match(/\/admin\/walls\/([0-9a-f-]{36})(?:$|[?#])/i);
     return match ? match[1].toLowerCase() : '';
   }
 
   function normaliseNfc(value) {
     const raw = String(value || '').trim();
     if (!raw) return '';
-    return /^https?:\\/\\//i.test(raw) ? raw : 'https://' + raw;
+    return /^https?:\/\//i.test(raw) ? raw : 'https://' + raw;
   }
 
   async function copyText(value, button) {
@@ -240,7 +240,7 @@ const clientScript = String.raw`(() => {
   }
 
   function addDetailLink(byWall) {
-    const match = location.pathname.match(/^\\/admin\\/walls\\/([0-9a-f-]{36})\\/?$/i);
+    const match = location.pathname.match(/^\/admin\/walls\/([0-9a-f-]{36})\/?$/i);
     if (!match) return;
     const meta = byWall.get(match[1].toLowerCase());
     if (!meta) return;
@@ -253,11 +253,11 @@ const clientScript = String.raw`(() => {
       : '—';
     const orderValue = meta.order_ref || 'No purchase order';
     const orderHtml = meta.order_id && meta.can_open_order
-      ? '<a href=\"/admin/orders?q=' + encodeURIComponent(meta.order_id) + '\">' + esc(orderValue) + '</a>'
+      ? '<a href="/admin/orders?q=' + encodeURIComponent(meta.order_id) + '">' + esc(orderValue) + '</a>'
       : '<b>' + esc(orderValue) + '</b>';
     const nfcValue = normaliseNfc(meta.current_nfc_tag);
     const nfcHtml = nfcValue
-      ? '<div class=\"wm-nfc-actions\"><code title=\"' + esc(nfcValue) + '\">' + esc(nfcValue) + '</code><button type=\"button\" class=\"wm-nfc-copy\">Copy</button></div>'
+      ? '<div class="wm-nfc-actions"><code title="' + esc(nfcValue) + '">' + esc(nfcValue) + '</code><button type="button" class="wm-nfc-copy">Copy</button></div>'
       : '<b>Not available</b>';
     const detail = document.createElement('div');
     detail.className = 'wm-order-detail';
@@ -299,7 +299,7 @@ const clientScript = String.raw`(() => {
         ['Total Walls', String(data.total_walls ?? 0)],
         ['Active Walls', String(data.active_walls ?? 0)],
         ['$ Sold', money(data.sold_cents, data.currency)],
-      ].map(([label, value]) => '<div class=\"wm-overview-kpi\"><b>'+value+'</b><span>'+label+'</span></div>').join('');
+      ].map(([label, value]) => '<div class="wm-overview-kpi"><b>'+value+'</b><span>'+label+'</span></div>').join('');
       host.prepend(row);
 
       if (!document.getElementById('wm-overview-style')) {
