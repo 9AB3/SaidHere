@@ -146,7 +146,7 @@ async function writeCustomerAudit(customer, action, { wall = null, details = {} 
 async function ownedWall(customerId, wallId) {
   if (!validUuid(wallId)) return null;
   const result = await pool.query(
-    `select w.id, w.slug, w.display_name, w.location_hint, w.active, w.created_at, w.setup_required,
+    `select w.id, w.slug, w.display_name, w.active, w.created_at, w.setup_required,
             o.started_at as owned_since,
             count(distinct p.id) filter (where p.hidden_at is null)::int as post_count,
             count(distinct v.session_id)::int as visitor_count
@@ -164,7 +164,7 @@ async function ownedWall(customerId, wallId) {
 
 async function customerWalls(customerId) {
   const result = await pool.query(
-    `select w.id, w.slug, w.display_name, w.location_hint, w.active, w.setup_required,
+    `select w.id, w.slug, w.display_name, w.active, w.setup_required,
             o.started_at,
             count(distinct p.id) filter (where p.hidden_at is null)::int as post_count,
             count(distinct v.session_id)::int as visitor_count,
@@ -245,7 +245,7 @@ function claimPage({ token, email, error = '' }) {
 
 function dashboardPage({ session, walls, orders, notice = '', error = '' }) {
   const wallCards = walls.length
-    ? walls.map((wall) => `<article class="card wallrow"><div><div><span class="badge ${wall.active ? 'active' : 'inactive'}">${wall.active ? 'Active' : 'Inactive'}</span>${wall.setup_required ? ' <span class="badge reported">First scan required</span>' : ''}${Number(wall.report_count) > 0 ? ` <span class="badge reported">${escapeHtml(wall.report_count)} reports</span>` : ''}</div><h2>${escapeHtml(wall.display_name)}</h2><div class="sub">${escapeHtml(wall.location_hint || (wall.setup_required ? 'Name and location set on first scan' : 'Location not set'))}</div><div class="metrics"><div class="metric"><strong>${escapeHtml(wall.post_count)}</strong><span>Messages</span></div><div class="metric"><strong>${escapeHtml(wall.visitor_count)}</strong><span>Visitors</span></div></div></div><a class="button secondary" href="/my-walls/${encodeURIComponent(wall.id)}">${wall.setup_required ? 'Setup info' : 'Manage'}</a></article>`).join('')
+    ? walls.map((wall) => `<article class="card wallrow"><div><div><span class="badge ${wall.active ? 'active' : 'inactive'}">${wall.active ? 'Active' : 'Inactive'}</span>${wall.setup_required ? ' <span class="badge reported">First scan required</span>' : ''}${Number(wall.report_count) > 0 ? ` <span class="badge reported">${escapeHtml(wall.report_count)} reports</span>` : ''}</div><h2>${escapeHtml(wall.display_name)}</h2>${wall.setup_required ? '<div class="sub">Name this Wall on its first scan</div>' : ''}<div class="metrics"><div class="metric"><strong>${escapeHtml(wall.post_count)}</strong><span>Messages</span></div><div class="metric"><strong>${escapeHtml(wall.visitor_count)}</strong><span>Visitors</span></div></div></div><a class="button secondary" href="/my-walls/${encodeURIComponent(wall.id)}">${wall.setup_required ? 'Setup info' : 'Manage'}</a></article>`).join('')
     : '<div class="card empty">No Walls are assigned to your account yet. If you have just ordered, your Wall may still be being prepared.</div>';
   const pending = orders.filter((order) => order.status !== 'fulfilled');
   const pendingHtml = pending.length
@@ -258,7 +258,7 @@ function managePage({ session, wall, reports, notice = '', error = '' }) {
   const reportsHtml = reports.length
     ? reports.map((post) => `<article class="card report"><div><span class="badge reported">${escapeHtml(post.report_count)} report${Number(post.report_count) === 1 ? '' : 's'}</span>${post.hidden_at ? ' <span class="badge inactive">Auto-hidden</span>' : ''}</div><blockquote>“${escapeHtml(post.body)}”</blockquote><div class="sub">Posted ${escapeHtml(fmt(post.created_at))}</div><div class="actions" style="margin-top:13px"><form method="post" action="/my-walls/${encodeURIComponent(wall.id)}/reports/${encodeURIComponent(post.id)}/keep"><input type="hidden" name="_csrf" value="${escapeHtml(session.csrf)}"><button class="button good" type="submit">Keep post</button></form><form method="post" action="/my-walls/${encodeURIComponent(wall.id)}/reports/${encodeURIComponent(post.id)}/remove"><input type="hidden" name="_csrf" value="${escapeHtml(session.csrf)}"><button class="button warn" type="submit">Remove post</button></form></div></article>`).join('')
     : '<div class="card empty">No reported posts need your attention.</div>';
-  return layout(wall.display_name, `<main class="shell">${header(session)}<a class="back" href="/my-walls">← My Walls</a>${notice ? `<div class="notice">${escapeHtml(notice)}</div>` : ''}${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}<div class="pagehead"><div><span class="eyebrow">Wall owner controls</span><h1>${escapeHtml(wall.display_name)}</h1><div class="sub">${escapeHtml(wall.location_hint || 'Location not set')}</div></div><span class="badge ${wall.active ? 'active' : 'inactive'}">${wall.active ? 'Active' : 'Inactive'}</span></div><section class="card"><h2 style="margin-top:0">Wall details</h2><p class="help">Posts remain anonymous. You can manage this Wall and moderate reported content, but you are not shown who posted a message.</p><form method="post" action="/my-walls/${encodeURIComponent(wall.id)}/edit"><input type="hidden" name="_csrf" value="${escapeHtml(session.csrf)}"><div class="field"><label>Wall name</label><input name="display_name" maxlength="80" required value="${escapeHtml(wall.display_name)}"></div><div class="field"><label>Location</label><input name="location_hint" maxlength="120" value="${escapeHtml(wall.location_hint || '')}"></div><button class="button" type="submit">Save details</button></form><div class="divider"></div><div class="metrics"><div class="metric"><strong>${escapeHtml(wall.post_count)}</strong><span>Messages</span></div><div class="metric"><strong>${escapeHtml(wall.visitor_count)}</strong><span>Visitors</span></div><div class="metric"><strong>${escapeHtml(fmt(wall.owned_since))}</strong><span>Owned since</span></div></div><div class="divider"></div><form method="post" action="/my-walls/${encodeURIComponent(wall.id)}/status"><input type="hidden" name="_csrf" value="${escapeHtml(session.csrf)}"><input type="hidden" name="active" value="${wall.active ? 'false' : 'true'}"><button class="button ${wall.active ? 'warn' : 'good'}" type="submit">${wall.active ? 'Deactivate Wall' : 'Reactivate Wall'}</button></form></section><div class="pagehead"><div><span class="eyebrow">Moderation</span><h1 style="font-size:25px">Reported posts</h1></div><span class="badge reported">${reports.length} pending</span></div><p class="help">You can remove posts only after they have been reported. Keeping a post clears its reports and restores it if it was automatically hidden.</p>${reportsHtml}</main>`);
+  return layout(wall.display_name, `<main class="shell">${header(session)}<a class="back" href="/my-walls">← My Walls</a>${notice ? `<div class="notice">${escapeHtml(notice)}</div>` : ''}${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}<div class="pagehead"><div><span class="eyebrow">Wall owner controls</span><h1>${escapeHtml(wall.display_name)}</h1></div><span class="badge ${wall.active ? 'active' : 'inactive'}">${wall.active ? 'Active' : 'Inactive'}</span></div><section class="card"><h2 style="margin-top:0">Wall details</h2><p class="help">Posts remain anonymous. You can rename this Wall, pause it and moderate reported content, but you are not shown who posted a message.</p><form method="post" action="/my-walls/${encodeURIComponent(wall.id)}/edit"><input type="hidden" name="_csrf" value="${escapeHtml(session.csrf)}"><div class="field"><label>Wall name</label><input name="display_name" maxlength="80" required value="${escapeHtml(wall.display_name)}"></div><button class="button" type="submit">Save name</button></form><div class="divider"></div><div class="metrics"><div class="metric"><strong>${escapeHtml(wall.post_count)}</strong><span>Messages</span></div><div class="metric"><strong>${escapeHtml(wall.visitor_count)}</strong><span>Visitors</span></div><div class="metric"><strong>${escapeHtml(fmt(wall.owned_since))}</strong><span>Owned since</span></div></div><div class="divider"></div><form method="post" action="/my-walls/${encodeURIComponent(wall.id)}/status"><input type="hidden" name="_csrf" value="${escapeHtml(session.csrf)}"><input type="hidden" name="active" value="${wall.active ? 'false' : 'true'}"><button class="button ${wall.active ? 'warn' : 'good'}" type="submit">${wall.active ? 'Deactivate Wall' : 'Reactivate Wall'}</button></form></section><div class="pagehead"><div><span class="eyebrow">Moderation</span><h1 style="font-size:25px">Reported posts</h1></div><span class="badge reported">${reports.length} pending</span></div><p class="help">You can remove posts only after they have been reported. Keeping a post clears its reports and restores it if it was automatically hidden.</p>${reportsHtml}</main>`);
 }
 
 export function mountCustomerPortal(app) {
@@ -431,15 +431,13 @@ export function mountCustomerPortal(app) {
       const wall = await ownedWall(req.customerSession.customer.id, req.params.wallId);
       if (!wall) return res.sendStatus(404);
       const displayName = clean(req.body?.display_name);
-      const location = clean(req.body?.location_hint);
       if (!displayName || displayName.length > 80) throw new Error('Wall name must be between 1 and 80 characters.');
-      if (location.length > 120) throw new Error('Location must be 120 characters or fewer.');
-      await pool.query(`update walls set display_name = $2, location_hint = $3 where id = $1`, [wall.id, displayName, location]);
+      await pool.query(`update walls set display_name = $2, location_hint = '' where id = $1`, [wall.id, displayName]);
       await writeCustomerAudit(req.customerSession.customer, 'wall.details_changed', {
         wall,
-        details: { display_name: displayName, location_hint: location },
+        details: { display_name: displayName },
       });
-      return res.redirect(303, `/my-walls/${encodeURIComponent(wall.id)}?notice=Wall%20details%20updated.`);
+      return res.redirect(303, `/my-walls/${encodeURIComponent(wall.id)}?notice=Wall%20name%20updated.`);
     } catch (error) {
       return next(error);
     }
