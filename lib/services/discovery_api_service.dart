@@ -35,6 +35,7 @@ class DiscoveryApiService {
     required double latitude,
     required double longitude,
     required double accuracyMetres,
+    required String suburb,
   }) async {
     final headers = await _headers();
     if (headers == null) return;
@@ -46,6 +47,7 @@ class DiscoveryApiService {
             'latitude': latitude,
             'longitude': longitude,
             'accuracy_metres': accuracyMetres,
+            'suburb': suburb.trim(),
           }),
         )
         .timeout(_timeout);
