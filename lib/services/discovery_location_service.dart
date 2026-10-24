@@ -32,7 +32,8 @@ class DiscoveryLocationService {
 
       var suburb = '';
       try {
-        final placemarks = await placemarkFromCoordinates(
+        final geocoding = Geocoding();
+        final placemarks = await geocoding.placemarkFromCoordinates(
           position.latitude,
           position.longitude,
         ).timeout(const Duration(seconds: 5));
