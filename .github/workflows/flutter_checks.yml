@@ -11,19 +11,61 @@ concurrency:
 jobs:
   analyze-test-build:
     runs-on: ubuntu-latest
+    env:
+      APP_HOST: nfc.saidhere.app
+      API_BASE_URL: https://saidhere.app
+      # CI-only placeholder. Production Android uses a restricted key from Codemagic.
+      GOOGLE_MAPS_API_KEY: CI_ANDROID_MAPS_KEY_NOT_FOR_DISTRIBUTION
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-      - run: python3 tool/bootstrap_platforms.py --host saidhere.app
+      - name: Generate Flutter platform projects
+        run: python3 tool/bootstrap_platforms.py --host "$APP_HOST"
+      - name: Apply Android production patch
+        run: python3 tool/android_release_patch.py --host "$APP_HOST"
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
       - name: Build Flutter web
-        run: flutter build web --release --dart-define=API_BASE_URL=https://saidhere.app
+        run: >-
+          flutter build web --release
+          --dart-define=API_BASE_URL="$API_BASE_URL"
+          --dart-define=APP_HOST="$APP_HOST"
       - name: Build Android debug APK
-        run: flutter build apk --debug --dart-define=API_BASE_URL=https://saidhere.app
+        run: >-
+          flutter build apk --debug
+          --dart-define=API_BASE_URL="$API_BASE_URL"
+          --dart-define=APP_HOST="$APP_HOST"
+          --dart-define=GOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY"
+      - name: Create CI-only Android release key
+        run: |
+          set -euo pipefail
+          KEYSTORE="$RUNNER_TEMP/saidhere-ci-release.keystore"
+          keytool -genkeypair -v \
+            -keystore "$KEYSTORE" \
+            -storepass ci-pass \
+            -keypass ci-pass \
+            -alias ci-release \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 30 \
+            -dname "CN=SaidHere CI, OU=CI, O=SaidHere, L=Sydney, ST=NSW, C=AU"
+          echo "CM_KEYSTORE_PATH=$KEYSTORE" >> "$GITHUB_ENV"
+          echo "CM_KEYSTORE_PASSWORD=ci-pass" >> "$GITHUB_ENV"
+          echo "CM_KEY_ALIAS=ci-release" >> "$GITHUB_ENV"
+          echo "CM_KEY_PASSWORD=ci-pass" >> "$GITHUB_ENV"
+      - name: Build signed Android release AAB
+        run: >-
+          flutter build appbundle --release
+          --build-name=0.1.0
+          --build-number="$GITHUB_RUN_NUMBER"
+          --dart-define=API_BASE_URL="$API_BASE_URL"
+          --dart-define=APP_HOST="$APP_HOST"
+          --dart-define=GOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY"
+      - name: Verify release AAB signature
+        run: jarsigner -verify -strict build/app/outputs/bundle/release/app-release.aab
       - name: Check Render API JavaScript
         run: npm --prefix server run check
