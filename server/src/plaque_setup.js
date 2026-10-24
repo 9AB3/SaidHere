@@ -89,7 +89,7 @@ async function currentCustomer(req) {
 
 async function wallForToken(rawToken) {
   const result = await pool.query(
-    `select w.id, w.slug, w.display_name, w.location_hint, w.setup_required,
+    `select w.id, w.slug, w.display_name, w.setup_required,
             p.serial_code,
             o.customer_id,
             c.email as customer_email,
@@ -118,8 +118,8 @@ function setupPage({ customer = null, token, wall, activateAccount = false, erro
     : `Signed in as ${escapeHtml(customer?.email || '')}.`;
 
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Set up your Wall</title><style>
-    *{box-sizing:border-box}body{margin:0;background:#d6cab4 url('/wall-background.png') center/cover fixed;color:#171411;font-family:Inter,Arial,sans-serif}.shade{min-height:100vh;background:rgba(237,227,208,.82);padding:18px}.card{max-width:540px;margin:5vh auto;background:#fffaf1;border:1px solid #cabfaa;border-radius:18px;padding:26px;box-shadow:0 18px 48px rgba(25,20,15,.18)}.logo{display:block;width:104px;margin:0 auto 18px}.eyebrow{text-align:center;font-size:9px;text-transform:uppercase;letter-spacing:1.6px;color:#796f63;font-weight:950}.card h1{text-align:center;margin:7px 0 8px;font-size:31px;letter-spacing:-.8px}.intro{text-align:center;color:#625a50;line-height:1.5;margin:0 0 22px}.serial{width:max-content;max-width:100%;margin:0 auto 20px;padding:7px 10px;border-radius:999px;background:#eee7dc;color:#6b635a;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.7px}.field{display:flex;flex-direction:column;gap:6px;margin:0 0 13px}.field label{font-size:9px;text-transform:uppercase;letter-spacing:1px;font-weight:950}.field input{min-height:50px;padding:11px 12px;border:1px solid #9d917f;border-radius:8px;background:#fffdf8;font:inherit}.button{display:flex;width:100%;min-height:50px;align-items:center;justify-content:center;margin-top:9px;border:1px solid #171411;border-radius:8px;background:#171411;color:#fff;text-decoration:none;font-weight:900;cursor:pointer}.error{padding:11px 13px;margin-bottom:14px;background:#f0d8d3;border-left:4px solid #963c33;border-radius:8px}.help{font-size:12px;line-height:1.5;color:#7b7266}.account{margin-top:18px;padding-top:15px;border-top:1px solid #e1d8ca;color:#756d63;font-size:11px;text-align:center}.divider{display:flex;align-items:center;gap:9px;margin:18px 0 13px;color:#7b7266;font-size:8px;text-transform:uppercase;letter-spacing:1px;font-weight:900}.divider::before,.divider::after{content:'';height:1px;flex:1;background:#ddd3c5}@media(max-width:520px){.card{padding:22px 18px;margin:3vh auto}.card h1{font-size:28px}}
-  </style></head><body><div class="shade"><main class="card"><img class="logo" src="/plaque.png" alt="The Wall"><div class="eyebrow">First scan</div><h1>Make this Wall yours.</h1><p class="intro">Choose the Wall name and location now. After setup, both can be changed whenever you like from My Walls.</p>${wall.serial_code ? `<div class="serial">Wall ${escapeHtml(wall.serial_code)}</div>` : ''}${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}<form method="post" action="/my-walls/setup/${encodeURIComponent(token)}"><div class="field"><label>Wall name</label><input name="display_name" maxlength="80" required autofocus placeholder="e.g. The Royal Hotel — Men's Bathroom"></div><div class="field"><label>Location</label><input name="location_hint" maxlength="120" required placeholder="e.g. Singleton NSW"></div>${accountFields}<button class="button" type="submit">${activateAccount ? 'Activate account & finish setup' : 'Finish Wall setup'}</button></form><p class="help">${accountNote}</p></main></div></body></html>`;
+    *{box-sizing:border-box}body{margin:0;background:#d6cab4 url('/wall-background.png') center/cover fixed;color:#171411;font-family:Inter,Arial,sans-serif}.shade{min-height:100vh;background:rgba(237,227,208,.82);padding:18px}.card{max-width:540px;margin:5vh auto;background:#fffaf1;border:1px solid #cabfaa;border-radius:18px;padding:26px;box-shadow:0 18px 48px rgba(25,20,15,.18)}.logo{display:block;width:104px;margin:0 auto 18px}.eyebrow{text-align:center;font-size:9px;text-transform:uppercase;letter-spacing:1.6px;color:#796f63;font-weight:950}.card h1{text-align:center;margin:7px 0 8px;font-size:31px;letter-spacing:-.8px}.intro{text-align:center;color:#625a50;line-height:1.5;margin:0 0 22px}.serial{width:max-content;max-width:100%;margin:0 auto 20px;padding:7px 10px;border-radius:999px;background:#eee7dc;color:#6b635a;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.7px}.field{display:flex;flex-direction:column;gap:6px;margin:0 0 13px}.field label{font-size:9px;text-transform:uppercase;letter-spacing:1px;font-weight:950}.field input{min-height:50px;padding:11px 12px;border:1px solid #9d917f;border-radius:8px;background:#fffdf8;font:inherit}.button{display:flex;width:100%;min-height:50px;align-items:center;justify-content:center;margin-top:9px;border:1px solid #171411;border-radius:8px;background:#171411;color:#fff;text-decoration:none;font-weight:900;cursor:pointer}.error{padding:11px 13px;margin-bottom:14px;background:#f0d8d3;border-left:4px solid #963c33;border-radius:8px}.help{font-size:12px;line-height:1.5;color:#7b7266}.divider{display:flex;align-items:center;gap:9px;margin:18px 0 13px;color:#7b7266;font-size:8px;text-transform:uppercase;letter-spacing:1px;font-weight:900}.divider::before,.divider::after{content:'';height:1px;flex:1;background:#ddd3c5}@media(max-width:520px){.card{padding:22px 18px;margin:3vh auto}.card h1{font-size:28px}}
+  </style></head><body><div class="shade"><main class="card"><img class="logo" src="/plaque.png" alt="The Wall"><div class="eyebrow">First scan</div><h1>Make this Wall yours.</h1><p class="intro">Give this Wall a name. Its location is never set by the owner — each visitor sees the suburb where they personally scanned it.</p>${wall.serial_code ? `<div class="serial">Wall ${escapeHtml(wall.serial_code)}</div>` : ''}${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}<form method="post" action="/my-walls/setup/${encodeURIComponent(token)}"><div class="field"><label>Wall name</label><input name="display_name" maxlength="80" required autofocus placeholder="e.g. The Royal Hotel — Men's Bathroom"></div>${accountFields}<button class="button" type="submit">${activateAccount ? 'Activate account & finish setup' : 'Finish Wall setup'}</button></form><p class="help">${accountNote}</p></main></div></body></html>`;
 }
 
 function loginNeededPage(token) {
@@ -132,10 +132,10 @@ function wrongAccountPage() {
 }
 
 function completePage({ token, wall }) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Wall ready</title><style>*{box-sizing:border-box}body{margin:0;background:#d6cab4 url('/wall-background.png') center/cover fixed;color:#171411;font-family:Inter,Arial,sans-serif}.shade{min-height:100vh;background:rgba(237,227,208,.82);padding:18px}.card{max-width:520px;margin:8vh auto;background:#fffaf1;border:1px solid #cabfaa;border-radius:18px;padding:28px;text-align:center}.logo{width:108px}.card h1{font-size:31px;margin:16px 0 8px}.card p{color:#625a50;line-height:1.5}.button{display:flex;min-height:50px;align-items:center;justify-content:center;margin-top:12px;border:1px solid #171411;border-radius:8px;background:#171411;color:#fff;text-decoration:none;font-weight:900}.button.secondary{background:#fffaf1;color:#171411}</style></head><body><div class="shade"><main class="card"><img class="logo" src="/plaque.png" alt="The Wall"><h1>${escapeHtml(wall.display_name)} is ready.</h1><p>${escapeHtml(wall.location_hint)}</p><p>From now on, scanning this Wall opens it and grants the normal in-person writing window.</p><a class="button" href="/t/${encodeURIComponent(token)}">Open this Wall</a><a class="button secondary" href="/my-walls/${encodeURIComponent(wall.id)}">Manage in My Walls</a></main></div></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Wall ready</title><style>*{box-sizing:border-box}body{margin:0;background:#d6cab4 url('/wall-background.png') center/cover fixed;color:#171411;font-family:Inter,Arial,sans-serif}.shade{min-height:100vh;background:rgba(237,227,208,.82);padding:18px}.card{max-width:520px;margin:8vh auto;background:#fffaf1;border:1px solid #cabfaa;border-radius:18px;padding:28px;text-align:center}.logo{width:108px}.card h1{font-size:31px;margin:16px 0 8px}.card p{color:#625a50;line-height:1.5}.button{display:flex;min-height:50px;align-items:center;justify-content:center;margin-top:12px;border:1px solid #171411;border-radius:8px;background:#171411;color:#fff;text-decoration:none;font-weight:900}.button.secondary{background:#fffaf1;color:#171411}</style></head><body><div class="shade"><main class="card"><img class="logo" src="/plaque.png" alt="The Wall"><h1>${escapeHtml(wall.display_name)} is ready.</h1><p>From now on, scanning this Wall opens it and grants the normal in-person writing window.</p><a class="button" href="/t/${encodeURIComponent(token)}">Open this Wall</a><a class="button secondary" href="/my-walls/${encodeURIComponent(wall.id)}">Manage in My Walls</a></main></div></body></html>`;
 }
 
-async function finishSetup({ token, customerId, email, displayName, location, password = null }) {
+async function finishSetup({ token, customerId, email, displayName, password = null }) {
   const client = await pool.connect();
   try {
     await client.query('begin');
@@ -178,19 +178,19 @@ async function finishSetup({ token, customerId, email, displayName, location, pa
     const result = await client.query(
       `update walls
           set display_name = $2,
-              location_hint = $3,
+              location_hint = '',
               setup_required = false,
               setup_completed_at = now()
         where id = $1
-        returning id, slug, display_name, location_hint`,
-      [owned.rows[0].id, displayName, location],
+        returning id, slug, display_name`,
+      [owned.rows[0].id, displayName],
     );
     const wall = result.rows[0];
     await client.query(
       `insert into customer_audit_log
          (customer_id, email_snapshot, action, wall_id, wall_name, details)
        values ($1, $2, 'wall.first_setup', $3, $4, $5::jsonb)`,
-      [customerId, email, wall.id, wall.display_name, JSON.stringify({ location_hint: wall.location_hint, activated_from_wall: password != null })],
+      [customerId, email, wall.id, wall.display_name, JSON.stringify({ activated_from_wall: password != null })],
     );
     await client.query('commit');
     return wall;
@@ -203,7 +203,6 @@ async function finishSetup({ token, customerId, email, displayName, location, pa
 }
 
 export function mountPlaqueSetup(app) {
-  // Browser first scans that are not configured yet go straight to owner setup.
   app.get('/t/:token', async (req, res, next) => {
     try {
       const token = clean(req.params.token);
@@ -223,7 +222,6 @@ export function mountPlaqueSetup(app) {
     }
   });
 
-  // Native app scans receive a setup URL instead of opening an unnamed Wall.
   app.post('/api/tags/open', async (req, res, next) => {
     try {
       const token = clean(req.body?.token);
@@ -273,10 +271,8 @@ export function mountPlaqueSetup(app) {
   router.post('/:token', async (req, res, next) => {
     const token = clean(req.params.token);
     const displayName = clean(req.body?.display_name);
-    const location = clean(req.body?.location_hint);
     try {
       if (!displayName || displayName.length > 80) throw new Error('Wall name must be between 1 and 80 characters.');
-      if (!location || location.length > 120) throw new Error('Location must be between 1 and 120 characters.');
       const wallRecord = await wallForToken(token);
       if (!wallRecord) return res.status(404).type('html').send('This Wall is not active.');
       const customer = await currentCustomer(req);
@@ -289,7 +285,6 @@ export function mountPlaqueSetup(app) {
           customerId: customer.id,
           email: customer.email,
           displayName,
-          location,
         });
         if (wall.alreadyDone) return res.redirect(303, `/my-walls/${encodeURIComponent(wall.id)}`);
         return res.type('html').send(completePage({ token, wall }));
@@ -311,7 +306,6 @@ export function mountPlaqueSetup(app) {
         customerId: wallRecord.customer_id,
         email: wallRecord.customer_email,
         displayName,
-        location,
         password,
       });
       const rawSession = await startSession(req, wallRecord.customer_id);
