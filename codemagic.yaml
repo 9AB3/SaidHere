@@ -44,6 +44,8 @@ workflows:
     integrations:
       app_store_connect: Codemagic
     environment:
+      groups:
+        - maps_config
       flutter: stable
       xcode: latest
       vars:
