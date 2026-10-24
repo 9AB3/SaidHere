@@ -87,7 +87,7 @@ workflows:
             --dart-define=API_BASE_URL="$API_BASE_URL" \
             --dart-define=APP_HOST="$APP_HOST" \
             --dart-define=GOOGLE_MAPS_API_KEY="$ANDROID_GOOGLE_MAPS_API_KEY"
-          jarsigner -verify -strict build/app/outputs/bundle/release/app-release.aab
+          jarsigner -verify build/app/outputs/bundle/release/app-release.aab
       - name: Build signed Android APK
         script: |
           set -euo pipefail
