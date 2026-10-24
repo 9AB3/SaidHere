@@ -18,6 +18,7 @@ import { mountPlaqueSetup } from './plaque_setup.js';
 import { mountSetupGuard } from './setup_guard.js';
 import { mountCustomerPortal } from './customer_portal.runtime.js';
 import { mountCanonicalWebRedirect, mountPublicSite } from './public_site.js';
+import { mountWallDiscoveryLocations } from './wall_discovery_locations.js';
 
 const app = express();
 const port = Number(process.env.PORT || 10000);
@@ -73,6 +74,9 @@ function wallJson(row) {
     id: row.id,
     slug: row.slug,
     display_name: row.display_name,
+    // Kept as a compatibility key for older app builds. It now means the
+    // suburb where this anonymous visitor found the Wall, never an owner-set
+    // global Wall location.
     location_hint: row.location_hint || '',
     first_discovered_at: row.first_discovered_at || null,
     last_visited_at: row.last_visited_at || null,
@@ -83,7 +87,7 @@ function wallJson(row) {
 async function discoveredWall(sessionId, wallId) {
   if (!validUuid(wallId)) return null;
   const result = await pool.query(
-    `select w.id, w.slug, w.display_name, w.location_hint,
+    `select w.id, w.slug, w.display_name,
             v.first_discovered_at, v.last_visited_at, v.write_access_until
        from wall_visits v
        join walls w on w.id = v.wall_id
@@ -112,6 +116,8 @@ mountCommerce(app);
 mountCustomerSecurity(app);
 // The native app completes first-scan setup without handing the user to a browser.
 mountAppFirstSetup(app);
+// Scan coordinates and per-visitor suburb labels are stored separately from the Wall itself.
+mountWallDiscoveryLocations(app);
 // Browser first-scan setup and the setup-required guard remain as a fallback for users without the app.
 mountPlaqueSetup(app);
 mountSetupGuard(app);
@@ -137,7 +143,7 @@ app.post('/api/tags/open', requireSession, async (req, res, next) => {
   try {
     await client.query('begin');
     const tagResult = await client.query(
-      `select w.id, w.slug, w.display_name, w.location_hint
+      `select w.id, w.slug, w.display_name, ''::text as location_hint
          from wall_tags t
          join walls w on w.id = t.wall_id
         where t.token_hash = $1 and t.active = true and w.active = true
@@ -173,7 +179,16 @@ app.post('/api/tags/open', requireSession, async (req, res, next) => {
 app.get('/api/walls', requireSession, async (req, res, next) => {
   try {
     const result = await pool.query(
-      `select w.id, w.slug, w.display_name, w.location_hint,
+      `select w.id, w.slug, w.display_name,
+              coalesce((
+                select nullif(trim(l.suburb), '')
+                  from wall_scan_locations l
+                 where l.session_id = v.session_id
+                   and l.wall_id = w.id
+                   and trim(l.suburb) <> ''
+                 order by l.scanned_at asc
+                 limit 1
+              ), '') as location_hint,
               v.first_discovered_at, v.last_visited_at, v.write_access_until
          from wall_visits v
          join walls w on w.id = v.wall_id
@@ -190,7 +205,16 @@ app.get('/api/walls', requireSession, async (req, res, next) => {
 app.get('/api/walls/:slug', requireSession, async (req, res, next) => {
   try {
     const result = await pool.query(
-      `select w.id, w.slug, w.display_name, w.location_hint,
+      `select w.id, w.slug, w.display_name,
+              coalesce((
+                select nullif(trim(l.suburb), '')
+                  from wall_scan_locations l
+                 where l.session_id = v.session_id
+                   and l.wall_id = w.id
+                   and trim(l.suburb) <> ''
+                 order by l.scanned_at asc
+                 limit 1
+              ), '') as location_hint,
               v.first_discovered_at, v.last_visited_at, v.write_access_until
          from wall_visits v
          join walls w on w.id = v.wall_id
