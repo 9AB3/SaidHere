@@ -38,6 +38,78 @@ workflows:
       - build/web/**
       - build/app/outputs/flutter-apk/*.apk
 
+  saidhere-android:
+    name: The Wall Android release
+    max_build_duration: 60
+    environment:
+      groups:
+        - android_maps_config
+      android_signing:
+        - saidhere_android_upload
+      flutter: stable
+      vars:
+        APP_HOST: nfc.saidhere.app
+        API_BASE_URL: https://saidhere.app
+    scripts:
+      - name: Generate Android release project
+        script: |
+          set -euo pipefail
+          test -n "${ANDROID_GOOGLE_MAPS_API_KEY:-}" || { echo 'FAIL: Add ANDROID_GOOGLE_MAPS_API_KEY to the android_maps_config Codemagic group.'; exit 1; }
+          export GOOGLE_MAPS_API_KEY="$ANDROID_GOOGLE_MAPS_API_KEY"
+          python3 tool/bootstrap_platforms.py --host "$APP_HOST"
+          python3 tool/android_release_patch.py --host "$APP_HOST"
+          flutter pub get
+      - name: Verify Android production configuration
+        script: |
+          set -euo pipefail
+          test -n "${CM_KEYSTORE_PATH:-}" || { echo 'FAIL: Upload the Android keystore to Codemagic with reference saidhere_android_upload.'; exit 1; }
+          test -n "${CM_KEYSTORE_PASSWORD:-}"
+          test -n "${CM_KEY_ALIAS:-}"
+          test -n "${CM_KEY_PASSWORD:-}"
+          grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.NFC' android/app/src/main/AndroidManifest.xml
+          grep -q 'android:scheme="saidhere"' android/app/src/main/AndroidManifest.xml
+          grep -q 'android:host="nfc.saidhere.app"' android/app/src/main/AndroidManifest.xml
+          grep -q 'com.google.android.geo.API_KEY' android/app/src/main/AndroidManifest.xml
+          grep -q 'SAIDHERE_RELEASE_SIGNING' android/app/build.gradle.kts || grep -q 'SAIDHERE_RELEASE_SIGNING' android/app/build.gradle
+          grep -q 'saidhere/nfc_writer' android/app/src/main/kotlin/app/saidhere/said_here/MainActivity.kt
+      - name: Analyze
+        script: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Test
+        script: flutter test
+      - name: Build signed Android App Bundle
+        script: |
+          set -euo pipefail
+          BUILD_NUMBER="${PROJECT_BUILD_NUMBER:-1}"
+          flutter build appbundle --release \
+            --build-name=0.1.0 \
+            --build-number="$BUILD_NUMBER" \
+            --dart-define=API_BASE_URL="$API_BASE_URL" \
+            --dart-define=APP_HOST="$APP_HOST" \
+            --dart-define=GOOGLE_MAPS_API_KEY="$ANDROID_GOOGLE_MAPS_API_KEY"
+          jarsigner -verify -strict build/app/outputs/bundle/release/app-release.aab
+      - name: Build signed Android APK
+        script: |
+          set -euo pipefail
+          BUILD_NUMBER="${PROJECT_BUILD_NUMBER:-1}"
+          flutter build apk --release \
+            --build-name=0.1.0 \
+            --build-number="$BUILD_NUMBER" \
+            --dart-define=API_BASE_URL="$API_BASE_URL" \
+            --dart-define=APP_HOST="$APP_HOST" \
+            --dart-define=GOOGLE_MAPS_API_KEY="$ANDROID_GOOGLE_MAPS_API_KEY"
+      - name: Print upload certificate fingerprints
+        script: |
+          set -euo pipefail
+          keytool -list -v \
+            -keystore "$CM_KEYSTORE_PATH" \
+            -storepass "$CM_KEYSTORE_PASSWORD" \
+            -alias "$CM_KEY_ALIAS" \
+            -keypass "$CM_KEY_PASSWORD" | grep -E 'SHA1:|SHA256:' || true
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab
+      - build/app/outputs/flutter-apk/*-release.apk
+
   saidhere-ios:
     name: SaidHere iOS TestFlight
     max_build_duration: 60
