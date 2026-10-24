@@ -270,12 +270,14 @@ class _WallScreenState extends State<WallScreen> {
                 post: root,
                 onReply: canWrite ? () => _openComposer(parent: root) : null,
                 onReport: () => _report(root),
+                onBlock: () => _blockAuthor(root),
               ),
               for (final reply in replies)
                 PostCard(
                   post: reply,
                   depth: 1,
                   onReport: () => _report(reply),
+                  onBlock: () => _blockAuthor(reply),
                 ),
             ],
           );
@@ -394,6 +396,43 @@ class _WallScreenState extends State<WallScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not report this message. ${error.toString()}')),
+      );
+    }
+  }
+
+  Future<void> _blockAuthor(WallPost post) async {
+    final shouldBlock = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Block this poster?'),
+        content: const Text(
+          'Messages from this anonymous poster will be hidden from you across The Wall. They will not be told that you blocked them.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('CANCEL'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('BLOCK'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldBlock != true) return;
+    try {
+      await widget.service.blockPostAuthor(post.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Anonymous poster blocked.')),
+      );
+      await _load();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not block this poster. ${error.toString()}')),
       );
     }
   }
