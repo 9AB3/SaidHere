@@ -14,6 +14,10 @@ function number(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function clean(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 export function mountWallDiscoveryLocations(app) {
   const router = express.Router();
 
@@ -25,6 +29,7 @@ export function mountWallDiscoveryLocations(app) {
       const latitude = number(req.body?.latitude);
       const longitude = number(req.body?.longitude);
       const accuracy = number(req.body?.accuracy_metres);
+      const suburb = clean(req.body?.suburb).slice(0, 120);
       if (latitude == null || latitude < -90 || latitude > 90 ||
           longitude == null || longitude < -180 || longitude > 180 ||
           accuracy == null || accuracy < 0 || accuracy > 5000) {
@@ -49,9 +54,9 @@ export function mountWallDiscoveryLocations(app) {
 
       await pool.query(
         `insert into wall_scan_locations
-           (session_id, wall_id, latitude, longitude, accuracy_metres)
-         values ($1, $2, $3, $4, $5)`,
-        [req.sessionId, req.params.wallId, latitude, longitude, accuracy],
+           (session_id, wall_id, latitude, longitude, accuracy_metres, suburb)
+         values ($1, $2, $3, $4, $5, $6)`,
+        [req.sessionId, req.params.wallId, latitude, longitude, accuracy, suburb],
       );
       return res.status(201).json({ ok: true });
     } catch (error) {
@@ -70,6 +75,7 @@ export function mountWallDiscoveryLocations(app) {
                 l.latitude,
                 l.longitude,
                 l.accuracy_metres,
+                l.suburb,
                 l.scanned_at,
                 counts.scan_count
            from wall_scan_locations l
