@@ -5,6 +5,7 @@ class WallDiscovery {
     required this.longitude,
     required this.scannedAt,
     required this.scanCount,
+    required this.suburb,
     this.accuracyMetres,
   });
 
@@ -14,6 +15,7 @@ class WallDiscovery {
   final double? accuracyMetres;
   final DateTime scannedAt;
   final int scanCount;
+  final String suburb;
 
   factory WallDiscovery.fromMap(Map<String, dynamic> map) {
     double number(dynamic value) => value is num
@@ -29,6 +31,7 @@ class WallDiscovery {
       scannedAt: DateTime.tryParse((map['scanned_at'] ?? '').toString())?.toLocal() ??
           DateTime.now(),
       scanCount: int.tryParse((map['scan_count'] ?? '1').toString()) ?? 1,
+      suburb: (map['suburb'] ?? '').toString().trim(),
     );
   }
 }
