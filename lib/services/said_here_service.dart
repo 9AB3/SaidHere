@@ -235,6 +235,28 @@ class SaidHereService {
     _decode(response);
   }
 
+  Future<void> blockPostAuthor(String postId) async {
+    final response = await _authorized(
+      (headers) => _http.post(
+        _uri('/api/posts/${Uri.encodeComponent(postId)}/block'),
+        headers: headers,
+        body: '{}',
+      ),
+    );
+    _decode(response);
+  }
+
+  Future<void> deleteAnonymousData() async {
+    final response = await _authorized(
+      (headers) => _http.delete(
+        _uri('/api/session'),
+        headers: headers,
+      ),
+    );
+    _decode(response);
+    await _resetSession();
+  }
+
   Future<List<Wall>> getMyWalls() async {
     final response = await _authorized(
       (headers) => _http.get(_uri('/api/walls'), headers: headers),
