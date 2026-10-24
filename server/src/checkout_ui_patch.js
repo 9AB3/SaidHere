@@ -42,6 +42,14 @@ const CHECKOUT_SCRIPT = String.raw`(() => {
   render();
 })();`;
 
+function replaceOwnerLocationCopy(body) {
+  if (typeof body !== 'string') return body;
+  return body
+    .replace('Name and location are set on the first scan.', 'Name your Wall on the first scan.')
+    .replace('its first NFC scan lets you choose the name and location.', 'its first NFC scan lets you choose the Wall name.')
+    .replace('On the first scan you choose the Wall name and location.', 'On the first scan you choose the Wall name.');
+}
+
 export function installCheckoutUiPatch(app) {
   // Serve the checkout behaviour directly from the Node app. This avoids relying
   // on Render's copied static directory and remains allowed by Helmet's script-src 'self'.
@@ -55,12 +63,8 @@ export function installCheckoutUiPatch(app) {
 
     const originalSend = res.send.bind(res);
     res.send = (body) => {
+      body = replaceOwnerLocationCopy(body);
       if (typeof body === 'string' && body.includes('id="quantity"')) {
-        // The owner no longer assigns a global Wall location during setup.
-        body = body
-          .replace('Name and location are set on the first scan.', 'Name your Wall on the first scan.')
-          .replace('its first NFC scan lets you choose the name and location.', 'its first NFC scan lets you choose the Wall name.');
-
         // Remove the original inline checkout script, which Helmet correctly blocks,
         // then load the CSP-safe server-served script instead.
         body = body.replace(/<script>\(\(\)=>\{[\s\S]*?<\/script>/, '');
@@ -73,6 +77,14 @@ export function installCheckoutUiPatch(app) {
       }
       return originalSend(body);
     };
+    return next();
+  });
+
+  // The polished purchase-success renderer is registered after this middleware.
+  // Keep its first-scan copy aligned with the app's name-only owner setup too.
+  app.use('/purchase', (_req, res, next) => {
+    const originalSend = res.send.bind(res);
+    res.send = (body) => originalSend(replaceOwnerLocationCopy(body));
     return next();
   });
 }
