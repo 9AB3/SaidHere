@@ -7,6 +7,7 @@ import { installCommerceEmailPolish, mountCommercePolish } from './commerce_poli
 import { installCheckoutUiPatch } from './checkout_ui_patch.js';
 import { installCustomerPortalUiPatch } from './customer_portal_ui_patch.js';
 import { installOrderReferenceEmailPatch } from './email_order_ref_patch.js';
+import { installPurchaseSuccessUiPatch } from './purchase_success_ui_patch.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const publicRoot = path.resolve(here, '..', 'public');
@@ -85,6 +86,7 @@ export function mountCanonicalWebRedirect(app) {
 
   installCheckoutUiPatch(app);
   installCustomerPortalUiPatch(app);
+  installPurchaseSuccessUiPatch(app);
 
   // These routes are deliberately registered before the legacy commerce and
   // purchase-success mounts in index.js, so they become the customer-facing flow
