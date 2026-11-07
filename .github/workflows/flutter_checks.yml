@@ -60,7 +60,7 @@ jobs:
       - name: Build signed Android release AAB
         run: >-
           flutter build appbundle --release
-          --build-name=0.1.0
+          --build-name=1.0.0
           --build-number="$GITHUB_RUN_NUMBER"
           --dart-define=API_BASE_URL="$API_BASE_URL"
           --dart-define=APP_HOST="$APP_HOST"
