@@ -155,135 +155,14 @@ def patch_play_api_level() -> None:
     if kts.exists():
         path = kts
         patterns = (
-            (r'(?m)^(\s*)compileSdk\s*=\s*(?:flutter\.compileSdkVersion|\d+)\s*
-    template = ROOT / 'tool/android_main_activity.kt'
-    if not template.exists():
-        raise RuntimeError(f'Missing Android activity template: {template}')
-    MAIN_ACTIVITY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(template, MAIN_ACTIVITY_PATH)
-    activity = MAIN_ACTIVITY_PATH.read_text(encoding='utf-8')
-    if f'package {MAIN_ACTIVITY_PACKAGE}' not in activity:
-        raise RuntimeError('Android activity template package does not match generated application package')
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--host', default='nfc.saidhere.app')
-    args = parser.parse_args()
-
-    if not ANDROID.exists():
-        raise RuntimeError('Run tool/bootstrap_platforms.py before Android release patching')
-
-    patch_manifest(args.host)
-    patch_play_api_level()
-    patch_signing()
-    install_main_activity()
-    print('Android production patch applied')
-    print(f'Package: {MAIN_ACTIVITY_PACKAGE}')
-    print(f'App Link host: {args.host}')
-    print('Release signing: CM_KEYSTORE_* / CM_KEY_* environment variables')
-
-
-if __name__ == '__main__':
-    main()
-, 'compileSdk = 36'),
-            (r'(?m)^(\s*)targetSdk\s*=\s*(?:flutter\.targetSdkVersion|\d+)\s*
-    template = ROOT / 'tool/android_main_activity.kt'
-    if not template.exists():
-        raise RuntimeError(f'Missing Android activity template: {template}')
-    MAIN_ACTIVITY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(template, MAIN_ACTIVITY_PATH)
-    activity = MAIN_ACTIVITY_PATH.read_text(encoding='utf-8')
-    if f'package {MAIN_ACTIVITY_PACKAGE}' not in activity:
-        raise RuntimeError('Android activity template package does not match generated application package')
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--host', default='nfc.saidhere.app')
-    args = parser.parse_args()
-
-    if not ANDROID.exists():
-        raise RuntimeError('Run tool/bootstrap_platforms.py before Android release patching')
-
-    patch_manifest(args.host)
-    patch_signing()
-    install_main_activity()
-    print('Android production patch applied')
-    print(f'Package: {MAIN_ACTIVITY_PACKAGE}')
-    print(f'App Link host: {args.host}')
-    print('Release signing: CM_KEYSTORE_* / CM_KEY_* environment variables')
-
-
-if __name__ == '__main__':
-    main()
-, 'targetSdk = 36'),
+            (r'(?m)^(\s*)compileSdk\s*=\s*(?:flutter\.compileSdkVersion|\d+)\s*$', 'compileSdk = 36'),
+            (r'(?m)^(\s*)targetSdk\s*=\s*(?:flutter\.targetSdkVersion|\d+)\s*$', 'targetSdk = 36'),
         )
     elif groovy.exists():
         path = groovy
         patterns = (
-            (r'(?m)^(\s*)(?:compileSdkVersion|compileSdk)\s+(?:flutter\.compileSdkVersion|\d+)\s*
-    template = ROOT / 'tool/android_main_activity.kt'
-    if not template.exists():
-        raise RuntimeError(f'Missing Android activity template: {template}')
-    MAIN_ACTIVITY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(template, MAIN_ACTIVITY_PATH)
-    activity = MAIN_ACTIVITY_PATH.read_text(encoding='utf-8')
-    if f'package {MAIN_ACTIVITY_PACKAGE}' not in activity:
-        raise RuntimeError('Android activity template package does not match generated application package')
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--host', default='nfc.saidhere.app')
-    args = parser.parse_args()
-
-    if not ANDROID.exists():
-        raise RuntimeError('Run tool/bootstrap_platforms.py before Android release patching')
-
-    patch_manifest(args.host)
-    patch_signing()
-    install_main_activity()
-    print('Android production patch applied')
-    print(f'Package: {MAIN_ACTIVITY_PACKAGE}')
-    print(f'App Link host: {args.host}')
-    print('Release signing: CM_KEYSTORE_* / CM_KEY_* environment variables')
-
-
-if __name__ == '__main__':
-    main()
-, 'compileSdkVersion 36'),
-            (r'(?m)^(\s*)(?:targetSdkVersion|targetSdk)\s+(?:flutter\.targetSdkVersion|\d+)\s*
-    template = ROOT / 'tool/android_main_activity.kt'
-    if not template.exists():
-        raise RuntimeError(f'Missing Android activity template: {template}')
-    MAIN_ACTIVITY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(template, MAIN_ACTIVITY_PATH)
-    activity = MAIN_ACTIVITY_PATH.read_text(encoding='utf-8')
-    if f'package {MAIN_ACTIVITY_PACKAGE}' not in activity:
-        raise RuntimeError('Android activity template package does not match generated application package')
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--host', default='nfc.saidhere.app')
-    args = parser.parse_args()
-
-    if not ANDROID.exists():
-        raise RuntimeError('Run tool/bootstrap_platforms.py before Android release patching')
-
-    patch_manifest(args.host)
-    patch_signing()
-    install_main_activity()
-    print('Android production patch applied')
-    print(f'Package: {MAIN_ACTIVITY_PACKAGE}')
-    print(f'App Link host: {args.host}')
-    print('Release signing: CM_KEYSTORE_* / CM_KEY_* environment variables')
-
-
-if __name__ == '__main__':
-    main()
-, 'targetSdkVersion 36'),
+            (r'(?m)^(\s*)(?:compileSdkVersion|compileSdk)\s+(?:flutter\.compileSdkVersion|\d+)\s*$', 'compileSdkVersion 36'),
+            (r'(?m)^(\s*)(?:targetSdkVersion|targetSdk)\s+(?:flutter\.targetSdkVersion|\d+)\s*$', 'targetSdkVersion 36'),
         )
     else:
         raise RuntimeError('Could not find Android Gradle configuration for API 36')
@@ -316,6 +195,7 @@ def main() -> None:
         raise RuntimeError('Run tool/bootstrap_platforms.py before Android release patching')
 
     patch_manifest(args.host)
+    patch_play_api_level()
     patch_signing()
     install_main_activity()
     print('Android production patch applied')
