@@ -82,7 +82,7 @@ workflows:
           set -euo pipefail
           BUILD_NUMBER="${PROJECT_BUILD_NUMBER:-1}"
           flutter build appbundle --release \
-            --build-name=0.1.0 \
+            --build-name=1.0.0 \
             --build-number="$BUILD_NUMBER" \
             --dart-define=API_BASE_URL="$API_BASE_URL" \
             --dart-define=APP_HOST="$APP_HOST" \
@@ -93,7 +93,7 @@ workflows:
           set -euo pipefail
           BUILD_NUMBER="${PROJECT_BUILD_NUMBER:-1}"
           flutter build apk --release \
-            --build-name=0.1.0 \
+            --build-name=1.0.0 \
             --build-number="$BUILD_NUMBER" \
             --dart-define=API_BASE_URL="$API_BASE_URL" \
             --dart-define=APP_HOST="$APP_HOST" \
