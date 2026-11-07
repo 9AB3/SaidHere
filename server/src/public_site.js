@@ -108,6 +108,11 @@ export function mountPublicSite(app) {
     return res.sendFile(path.join(publicRoot, 'support', 'index.html'));
   });
 
+  app.get(['/child-safety', '/child-safety/'], (_req, res) => {
+    noStore(res);
+    return res.sendFile(path.join(publicRoot, 'child-safety', 'index.html'));
+  });
+
   app.get('/t/:token', (req, res) => {
     const token = encodeURIComponent(req.params.token || '');
     return renderAppFallback(res, `saidhere://t/${token}`);
