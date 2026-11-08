@@ -6,7 +6,7 @@ projects:
           - type: web
             name: saidhere-api-9ab3
             runtime: node
-            plan: free
+            plan: starter
             region: singapore
             rootDir: server
             buildCommand: >-
@@ -64,7 +64,7 @@ projects:
 
         databases:
           - name: saidhere-db-9ab3
-            plan: free
+            plan: basic_256mb
             region: singapore
             databaseName: saidhere
             user: saidhere
