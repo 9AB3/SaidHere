@@ -79,7 +79,28 @@ def patch_android(host: str, maps_key: str) -> None:
             text = text[:app_open_end + 1] + maps_meta + text[app_open_end + 1:]
 
     if 'SAIDHERE_APP_LINK' not in text:
-        intent = f'''\n            <!-- SAIDHERE_APP_LINK -->\n            <intent-filter android:autoVerify="true">\n                <action android:name="android.intent.action.VIEW" />\n                <category android:name="android.intent.category.DEFAULT" />\n                <category android:name="android.intent.category.BROWSABLE" />\n                <data android:scheme="https" android:host="{host}" android:pathPrefix="/t/" />\n                <data android:scheme="https" android:host="{host}" android:pathPrefix="/w/" />\n            </intent-filter>\n'''
+        # Production NFC links use saidhere.app; Codemagic may also use nfc.saidhere.app.
+        # Both must be declared for Android to be eligible to open their HTTPS links.
+        link_hosts = sorted({'saidhere.app', host})
+        filters = []
+        for link_host in link_hosts:
+            filters.append(f'''\n            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="{link_host}" android:pathPrefix="/t/" />
+                <data android:scheme="https" android:host="{link_host}" android:pathPrefix="/w/" />
+            </intent-filter>''')
+        # Allow manual fallback links to open the app without an Android App Link
+        # verification. The path is handled by the existing Flutter router.
+        filters.append('''
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="saidhere" />
+            </intent-filter>''')
+        intent = '\n            <!-- SAIDHERE_APP_LINK -->' + ''.join(filters) + '\n'
         text = text.replace('</activity>', intent + '        </activity>', 1)
     manifest.write_text(text, encoding='utf-8')
 
