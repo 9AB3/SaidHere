@@ -46,8 +46,14 @@ function sendAppleAssociation(res) {
 
 function renderAppFallback(res, appHref) {
   const template = fs.readFileSync(fallbackPath, 'utf8');
+  // Chrome's explicit Android intent can launch the app even when HTTPS
+  // App Link verification is not yet configured, provided its manifest
+  // includes the existing nfc.saidhere.app VIEW intent filter.
+  const route = new URL(appHref).hostname + new URL(appHref).pathname;
+  const androidHref = `intent://nfc.saidhere.app/${route}#Intent;scheme=https;package=app.saidhere.said_here;end`;
   const html = template
     .replace('href="saidhere://"', `href="${appHref}"`)
+    .replace('href="saidhere-android://"', `href="${androidHref}"`)
     .replace(/\n\s*<script>[\s\S]*?<\/script>\s*/i, '\n');
   res.type('html');
   noStore(res);
