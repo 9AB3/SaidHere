@@ -94,6 +94,23 @@ try {
     }
   }
 
+  // One-time public Android test Wall, with only the SHA-256 tag hash in source.
+  // Re-running migrations must never reset the Wall or its tag.
+  const androidTestWall = await pool.query(
+    `insert into walls (slug, display_name, location_hint, active, setup_required)
+     values ('AndroidTesters', 'AndroidTesters', 'Online Android testing group', true, false)
+     on conflict (slug) do nothing
+     returning id`,
+  );
+  if (androidTestWall.rowCount > 0) {
+    await pool.query(
+      `insert into wall_tags (wall_id, token_hash, active)
+       values ($1, $2, true)`,
+      [androidTestWall.rows[0].id, '4ac78a79d43ed3296a50ae1988c3afca44e0c795e86c4d4ba5aae64c903ac9ca'],
+    );
+    console.log('Created AndroidTesters public testing Wall.');
+  }
+
   // Keep long-running production databases from accumulating expired auth and
   // one-time fulfilment state.
   await pool.query(`delete from admin_sessions where expires_at <= now()`);
