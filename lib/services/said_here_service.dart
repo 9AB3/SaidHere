@@ -257,6 +257,18 @@ class SaidHereService {
     await _resetSession();
   }
 
+  /// Server deduplicates first opens by anonymous session.
+  Future<void> reportFirstOpen({required String platform}) async {
+    final response = await _authorized(
+      (headers) => _http.post(
+        _uri('/api/app/first-open'),
+        headers: headers,
+        body: jsonEncode({'platform': platform}),
+      ),
+    );
+    _decode(response);
+  }
+
   Future<List<Wall>> getMyWalls() async {
     final response = await _authorized(
       (headers) => _http.get(_uri('/api/walls'), headers: headers),
