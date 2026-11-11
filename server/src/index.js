@@ -19,6 +19,7 @@ import { mountSetupGuard } from './setup_guard.js';
 import { mountCustomerPortal } from './customer_portal.runtime.js';
 import { mountCanonicalWebRedirect, mountPublicSite } from './public_site.js';
 import { mountWallDiscoveryLocations } from './wall_discovery_locations.js';
+import { mountFirstOpenNotifications } from './first_open_notifications.js';
 
 const app = express();
 const port = Number(process.env.PORT || 10000);
@@ -134,6 +135,9 @@ app.post('/api/session', sessionLimiter, async (_req, res, next) => {
     return next(error);
   }
 });
+
+// First launch notifications are independent of NFC Wall discovery.
+mountFirstOpenNotifications(app, { requireSession, pool });
 
 app.post('/api/tags/open', requireSession, async (req, res, next) => {
   const tagToken = cleanBody(req.body?.token);
