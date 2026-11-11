@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Analytics · SaidHere Admin</title>
+<style>
+.ana{max-width:1200px;margin:0 auto 50px;color:#17191d}
+.ana-head{display:flex;align-items:start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:15px}
+.ana-head h2{font-size:22px;letter-spacing:-.5px;margin:0 0 5px}
+.ana-head p{font-size:11px;color:#69737e;margin:0}
+.ana-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ana select,.ana button,.ana .ana-link{border:1px solid #d9dce1;background:#fff;color:#20242a;border-radius:8px;padding:10px 11px;font-size:11px;font-weight:750;cursor:pointer}
+.ana .ana-link{text-decoration:none;display:inline-block}
+.ana-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.ana-card,.ana-panel{background:#fff;border:1px solid #e3e6ea;border-radius:12px;box-shadow:0 2px 8px rgba(25,29,35,.035)}
+.ana-card{padding:17px 19px;min-height:113px}
+.ana-label{color:#68727e;font-size:11px;font-weight:800}
+.ana-value{display:block;font-size:30px;letter-spacing:-1px;font-weight:850;margin:8px 0 0;font-variant-numeric:tabular-nums}
+.ana-desc{display:block;margin-top:6px;font-size:10px;color:#828994}
+.ana-section{margin-top:14px;display:grid;grid-template-columns:minmax(0,1.7fr) minmax(260px,.95fr);gap:12px}
+.ana-panel{padding:17px;min-width:0}
+.ana-panel h3{font-size:15px;margin:0}
+.ana-sub{margin:5px 0 13px;font-size:11px;line-height:1.5;color:#757e88}
+.ana-panel-head{display:flex;justify-content:space-between;align-items:start;gap:10px;flex-wrap:wrap}
+.ana-chart{min-height:240px}.ana-chart svg{display:block;width:100%;height:auto}
+.ana-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:11px;color:#68727e}
+.ana-row{display:flex;justify-content:space-between;font-size:11px;font-weight:750;gap:12px}
+.ana-bars{display:grid;gap:14px}
+.ana-track{height:9px;border-radius:20px;background:#edf0f4;margin-top:7px;overflow:hidden}
+.ana-fill{height:100%;border-radius:20px;background:#303942;min-width:0}
+.ana-fill.alt{background:#4c7a66}
+.ana-table{border-collapse:collapse;width:100%;font-size:12px}
+.ana-table th{text-align:left;color:#69737e;font-size:10px;text-transform:uppercase;letter-spacing:.45px}
+.ana-table td,.ana-table th{border-bottom:1px solid #eef0f2;padding:10px 6px}
+.ana-table th:not(:first-child),.ana-table td:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}
+.ana-table td:first-child{font-weight:750}
+.ana-note{padding:13px 15px;margin-top:16px;border:1px solid #e1e5e9;border-radius:9px;background:#f8f9fb;color:#626b75;line-height:1.65;font-size:11px}
+.ana-empty{padding:36px 12px;text-align:center;color:#8a929d;font-size:12px}
+.ana-status{color:#a13e35;font-size:11px;min-height:14px}
+.ana-top{margin-top:14px}
+@media(max-width:930px){.ana-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ana-section{grid-template-columns:1fr}}
+@media(max-width:520px){.ana-grid{gap:8px}.ana-card{padding:12px;min-height:100px}.ana-value{font-size:25px}.ana-panel{padding:12px}.ana-head h2{font-size:20px}.ana-actions{width:100%}.ana .ana-link{flex:1;text-align:center}}
+</style>
+<script src="/admin/ui.js" defer></script>
+<script src="/admin/analytics-client.js" defer></script>
+</head>
+<body>
+<main class="shell">
+<header class="top"><div><h1>SaidHere</h1><small>Admin console</small></div><div><span>Main Admin · Main Admin</span></div></header>
+<nav class="nav"><a href="/admin/walls">Walls</a><a class="active" href="/admin/analytics">Analytics</a><a href="/admin/orders">Orders</a><a href="/admin/users">Users</a></nav>
+<section class="ana" aria-label="Said Here analytics">
+  <div class="ana-head"><div><h2>Performance overview</h2><p>App launches, NFC engagement and Wall purchases · Australia/Sydney</p></div>
+    <div class="ana-actions"><label for="anaRange">Period</label><select id="anaRange" aria-label="Reporting period"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select><button id="anaRefresh" type="button">Refresh</button><a id="anaExport" class="ana-link" href="/admin/analytics/export.csv?days=30">Export CSV</a></div></div>
+  <div id="anaStatus" class="ana-status" role="status" aria-live="polite"></div>
+  <div class="ana-grid">
+    <div class="ana-card"><span class="ana-label">First app opens</span><strong class="ana-value" data-kpi="first_opens">—</strong><span class="ana-desc">Instrumented iOS + Android builds</span></div>
+    <div class="ana-card"><span class="ana-label">NFC Wall opens</span><strong class="ana-value" data-kpi="scans">—</strong><span class="ana-desc">Successful recorded tag opens</span></div>
+    <div class="ana-card"><span class="ana-label">Unique Wall visitors</span><strong class="ana-value" data-kpi="visitors">—</strong><span class="ana-desc">Distinct anonymous sessions</span></div>
+    <div class="ana-card"><span class="ana-label">Active app sessions</span><strong class="ana-value" data-kpi="active_sessions">—</strong><span class="ana-desc">Used the API during this period</span></div>
+    <div class="ana-card"><span class="ana-label">Visible posts</span><strong class="ana-value" data-kpi="posts">—</strong><span class="ana-desc">Messages and replies</span></div>
+    <div class="ana-card"><span class="ana-label">Paid orders</span><strong class="ana-value" data-kpi="paid_orders">—</strong><span class="ana-desc">Stripe-confirmed orders</span></div>
+    <div class="ana-card"><span class="ana-label">Revenue (AUD)</span><strong class="ana-value" data-kpi="revenue_cents">—</strong><span class="ana-desc">Current paid/fulfilled orders; refunds excluded, before fees</span></div>
+  </div>
+  <div class="ana-section">
+    <section class="ana-panel"><div class="ana-panel-head"><div><h3>Activity over time</h3><p class="ana-sub">Daily event counts · Sydney dates</p></div><select id="anaMetric" aria-label="Activity metric"><option value="scans">NFC opens</option><option value="first_opens">First app opens</option><option value="posts">Posts</option><option value="paid_orders">Paid orders</option><option value="revenue">Revenue (AUD)</option><option value="store_click">App store link clicks</option></select></div><div id="anaChart" class="ana-chart"></div><div id="anaLegend" class="ana-legend"></div></section>
+    <section class="ana-panel"><h3>First opens by platform</h3><p class="ana-sub">Tracked native first launches — not store downloads</p><div id="anaPlatforms" class="ana-bars"></div><hr style="border:0;border-top:1px solid #edf0f2;margin:22px 0"><h3>How visitors arrived</h3><p class="ana-sub">Landing-page visits by coarse referral source</p><div id="anaSources" class="ana-bars"></div></section>
+  </div>
+  <div class="ana-section">
+    <section class="ana-panel"><h3>App discovery journey</h3><p class="ana-sub">Different event totals, not a same-user funnel. Rates cannot yet be calculated reliably.</p><div id="anaAppJourney" class="ana-bars"></div></section>
+    <section class="ana-panel"><h3>Wall purchase journey</h3><p class="ana-sub">Separate event totals — checkout completion is directional, not attributed to one visit.</p><div id="anaSalesJourney" class="ana-bars"></div></section>
+  </div>
+  <section class="ana-panel ana-top"><h3>Most active Walls</h3><p class="ana-sub">Recorded NFC opens, distinct visitors and visible posts for the period</p><div style="overflow:auto"><table class="ana-table"><thead><tr><th>Wall</th><th>Scans</th><th>Visitors</th><th>Posts</th></tr></thead><tbody id="anaWalls"></tbody></table></div></section>
+  <div class="ana-note" id="anaNote"><strong>Tracking coverage:</strong> First-open data requires the new iOS/Android app builds. Landing and store-click events start after this website update is deployed; earlier visits cannot be reconstructed. Store downloads, retention and crash statistics still come from App Store Connect, Google Play or a separate mobile analytics integration. Anonymous session metrics are estimates of people, not verified individuals.</div>
+</section>
+</main>
+</body>
+</html>

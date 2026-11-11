@@ -146,7 +146,7 @@ function shell({ admin, title, subtitle, content, script = '' }) {
 
 function listPage(admin, walls) {
   const rows = walls.map((wall) => `<a class="wm-row" href="/admin/walls/${encodeURIComponent(wall.id)}" data-search="${escapeHtml((wall.display_name + ' ' + ownerLabel(wall)).toLowerCase())}"><div class="wm-name">${escapeHtml(wall.display_name)}</div><div class="wm-owner">${escapeHtml(ownerLabel(wall))}</div><span class="wm-status ${wall.active ? 'on' : 'off'}">${wall.active ? 'Active' : 'Inactive'}</span><span class="wm-chevron">›</span></a>`).join('');
-  const content = `<div class="wm-toolbar"><div><h2>Walls</h2><p>Read-only overview of deployed Walls.</p></div><a class="wm-btn" href="/admin/walls/analytics">Analytics</a></div><input id="wmWallSearch" class="wm-search" type="search" placeholder="Search Wall or owner"><div class="wm-list"><div class="wm-head"><span>Wall</span><span>Owner</span><span>Status</span><span></span></div>${rows || '<div class="wm-empty">No Walls available.</div>'}</div>`;
+  const content = `<div class="wm-toolbar"><div><h2>Walls</h2><p>Read-only overview of deployed Walls.</p></div><a class="wm-btn" href="/admin/walls/analytics">Wall activity charts</a></div><input id="wmWallSearch" class="wm-search" type="search" placeholder="Search Wall or owner"><div class="wm-list"><div class="wm-head"><span>Wall</span><span>Owner</span><span>Status</span><span></span></div>${rows || '<div class="wm-empty">No Walls available.</div>'}</div>`;
   return shell({ admin, title: 'Walls', subtitle: '', content, script: '/admin/walls-monitor.js' });
 }
 

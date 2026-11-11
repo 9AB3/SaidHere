@@ -7,6 +7,27 @@ create table if not exists visitor_sessions (
   last_seen_at timestamptz not null default now()
 );
 
+-- First native launches only; deleting a visitor session removes its event.
+create table if not exists app_first_opens (
+  session_id uuid primary key references visitor_sessions(id) on delete cascade,
+  platform text not null check (platform in ('ios', 'android')),
+  first_opened_at timestamptz not null default now(),
+  notified_at timestamptz
+);
+
+-- Aggregate-only acquisition events. No IP address, user ID or message contents.
+create table if not exists site_analytics_events (
+  id bigserial primary key,
+  event_type text not null check (event_type in ('landing_view','store_click','shop_view','checkout_started')),
+  platform text check (platform in ('ios','android')),
+  landing text check (landing in ('home','nfc')),
+  source text not null default 'direct',
+  occurred_at timestamptz not null default now()
+);
+create index if not exists idx_site_analytics_time on site_analytics_events(occurred_at desc);
+create index if not exists idx_app_first_opens_time on app_first_opens(first_opened_at desc);
+create index if not exists idx_visitor_sessions_last_seen on visitor_sessions(last_seen_at desc);
+
 create table if not exists walls (
   id uuid primary key default gen_random_uuid(),
   slug text not null unique,
@@ -292,3 +313,6 @@ create index if not exists idx_customer_claim_tokens_customer on customer_claim_
 create index if not exists idx_customer_password_reset_tokens_customer on customer_password_reset_tokens(customer_id, created_at desc);
 create index if not exists idx_customer_password_reset_tokens_expiry on customer_password_reset_tokens(expires_at) where used_at is null;
 create index if not exists idx_customer_audit_customer on customer_audit_log(customer_id, created_at desc);
+
+create index if not exists idx_wall_posts_time_visible on wall_posts(created_at desc) where hidden_at is null;
+create index if not exists idx_paid_orders_time on commerce_orders(paid_at desc) where status in ('paid','fulfilled');

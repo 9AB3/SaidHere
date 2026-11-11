@@ -25,5 +25,7 @@ jobs:
         run: flutter build web --release --dart-define=API_BASE_URL=https://saidhere.app
       - name: Build Android debug APK
         run: flutter build apk --debug --dart-define=API_BASE_URL=https://saidhere.app
+      - name: Install Render API dependencies
+        run: npm install --prefix server --no-audit --no-fund
       - name: Check Render API JavaScript
         run: npm --prefix server run check

@@ -14,6 +14,8 @@ try {
       on wall_visit_events(wall_id, visited_at desc)
   `);
 
+  await pool.query(`create index if not exists idx_wall_visit_events_time on wall_visit_events(visited_at desc)`);
+
   // wall_visits is inserted or updated every time a valid NFC tag is opened. A
   // trigger gives analytics a true scan/event history without changing the app API
   // transaction or the existing per-session visit summary table.

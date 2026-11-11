@@ -9,7 +9,7 @@
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   })[char]);
 
-  const page = path.startsWith('/admin/orders') ? 'orders'
+  const page = path.startsWith('/admin/analytics') ? 'analytics' : path.startsWith('/admin/orders') ? 'orders'
     : path.startsWith('/admin/reports') ? 'moderation'
       : path.startsWith('/admin/users') ? 'users'
         : path === '/admin/audit' ? 'activity'
@@ -19,6 +19,7 @@
   const pageMeta = {
     walls: ['Walls', 'Places, plaques and Wall activity'],
     orders: ['Orders', 'Payment, NFC setup and fulfilment'],
+    analytics: ['Analytics', 'App opens, Wall activity and conversion events'],
     moderation: ['Moderation', 'Reported posts waiting for a decision'],
     users: ['Users', 'Administrator access and Wall assignments'],
     activity: ['Activity', 'Recent administrator actions'],
@@ -118,6 +119,7 @@
   addGroup('Manage', [
     ['/admin/walls', 'Walls', page === 'walls'],
     ...(owner ? [['/admin/orders', 'Orders', page === 'orders']] : []),
+    ...(owner ? [['/admin/analytics', 'Analytics', page === 'analytics']] : []),
     ['/admin/reports', 'Moderation', page === 'moderation'],
   ]);
   if (owner) addGroup('Administration', [

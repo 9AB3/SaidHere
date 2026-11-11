@@ -149,6 +149,26 @@ void main() {
     expect(wall.canWriteNow, isTrue);
   });
 
+  test('first open posts the platform with an anonymous session', () async {
+    var firstOpenCalls = 0;
+    final client = MockClient((request) async {
+      if (request.url.path == '/api/session') {
+        return http.Response(jsonEncode({'token': 'new-session'}), 201);
+      }
+      if (request.url.path == '/api/app/first-open') {
+        firstOpenCalls += 1;
+        expect(request.method, 'POST');
+        expect(request.headers['authorization'], 'Bearer new-session');
+        expect(jsonDecode(request.body)['platform'], 'android');
+        return http.Response(jsonEncode({'ok': true}), 201);
+      }
+      return http.Response('{}', 404);
+    });
+
+    await SaidHereService(client: client).reportFirstOpen(platform: 'android');
+    expect(firstOpenCalls, 1);
+  });
+
   test('server error text is surfaced to the UI layer', () async {
     SharedPreferences.setMockInitialValues({
       'saidhere_api_session': 'session-token',
