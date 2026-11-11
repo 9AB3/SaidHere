@@ -31,6 +31,8 @@ mountStripeWebhook(app);
 
 const csp = helmet.contentSecurityPolicy.getDefaultDirectives();
 csp['form-action'] = ["'self'", 'https://checkout.stripe.com'];
+// Original App Store and Google Play download badges shown on the NFC fallback.
+csp['img-src'] = [...(csp['img-src'] || ["'self'", 'data:']), 'https://developer.apple.com', 'https://play.google.com'];
 app.use(helmet({ contentSecurityPolicy: { directives: csp } }));
 app.use(express.json({ limit: '32kb' }));
 app.use(express.urlencoded({ extended: false, limit: '16kb' }));
