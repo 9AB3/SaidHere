@@ -7,6 +7,14 @@ create table if not exists visitor_sessions (
   last_seen_at timestamptz not null default now()
 );
 
+-- First native launches only; deleting a visitor session removes its event.
+create table if not exists app_first_opens (
+  session_id uuid primary key references visitor_sessions(id) on delete cascade,
+  platform text not null check (platform in ('ios', 'android')),
+  first_opened_at timestamptz not null default now(),
+  notified_at timestamptz
+);
+
 create table if not exists walls (
   id uuid primary key default gen_random_uuid(),
   slug text not null unique,
