@@ -48,6 +48,7 @@ export function mountFirstOpenNotifications(app, { requireSession, pool, fetchIm
             user,
             title: 'Said Here - new installation',
             message: `Said Here was opened for the first time on ${platform === 'ios' ? 'iPhone (iOS)' : 'Android'}.`,
+            ...(process.env.PUSHOVER_DEVICE?.trim() ? { device: process.env.PUSHOVER_DEVICE.trim() } : {}),
           }),
           signal: AbortSignal.timeout(6000),
         });
