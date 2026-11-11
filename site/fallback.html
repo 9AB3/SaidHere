@@ -4,41 +4,42 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#171411">
-  <title>The Wall</title>
+  <title>Open a Wall | The Wall</title>
+  <meta name="description" content="You found a Wall. Install The Wall app to read and leave messages.">
   <style>
-    :root{--ink:#171411;--cream:#eee5d5;--muted:#756b5f;--line:rgba(238,229,213,.18)}*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#b7aa93}body{min-height:100svh;color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:linear-gradient(rgba(216,204,183,.08),rgba(216,204,183,.08)),url('/wall-background.png') center/cover fixed no-repeat}.page{min-height:100svh;display:flex;flex-direction:column;align-items:center;padding:max(22px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom))}.hero{width:min(100%,520px);flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px 0 22px}.plaque{display:block;width:min(76vw,330px);height:auto;filter:drop-shadow(0 14px 16px rgba(20,16,12,.24))}.tagline{margin:30px 0 0;max-width:360px;font-size:24px;line-height:1.06;font-weight:950;letter-spacing:-.6px}.eyebrow{margin:15px 0 0;font-size:11px;font-weight:900;letter-spacing:1.7px;text-transform:uppercase;color:#5e5549}.handoff{width:min(100%,520px);background:rgba(23,20,17,.96);color:var(--cream);padding:22px 20px 20px;box-shadow:0 10px 34px rgba(18,14,10,.25);border:1px solid rgba(255,255,255,.06)}.handoff h1{margin:0 0 8px;font-size:27px;line-height:1;font-weight:950;letter-spacing:-.7px;text-transform:uppercase}.handoff p{margin:0;color:#c9bead;font-size:14px;line-height:1.45;font-weight:600}.actions{display:grid;gap:10px;margin-top:18px}.button{min-height:54px;display:flex;align-items:center;justify-content:center;padding:13px 18px;border:1px solid var(--cream);text-decoration:none;font-size:13px;font-weight:950;letter-spacing:1px;text-transform:uppercase}.button.primary{background:var(--cream);color:var(--ink)}.button.secondary{background:transparent;color:var(--cream)}.platforms{display:grid;gap:12px;margin-top:16px}.platform{padding:16px;border:1px solid var(--line);background:rgba(238,229,213,.07)}.platform h2{margin:0 0 8px;color:var(--cream);font-size:16px;font-weight:950}.platform p{font-size:12px;line-height:1.55}.platform .button{margin-top:12px;min-height:46px}.platform-note{margin-top:10px!important;font-size:11px!important;color:#aaa092!important}.hint{display:flex;gap:10px;align-items:flex-start;padding-top:16px;margin-top:17px;border-top:1px solid var(--line);color:#9f9587;font-size:11px;line-height:1.4;font-weight:700}.hint-mark{flex:0 0 24px;width:24px;height:24px;border:1px solid #70685e;border-radius:50%;display:grid;place-items:center;color:var(--cream);font-size:12px;font-weight:900}footer{width:min(100%,520px);display:flex;justify-content:center;gap:16px;padding:17px 0 0;font-size:11px;font-weight:800}footer a{color:#463f36;text-decoration:none}@media(min-width:700px){.page{padding-left:28px;padding-right:28px}.hero{padding-top:42px}.plaque{width:300px}.tagline{font-size:28px}.handoff{padding:26px}}
+    :root{--ink:#171411;--paper:#f5ede0;--muted:#6b6053}
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    body{color:var(--ink);background:linear-gradient(rgba(235,224,204,.77),rgba(235,224,204,.85)),url('/wall-background.png') center/cover fixed no-repeat}
+    .page{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:max(20px,env(safe-area-inset-top)) 22px max(20px,env(safe-area-inset-bottom))}
+    .content{width:min(100%,390px);text-align:center;margin:auto 0}
+    .plaque{display:block;width:150px;max-width:50vw;height:auto;margin:0 auto 20px;filter:drop-shadow(0 12px 18px rgba(30,23,15,.22))}
+    .eyebrow{margin:0 0 10px;color:#62574a;font-size:11px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase}
+    h1{margin:0;font-size:clamp(30px,9vw,40px);line-height:1.04;letter-spacing:-1.5px;font-weight:950}
+    .description{max-width:310px;margin:14px auto 24px;color:#554d43;font-size:15px;line-height:1.45;font-weight:600}
+    .stores{display:grid;gap:10px}
+    .store{display:flex;align-items:center;justify-content:center;min-height:52px;padding:12px 16px;border:2px solid var(--ink);border-radius:10px;background:var(--ink);color:var(--paper);text-decoration:none;font-size:14px;font-weight:900}
+    .store.secondary{background:rgba(255,251,244,.74);color:var(--ink)}
+    .store:focus-visible,.installed a:focus-visible,footer a:focus-visible{outline:3px solid #806042;outline-offset:3px}
+    .installed{margin:22px 0 0;font-size:13px;color:var(--muted)}
+    .installed a{color:var(--ink);font-weight:900;text-underline-offset:3px}
+    footer{display:flex;gap:20px;justify-content:center;margin-top:30px;font-size:11px;font-weight:800}
+    footer a{color:#554a3e;text-decoration:none}
+    @media(max-height:650px){.plaque{width:105px;margin-bottom:12px}.description{margin-bottom:17px}.installed{margin-top:15px}footer{margin-top:18px}}
   </style>
 </head>
 <body>
   <main class="page">
-    <section class="hero">
+    <section class="content">
       <img class="plaque" src="/plaque.png" alt="The Wall">
-      <p class="tagline">Every place has something to say.</p>
-      <p class="eyebrow">You found one</p>
-    </section>
-    <section class="handoff">
-      <h1>Open this Wall</h1>
-      <p>Read what people have left here. Opening a valid Wall tag link in the app unlocks writing for 15 minutes.</p>
-      <div class="actions">
-        <a id="open-app" class="button primary" href="saidhere://">Open The Wall app</a>
-      </div>
-      <div class="platforms">
-        <section class="platform" aria-label="Android instructions">
-          <h2>Android</h2>
-          <p>1. Install The Wall through your Google Play testing invitation, if you are a tester.</p>
-          <p>2. Come back to this page and tap the Android button below to open this Wall in the app.</p>
-          <a id="open-android" class="button secondary" href="saidhere-android://">Open in Android app</a>
-          <p class="platform-note">If Android doesn't open the app, check that it is installed from your testing invitation and that supported links are enabled in Android's App info settings.</p>
-          <p class="platform-note">The Android version is in testing. You may need to join the tester group before Google Play offers the install.</p>
-        </section>
-        <section class="platform" aria-label="iPhone instructions">
-          <h2>iPhone</h2>
-          <p>1. Install The Wall from the App Store.</p>
-          <a class="button secondary" href="https://apps.apple.com/app/id6823565189">Get the iPhone app</a>
-          <p style="margin-top:12px">2. Return here and tap <strong>Open The Wall app</strong>. If Safari stays open, use that button to hand off to the app.</p>
-        </section>
-      </div>
-      <div class="hint"><span class="hint-mark">i</span><span>Already installed? Use <strong>Open The Wall app</strong> above. If your phone doesn't open the app automatically from a Wall link, the button provides a manual handoff.</span></div>
+      <p class="eyebrow">You found a Wall</p>
+      <h1>See what’s on it.</h1>
+      <p class="description">Get The Wall app to read messages and leave your own.</p>
+      <nav class="stores" aria-label="Download The Wall">
+        <a class="store" href="https://apps.apple.com/au/app/id6823565189">Download on the App Store</a>
+        <a class="store secondary" href="https://play.google.com/store/apps/details?id=app.saidhere.said_here">Get it on Google Play</a>
+      </nav>
+      <p class="installed">Already installed? <a id="open-app" href="saidhere://">Open this Wall</a></p>
     </section>
     <footer><a href="/privacy/">Privacy</a><a href="/support/">Support</a></footer>
   </main>
