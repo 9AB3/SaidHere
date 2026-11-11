@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import rateLimit from 'express-rate-limit';
 import { hashToken } from './auth.js';
 import { pool } from './db.js';
 
@@ -33,6 +34,7 @@ async function requireOwner(req, res, next) {
     if (!result.rowCount) return res.redirect(303, '/admin/login?next=%2Fadmin%2Fanalytics');
     if (result.rows[0].role !== 'owner') return res.sendStatus(403);
     res.set('Cache-Control', 'no-store, private');
+    req.analyticsCsrf = hashToken('admin-csrf:' + token);
     next();
   } catch (error) { next(error); }
 }
@@ -106,8 +108,32 @@ export function mountAdminAnalyticsDashboard(app) {
     res.type('html').sendFile(path.join(publicRoot, 'admin-analytics.html'));
   });
   app.get('/admin/analytics/data', requireOwner, async (req, res, next) => {
-    try { res.json(await fetchAnalytics(req.query?.days)); }
+    try { res.json({ ...(await fetchAnalytics(req.query?.days)), push: { configured: Boolean(process.env.PUSHOVER_APP_TOKEN && process.env.PUSHOVER_USER_KEY), csrf: req.analyticsCsrf } }); }
     catch (error) { next(error); }
+  });
+  // Test the owner's own Pushover device without creating a fake installation.
+  const pushTestLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 5, standardHeaders: 'draft-8', legacyHeaders: false });
+  app.post('/admin/analytics/test-push', requireOwner, pushTestLimiter, async (req, res) => {
+    if (req.get('x-csrf-token') !== req.analyticsCsrf) return res.status(403).json({ error: 'Refresh Analytics and try again.' });
+    const token = process.env.PUSHOVER_APP_TOKEN;
+    const user = process.env.PUSHOVER_USER_KEY;
+    if (!token || !user) return res.status(503).json({ error: 'Set PUSHOVER_APP_TOKEN and PUSHOVER_USER_KEY in Render first.' });
+    const payload = { token, user, title: 'Said Here - test notification', message: 'Pushover is connected. First-launch notifications will arrive here.' };
+    if (process.env.PUSHOVER_DEVICE?.trim()) payload.device = process.env.PUSHOVER_DEVICE.trim();
+    try {
+      const response = await fetch('https://api.pushover.net/1/messages.json', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(payload),
+        signal: AbortSignal.timeout(6000),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || result?.status !== 1) return res.status(502).json({ error: 'Pushover rejected the notification. Check the User Key and API Token in Render.' });
+      return res.json({ ok: true, message: 'Test sent to Pushover. Check your iPhone notifications.' });
+    } catch (error) {
+      console.error('[admin-analytics] Pushover test failed:', error);
+      return res.status(502).json({ error: 'Could not connect to Pushover.' });
+    }
   });
   app.get('/admin/analytics/export.csv', requireOwner, async (req, res, next) => {
     try {
