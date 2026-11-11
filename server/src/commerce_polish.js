@@ -1,3 +1,4 @@
+import { recordSiteEvent, sourceFromRequest } from './site_analytics.js';
 import crypto from 'node:crypto';
 import express from 'express';
 import nodemailer from 'nodemailer';
@@ -273,6 +274,8 @@ export function mountCommercePolish(app) {
   app.post('/shop/checkout', async (req, res) => {
     try {
       const session = await createCheckout(req.body?.email, req.body?.quantity);
+      void recordSiteEvent({ event: 'checkout_started', source: sourceFromRequest(req) })
+        .catch((error) => console.error('[analytics] checkout started:', error));
       return res.redirect(303, session.url);
     } catch (error) {
       console.error('[shop/checkout-v2]', error);
