@@ -103,6 +103,11 @@ export function mountPublicSite(app) {
   app.get('/.well-known/apple-app-site-association', (_req, res) => sendAppleAssociation(res));
   app.get('/apple-app-site-association', (_req, res) => sendAppleAssociation(res));
 
+  app.get('/analytics-events.js', (_req, res) => {
+    res.set('Cache-Control', 'public, max-age=3600');
+    return res.sendFile(path.join(publicRoot, 'analytics-events.js'));
+  });
+
   app.get('/', sendIndex);
   app.get(['/privacy', '/privacy/'], (_req, res) => {
     noStore(res);
