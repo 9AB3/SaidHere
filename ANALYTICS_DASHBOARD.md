@@ -4,7 +4,7 @@ Go to **/admin/analytics** while signed in as the Main Admin. Moderator accounts
 
 The dashboard uses existing production data from PostgreSQL and Stripe reconciliation, not placeholder figures. It includes:
 - 7/30/90 Sydney-calendar-day filters and daily trend graphs.
-- First native opens by platform (requires the Flutter app update).
+- First native opens by platform (requires the Flutter app update) and active anonymous API sessions in the selected period.
 - Recorded NFC tag opens, distinct anonymous Wall visitor sessions, visible posts, paid orders, and AUD paid order value.
 - Top Walls by activity and a daily CSV export.
 - Website home/NFC landing views, Apple/Google Play badge clicks, shop page views, and successfully created Stripe checkout sessions.
