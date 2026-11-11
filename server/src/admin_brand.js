@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { mountAdminCustomers } from './admin_customers.js';
 import { mountAdminWallsMonitor } from './admin_walls_monitor.js';
 import { mountAdminWallsOverview } from './admin_walls_overview.js';
+import { mountAdminAnalyticsDashboard } from './admin_analytics_dashboard.js';
 import { mountNfcWriteReceipts } from './nfc_write_receipts.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -87,4 +88,5 @@ export function mountAdminBrand(app) {
   mountAdminCustomers(app);
   mountAdminWallsOverview(app);
   mountAdminWallsMonitor(app);
+  mountAdminAnalyticsDashboard(app);
 }
