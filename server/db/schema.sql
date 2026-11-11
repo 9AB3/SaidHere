@@ -27,9 +27,6 @@ create table if not exists site_analytics_events (
 create index if not exists idx_site_analytics_time on site_analytics_events(occurred_at desc);
 create index if not exists idx_app_first_opens_time on app_first_opens(first_opened_at desc);
 create index if not exists idx_visitor_sessions_last_seen on visitor_sessions(last_seen_at desc);
-create index if not exists idx_wall_visit_events_time on wall_visit_events(visited_at desc);
-create index if not exists idx_wall_posts_time_visible on wall_posts(created_at desc) where hidden_at is null;
-create index if not exists idx_paid_orders_time on commerce_orders(paid_at desc) where status in ('paid','fulfilled');
 
 create table if not exists walls (
   id uuid primary key default gen_random_uuid(),
@@ -316,3 +313,6 @@ create index if not exists idx_customer_claim_tokens_customer on customer_claim_
 create index if not exists idx_customer_password_reset_tokens_customer on customer_password_reset_tokens(customer_id, created_at desc);
 create index if not exists idx_customer_password_reset_tokens_expiry on customer_password_reset_tokens(expires_at) where used_at is null;
 create index if not exists idx_customer_audit_customer on customer_audit_log(customer_id, created_at desc);
+
+create index if not exists idx_wall_posts_time_visible on wall_posts(created_at desc) where hidden_at is null;
+create index if not exists idx_paid_orders_time on commerce_orders(paid_at desc) where status in ('paid','fulfilled');
