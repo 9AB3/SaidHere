@@ -17,10 +17,12 @@
     .eyebrow{margin:0 0 10px;color:#62574a;font-size:11px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase}
     h1{margin:0;font-size:clamp(30px,9vw,40px);line-height:1.04;letter-spacing:-1.5px;font-weight:950}
     .description{max-width:310px;margin:14px auto 24px;color:#554d43;font-size:15px;line-height:1.45;font-weight:600}
-    .stores{display:grid;gap:10px}
-    .store{display:flex;align-items:center;justify-content:center;min-height:52px;padding:12px 16px;border:2px solid var(--ink);border-radius:10px;background:var(--ink);color:var(--paper);text-decoration:none;font-size:14px;font-weight:900}
-    .store.secondary{background:rgba(255,251,244,.74);color:var(--ink)}
-    .store:focus-visible,.installed a:focus-visible,footer a:focus-visible{outline:3px solid #806042;outline-offset:3px}
+    .stores{display:flex;flex-direction:column;align-items:center;gap:7px}
+    .store{display:flex;align-items:center;justify-content:center;text-decoration:none;min-height:54px;width:240px;max-width:100%}
+    .store img{display:block;width:auto;max-width:100%;height:auto}
+    .store.apple img{width:178px}
+    .store.google img{width:222px}
+    .store:focus-visible,.installed a:focus-visible,footer a:focus-visible{outline:3px solid #806042;outline-offset:3px;border-radius:5px}
     .installed{margin:22px 0 0;font-size:13px;color:var(--muted)}
     .installed a{color:var(--ink);font-weight:900;text-underline-offset:3px}
     footer{display:flex;gap:20px;justify-content:center;margin-top:30px;font-size:11px;font-weight:800}
@@ -36,8 +38,12 @@
       <h1>See what’s on it.</h1>
       <p class="description">Install the app, then scan this Wall again to read and post.</p>
       <nav class="stores" aria-label="Download The Wall">
-        <a class="store" href="https://apps.apple.com/au/app/id6823565189">Download on the App Store</a>
-        <a class="store secondary" href="https://play.google.com/store/apps/details?id=app.saidhere.said_here">Get it on Google Play</a>
+        <a class="store apple" href="https://apps.apple.com/au/app/id6823565189" aria-label="Download on the App Store">
+          <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download on the App Store" width="178" decoding="async">
+        </a>
+        <a class="store google" href="https://play.google.com/store/apps/details?id=app.saidhere.said_here" aria-label="Get it on Google Play">
+          <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" width="222" decoding="async">
+        </a>
       </nav>
       <p class="installed">Already installed? <a id="open-app" href="saidhere://">Open this Wall</a></p>
     </section>
