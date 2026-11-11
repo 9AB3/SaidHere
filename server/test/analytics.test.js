@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeAnalyticsDays, fetchAnalytics } from '../src/admin_analytics_dashboard.js';
-import { normalizeSource, sourceFromRequest } from '../src/site_analytics.js';
+process.env.DATABASE_URL ||= 'postgresql://localhost/saidhere_analytics_test';
+const { normalizeAnalyticsDays, fetchAnalytics } = await import('../src/admin_analytics_dashboard.js');
+const { normalizeSource, sourceFromRequest } = await import('../src/site_analytics.js');
 
 test('analytics range is allowlisted to 7, 30 and 90 days', () => {
   assert.equal(normalizeAnalyticsDays('7'), 7);
