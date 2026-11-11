@@ -15,6 +15,18 @@ create table if not exists app_first_opens (
   notified_at timestamptz
 );
 
+-- Aggregate-only acquisition events. No IP address, user ID or message contents.
+create table if not exists site_analytics_events (
+  id bigserial primary key,
+  event_type text not null check (event_type in ('landing_view','store_click','shop_view','checkout_started')),
+  platform text check (platform in ('ios','android')),
+  landing text check (landing in ('home','nfc')),
+  source text not null default 'direct',
+  occurred_at timestamptz not null default now()
+);
+create index if not exists idx_site_analytics_time on site_analytics_events(occurred_at desc);
+create index if not exists idx_app_first_opens_time on app_first_opens(first_opened_at desc);
+
 create table if not exists walls (
   id uuid primary key default gen_random_uuid(),
   slug text not null unique,
