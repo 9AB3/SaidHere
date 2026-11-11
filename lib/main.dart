@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -12,11 +14,15 @@ import 'screens/tag_entry_screen.dart';
 import 'screens/wall_screen.dart';
 import 'services/local_history_service.dart';
 import 'services/said_here_service.dart';
+import 'services/first_open_telemetry.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final telemetry = FirstOpenTelemetry();
+  final shouldReport = AppConfig.isConfigured && await telemetry.shouldReport();
   runApp(const SaidHereApp());
+  if (shouldReport) unawaited(telemetry.report());
 }
 
 String? normalizeCustomSchemeLocation(Uri uri) {
