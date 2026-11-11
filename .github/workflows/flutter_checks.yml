@@ -19,7 +19,7 @@ jobs:
           cache: true
       - run: python3 tool/bootstrap_platforms.py --host saidhere.app
       - run: flutter pub get
-      - run: flutter analyze
+      - run: flutter analyze --no-fatal-infos # Flutter 3.50 emits new info-level material.dart deprecations
       - run: flutter test
       - name: Build Flutter web
         run: flutter build web --release --dart-define=API_BASE_URL=https://saidhere.app
