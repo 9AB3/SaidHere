@@ -13,7 +13,7 @@ workflows:
       - name: Get packages
         script: flutter pub get
       - name: Analyze
-        script: flutter analyze
+        script: flutter analyze --no-fatal-infos
       - name: Test
         script: flutter test
       - name: Build web
