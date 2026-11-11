@@ -136,7 +136,7 @@
     let noteText = 'Coverage: Web landing and store-click events start after deployment; old web events cannot be backfilled. ' +
       'First opens require updated iOS/Android builds and are not App Store or Play Store download totals. ' +
       'NFC opens are successful backend events, not every physical tap. ' +
-      'Visitor counts are anonymous sessions, not verified people. Revenue is gross paid AUD, before fees and refunds. ' +
+      'Visitor counts are anonymous sessions, not verified people. Revenue sums current paid/fulfilled AUD orders, excluding refunded orders and before processing fees. ' +
       'Journey numbers come from different visitors and time windows and must not be treated as attributable conversion rates.';
     if (data.metrics.other_currency_orders) noteText += ' Some non-AUD orders are excluded from the AUD revenue total.';
     note.textContent = noteText;
