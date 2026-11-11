@@ -41,6 +41,7 @@ export async function fetchAnalytics(days, db = pool) {
   const range = normalizeAnalyticsDays(days);
   const queries = [
     "select count(*)::integer as scans, count(distinct session_id)::integer as visitors from wall_visit_events where visited_at >= " + period,
+    "select count(*)::integer as active_sessions from visitor_sessions where last_seen_at >= " + period,
     "select count(*)::integer as posts, count(distinct author_session_id)::integer as posters from wall_posts where hidden_at is null and created_at >= " + period,
     "select count(*)::integer as first_opens, count(*) filter (where platform = 'ios')::integer as ios, count(*) filter (where platform = 'android')::integer as android from app_first_opens where first_opened_at >= " + period,
     "select count(*)::integer as paid_orders, coalesce(sum(amount_total) filter (where lower(currency) = 'aud'),0)::bigint as revenue_cents, count(*) filter (where currency is not null and lower(currency) <> 'aud')::integer as other_currency_orders from commerce_orders where status in ('paid','fulfilled') and paid_at >= " + period,
@@ -60,12 +61,13 @@ export async function fetchAnalytics(days, db = pool) {
       "select " + day('occurred_at') + ", event_type, count(*)::numeric from site_analytics_events where occurred_at >= " + period + " group by 1,2 " +
       ") t group by metric, day order by day asc",
   ];
-  const [scans, posts, opens, orders, web, sources, walls, trend] =
+  const [scans, active, posts, opens, orders, web, sources, walls, trend] =
     await Promise.all(queries.map((sql) => db.query(sql, [range])));
   return {
     days: range, timezone: 'Australia/Sydney',
     metrics: {
       scans: scans.rows[0]?.scans || 0,
+      active_sessions: active.rows[0]?.active_sessions || 0,
       visitors: scans.rows[0]?.visitors || 0,
       posts: posts.rows[0]?.posts || 0,
       posters: posts.rows[0]?.posters || 0,
