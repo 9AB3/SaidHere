@@ -20,6 +20,7 @@ import { mountCustomerPortal } from './customer_portal.runtime.js';
 import { mountCanonicalWebRedirect, mountPublicSite } from './public_site.js';
 import { mountWallDiscoveryLocations } from './wall_discovery_locations.js';
 import { mountFirstOpenNotifications } from './first_open_notifications.js';
+import { mountSiteAnalytics } from './site_analytics.js';
 
 const app = express();
 const port = Number(process.env.PORT || 10000);
@@ -110,6 +111,7 @@ app.get('/health', async (_req, res, next) => {
 });
 
 // Account/admin/commerce pages are mounted before the core app routes.
+mountSiteAnalytics(app);
 mountCanonicalWebRedirect(app);
 mountAdminSecurity(app);
 mountAdminBrand(app);
