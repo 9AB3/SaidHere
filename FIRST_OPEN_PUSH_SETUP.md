@@ -9,6 +9,7 @@ Said Here can notify the owner on an iPhone when a **new installation first open
 3. In the Render dashboard for Said Here's web service, add two **secret environment variables**:
    - `PUSHOVER_USER_KEY` — your Pushover User Key
    - `PUSHOVER_APP_TOKEN` — your app's API token
+   - Optional: `PUSHOVER_DEVICE` — the name of your iPhone in Pushover, to send alerts only to that device (otherwise all your Pushover devices receive them)
 4. Deploy the server update, including `npm run migrate` (the Render blueprint already does this), and publish a new Flutter app release to the Apple App Store and Google Play containing this change.
 5. Install the updated app on a fresh test device / test installation, launch it with internet access, and confirm the push arrives on your iPhone. A new install opened offline retries on a later launch.
 
@@ -20,3 +21,7 @@ Said Here can notify the owner on an iPhone when a **new installation first open
 - Pushover is an external notification service, so never send personal user details in the push payload. The notification contains only the OS platform.
 - Deleting an anonymous session also deletes the matching event. Clearing app storage or reinstalling may produce a new anonymous session; a first open is therefore only an approximation of an installation, not an authoritative store download metric.
 - Credentials must be configured privately in Render; they are never stored in app bundles or GitHub.
+
+## Verify delivery
+
+Once both keys are configured in Render, open **Main Admin → Analytics → iPhone installation notifications**, then select **Send test notification**. The test sends only to your Pushover devices and does not add a fake installation record. The control remains disabled until both credentials are detected.
