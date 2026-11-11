@@ -8,6 +8,7 @@
     posts: 'Visible posts', paid_orders: 'Paid orders', revenue: 'Gross revenue', store_click: 'Store clicks',
   };
   let current = null;
+  let pushCsrf = '';
 
   function format(value) { return formatter.format(Number(value) || 0); }
   function make(tag, className, text) {
@@ -92,6 +93,12 @@
 
   function render(data) {
     current = data;
+    pushCsrf = data.push?.csrf || '';
+    const pushReady = Boolean(data.push?.configured && pushCsrf);
+    $('anaPushTest').disabled = !pushReady;
+    $('anaPushStatus').textContent = pushReady
+      ? 'Pushover credentials detected in Render. Send a test to confirm delivery to your phone.'
+      : 'Pushover is not configured. Add PUSHOVER_APP_TOKEN and PUSHOVER_USER_KEY as private environment variables in Render.';
     for (const [key, value] of Object.entries(data.metrics || {})) {
       const target = document.querySelector('[data-kpi="' + key + '"]');
       if (target) target.textContent = key === 'revenue_cents' ? money(value / 100) : format(value);
@@ -160,5 +167,21 @@
   $('anaRange')?.addEventListener('change', load);
   $('anaRefresh')?.addEventListener('click', load);
   $('anaMetric')?.addEventListener('change', () => { if (current) showChart(current); });
+  $('anaPushTest')?.addEventListener('click', async () => {
+    const button = $('anaPushTest');
+    button.disabled = true;
+    $('anaPushStatus').textContent = 'Sending a test notification…';
+    try {
+      const response = await fetch('/admin/analytics/test-push', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'x-csrf-token': pushCsrf, 'content-type': 'application/json' },
+        body: '{}',
+      });
+      const result = await response.json().catch(() => ({}));
+      $('anaPushStatus').textContent = result.message || result.error || 'Unexpected response from Pushover.';
+    } catch (_) {
+      $('anaPushStatus').textContent = 'Could not send the test. Check your internet connection.';
+    } finally { button.disabled = !Boolean(current?.push?.configured); }
+  });
   load();
 })();
