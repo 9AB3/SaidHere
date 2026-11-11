@@ -26,6 +26,7 @@ test('marketing sources are coarse and do not retain arbitrary user text', () =>
 test('overview queries are aggregated, scoped and preserve zero values', async () => {
   const results = [
     [{ scans: 12, visitors: 5 }],
+    [{ active_sessions: 6 }],
     [{ posts: 3, posters: 2 }],
     [{ first_opens: 4, ios: 3, android: 1 }],
     [{ paid_orders: 2, revenue_cents: '3000', other_currency_orders: 0 }],
@@ -42,10 +43,11 @@ test('overview queries are aggregated, scoped and preserve zero values', async (
     },
   };
   const payload = await fetchAnalytics(30, db);
-  assert.equal(queries.length, 8);
+  assert.equal(queries.length, 9);
   assert.ok(queries.every((q) => q.params.length === 1 && q.params[0] === 30));
   assert.ok(queries.every((q) => q.sql.includes('Australia/Sydney')));
   assert.equal(payload.metrics.scans, 12);
+  assert.equal(payload.metrics.active_sessions, 6);
   assert.equal(payload.metrics.revenue_cents, 3000);
   assert.equal(payload.platforms.ios, 3);
   assert.equal(payload.top_walls[0].name, 'Test Wall');
