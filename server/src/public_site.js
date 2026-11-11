@@ -44,17 +44,16 @@ function sendAppleAssociation(res) {
   return res.status(200).type('application/json').send(JSON.stringify(APPLE_APP_SITE_ASSOCIATION));
 }
 
-function renderAppFallback(res, appHref) {
+function renderAppFallback(res, appHref, userAgent = '') {
   const template = fs.readFileSync(fallbackPath, 'utf8');
-  // Chrome's explicit Android intent can launch the app even when HTTPS
-  // App Link verification is not yet configured, provided its manifest
-  // includes the existing nfc.saidhere.app VIEW intent filter.
-  const route = new URL(appHref).hostname + new URL(appHref).pathname;
+  // Keep the NFC destination intact when someone taps "Open this Wall".
+  // Chrome on Android can use an explicit intent before App Link verification
+  // is configured; iOS uses the registered saidhere:// URL scheme.
+  const url = new URL(appHref);
+  const route = url.hostname + url.pathname;
   const androidHref = `intent://nfc.saidhere.app/${route}#Intent;scheme=https;package=app.saidhere.said_here;end`;
-  const html = template
-    .replace('href="saidhere://"', `href="${appHref}"`)
-    .replace('href="saidhere-android://"', `href="${androidHref}"`)
-    .replace(/\n\s*<script>[\s\S]*?<\/script>\s*/i, '\n');
+  const handoffHref = /Android/i.test(userAgent) ? androidHref : appHref;
+  const html = template.replace('href="saidhere://"', `href="${handoffHref}"`);
   res.type('html');
   noStore(res);
   return res.send(html);
@@ -121,11 +120,11 @@ export function mountPublicSite(app) {
 
   app.get('/t/:token', (req, res) => {
     const token = encodeURIComponent(req.params.token || '');
-    return renderAppFallback(res, `saidhere://t/${token}`);
+    return renderAppFallback(res, `saidhere://t/${token}`, req.get('user-agent') || '');
   });
   app.get('/w/:slug', (req, res) => {
     const slug = encodeURIComponent(req.params.slug || '');
-    return renderAppFallback(res, `saidhere://w/${slug}`);
+    return renderAppFallback(res, `saidhere://w/${slug}`, req.get('user-agent') || '');
   });
 
   app.use(express.static(publicRoot, {
