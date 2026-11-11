@@ -61,6 +61,10 @@ projects:
                 value: The Wall <orders@saidhere.app>
               - key: ORDER_NOTIFICATION_EMAIL
                 sync: false
+              - key: PUSHOVER_APP_TOKEN
+                sync: false
+              - key: PUSHOVER_USER_KEY
+                sync: false
 
         databases:
           - name: saidhere-db-9ab3
