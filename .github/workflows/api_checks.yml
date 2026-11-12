@@ -1,0 +1,26 @@
+name: SaidHere API checks
+
+on:
+  push:
+    paths:
+      - 'server/**'
+      - '.github/workflows/api_checks.yml'
+  pull_request:
+    paths:
+      - 'server/**'
+      - '.github/workflows/api_checks.yml'
+
+jobs:
+  api-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+      - name: Install API dependencies
+        run: npm ci --prefix server --no-audit --no-fund
+      - name: Syntax and unit tests
+        run: npm --prefix server run check
