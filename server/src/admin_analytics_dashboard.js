@@ -46,6 +46,7 @@ export async function fetchAnalytics(days, db = pool) {
     "select count(*)::integer as active_sessions from visitor_sessions where last_seen_at >= " + period,
     "select count(*)::integer as posts, count(distinct author_session_id)::integer as posters from wall_posts where hidden_at is null and created_at >= " + period,
     "select count(*)::integer as first_opens, count(*) filter (where platform = 'ios')::integer as ios, count(*) filter (where platform = 'android')::integer as android from app_first_opens where first_opened_at >= " + period,
+    "select count(*)::integer as new_sessions from session_push_notifications where created_at >= " + period,
     "select count(*)::integer as paid_orders, coalesce(sum(amount_total) filter (where lower(currency) = 'aud'),0)::bigint as revenue_cents, count(*) filter (where currency is not null and lower(currency) <> 'aud')::integer as other_currency_orders from commerce_orders where status in ('paid','fulfilled') and paid_at >= " + period,
     "select count(*) filter (where event_type = 'landing_view' and landing = 'home')::integer as home_views, count(*) filter (where event_type = 'landing_view' and landing = 'nfc')::integer as nfc_views, count(*) filter (where event_type = 'store_click')::integer as store_clicks, count(*) filter (where event_type = 'store_click' and platform = 'ios')::integer as ios_clicks, count(*) filter (where event_type = 'store_click' and platform = 'android')::integer as android_clicks, count(*) filter (where event_type = 'shop_view')::integer as shop_views, count(*) filter (where event_type = 'checkout_started')::integer as checkouts from site_analytics_events where occurred_at >= " + period,
     "select source, count(*)::integer as views from site_analytics_events where occurred_at >= " + period + " and event_type = 'landing_view' group by source order by views desc, source asc limit 8",
@@ -58,12 +59,13 @@ export async function fetchAnalytics(days, db = pool) {
       "select " + day('visited_at') + " as day, 'scans' as metric, count(*)::numeric as value from wall_visit_events where visited_at >= " + period + " group by 1 union all " +
       "select " + day('created_at') + ", 'posts', count(*)::numeric from wall_posts where hidden_at is null and created_at >= " + period + " group by 1 union all " +
       "select " + day('first_opened_at') + ", 'first_opens', count(*)::numeric from app_first_opens where first_opened_at >= " + period + " group by 1 union all " +
+      "select " + day('created_at') + ", 'new_sessions', count(*)::numeric from session_push_notifications where created_at >= " + period + " group by 1 union all " +
       "select " + day('paid_at') + ", 'paid_orders', count(*)::numeric from commerce_orders where status in ('paid','fulfilled') and paid_at >= " + period + " group by 1 union all " +
       "select " + day('paid_at') + ", 'revenue', coalesce(sum(amount_total) filter (where lower(currency) = 'aud'),0)::numeric/100 from commerce_orders where status in ('paid','fulfilled') and paid_at >= " + period + " group by 1 union all " +
       "select " + day('occurred_at') + ", event_type, count(*)::numeric from site_analytics_events where occurred_at >= " + period + " group by 1,2 " +
       ") t group by metric, day order by day asc",
   ];
-  const [scans, active, posts, opens, orders, web, sources, walls, trend] =
+  const [scans, active, posts, opens, sessions, orders, web, sources, walls, trend] =
     await Promise.all(queries.map((sql) => db.query(sql, [range])));
   return {
     days: range, timezone: 'Australia/Sydney',
@@ -74,6 +76,7 @@ export async function fetchAnalytics(days, db = pool) {
       posts: posts.rows[0]?.posts || 0,
       posters: posts.rows[0]?.posters || 0,
       first_opens: opens.rows[0]?.first_opens || 0,
+      new_sessions: sessions.rows[0]?.new_sessions || 0,
       paid_orders: orders.rows[0]?.paid_orders || 0,
       revenue_cents: Number(orders.rows[0]?.revenue_cents || 0),
       other_currency_orders: orders.rows[0]?.other_currency_orders || 0,
