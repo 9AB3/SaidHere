@@ -7,6 +7,20 @@ create table if not exists visitor_sessions (
   last_seen_at timestamptz not null default now()
 );
 
+-- Each anonymous session can generate at most one Pushover notification.
+-- This also tracks new sessions created by existing published mobile builds.
+create table if not exists session_push_notifications (
+  session_id uuid primary key references visitor_sessions(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  notified_at timestamptz,
+  suppressed_at timestamptz,
+  source text not null default 'session'
+);
+create index if not exists idx_session_push_notifications_created
+  on session_push_notifications(created_at desc);
+create index if not exists idx_session_push_notifications_notified
+  on session_push_notifications(notified_at desc) where notified_at is not null;
+
 -- First native launches only; deleting a visitor session removes its event.
 create table if not exists app_first_opens (
   session_id uuid primary key references visitor_sessions(id) on delete cascade,
