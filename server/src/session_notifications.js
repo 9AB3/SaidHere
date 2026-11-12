@@ -29,9 +29,10 @@ export async function sendSessionNotification({
       [sessionId],
     );
     if (existing.rows[0]?.notified_at || existing.rows[0]?.suppressed_at) {
+      const status = existing.rows[0]?.notified_at ? 'already_handled' : 'rate_limited';
       await client.query('commit');
       inTransaction = false;
-      return { status: 'already_handled' };
+      return { status };
     }
 
     // Guard against quota exhaustion from automated session creation.
