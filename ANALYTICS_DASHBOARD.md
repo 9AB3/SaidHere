@@ -4,7 +4,8 @@ Go to **/admin/analytics** while signed in as the Main Admin. Moderator accounts
 
 The dashboard uses existing production data from PostgreSQL and Stripe reconciliation, not placeholder figures. It includes:
 - 7/30/90 Sydney-calendar-day filters and daily trend graphs.
-- First native opens by platform (requires the Flutter app update) and active anonymous API sessions in the selected period.
+- New anonymous backend sessions created after deployment, whether the app is updated or not, plus first native opens by platform (the latter requires an updated Flutter build) and active anonymous API sessions during the selected period.
+- Backend-only session notifications are rate-capped at 30/hour, may include reinstalls or storage resets, and cannot identify iOS versus Android from the existing app.
 - Recorded NFC tag opens, distinct anonymous Wall visitor sessions, visible posts, paid orders, and AUD paid order value.
 - Top Walls by activity and a daily CSV export.
 - Website home/NFC landing views, Apple/Google Play badge clicks, shop page views, and successfully created Stripe checkout sessions.
