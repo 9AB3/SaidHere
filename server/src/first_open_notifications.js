@@ -1,6 +1,7 @@
-// Registers the first launch of a native installation and notifies the owner.
-// A unique anonymous session limits an installation to one successful alert.
-// Do not put Pushover credentials in client-side code.
+import { sendSessionNotification } from './session_notifications.js';
+
+// Native builds can tell us their platform; older builds cannot.
+// Both routes use the same notification ledger to avoid duplicate pushes.
 export function mountFirstOpenNotifications(app, { requireSession, pool, fetchImpl = fetch }) {
   app.post('/api/app/first-open', requireSession, async (req, res, next) => {
     const platform = typeof req.body?.platform === 'string'
@@ -10,70 +11,34 @@ export function mountFirstOpenNotifications(app, { requireSession, pool, fetchIm
       return res.status(400).json({ error: 'Invalid app platform.' });
     }
 
-    const client = await pool.connect();
     try {
-      await client.query('begin');
-      await client.query(
+      await pool.query(
         `insert into app_first_opens (session_id, platform)
          values ($1, $2)
-         on conflict (session_id) do nothing`,
+         on conflict (session_id) do update set platform = excluded.platform`,
         [req.sessionId, platform],
       );
-      // Lock this installation while sending so simultaneous requests cannot
-      // generate duplicate successful push messages.
-      const result = await client.query(
-        `select notified_at from app_first_opens
-         where session_id = $1 for update`,
-        [req.sessionId],
-      );
-      if (result.rows[0]?.notified_at) {
-        await client.query('commit');
-        return res.json({ ok: true, already_reported: true });
-      }
-
-      const token = process.env.PUSHOVER_APP_TOKEN;
-      const user = process.env.PUSHOVER_USER_KEY;
-      if (!token || !user) {
-        await client.query('commit');
-        // A new installation can retry on its next launch once configured.
+      const outcome = await sendSessionNotification({
+        pool, sessionId: req.sessionId, source: 'native', platform, fetchImpl,
+      });
+      if (outcome.status === 'unconfigured') {
         return res.status(503).json({ error: 'Notification service not configured.' });
       }
-
-      try {
-        const response = await fetchImpl('https://api.pushover.net/1/messages.json', {
-          method: 'POST',
-          headers: { 'content-type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            token,
-            user,
-            title: 'Said Here - new installation',
-            message: `Said Here was opened for the first time on ${platform === 'ios' ? 'iPhone (iOS)' : 'Android'}.`,
-            ...(process.env.PUSHOVER_DEVICE?.trim() ? { device: process.env.PUSHOVER_DEVICE.trim() } : {}),
-          }),
-          signal: AbortSignal.timeout(6000),
-        });
-        const body = await response.json().catch(() => null);
-        if (!response.ok || body?.status !== 1) {
-          throw new Error(`Pushover refused first-launch alert (HTTP ${response.status}).`);
-        }
-      } catch (error) {
-        console.error('First-launch push failed:', error);
-        await client.query('commit');
-        // Leave notified_at null; the app retries on a later launch.
-        return res.status(503).json({ error: 'Notification temporarily unavailable.' });
+      if (outcome.status === 'sent' || outcome.status === 'already_handled') {
+        await pool.query(
+          `update app_first_opens set notified_at = coalesce(notified_at, now())
+           where session_id = $1`,
+          [req.sessionId],
+        );
       }
-
-      await client.query(
-        `update app_first_opens set notified_at = now() where session_id = $1`,
-        [req.sessionId],
-      );
-      await client.query('commit');
-      return res.status(201).json({ ok: true, already_reported: false });
+      return res.status(outcome.status === 'sent' ? 201 : 200).json({
+        ok: true,
+        already_reported: outcome.status === 'already_handled',
+        suppressed: outcome.status === 'rate_limited',
+      });
     } catch (error) {
-      try { await client.query('rollback'); } catch (_) {}
+      console.error('[first-open] Notification failed:', error);
       return next(error);
-    } finally {
-      client.release();
     }
   });
 }

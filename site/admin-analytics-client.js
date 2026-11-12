@@ -4,7 +4,7 @@
   const formatter = new Intl.NumberFormat('en-AU');
   const money = (value) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 2 }).format(Number(value || 0));
   const names = {
-    scans: 'NFC opens', first_opens: 'First app opens',
+    scans: 'NFC opens', first_opens: 'First app opens', new_sessions: 'New API sessions',
     posts: 'Visible posts', paid_orders: 'Paid orders', revenue: 'Gross revenue', store_click: 'Store clicks',
   };
   let current = null;
@@ -114,6 +114,7 @@
     barList($('anaAppJourney'), [
       { label: 'NFC landing views (web)', value: data.web.nfc_views },
       { label: 'Store link clicks', value: data.web.store_clicks },
+      { label: 'New anonymous sessions', value: data.metrics.new_sessions },
       { label: 'Tracked first app opens', value: data.metrics.first_opens },
       { label: 'Successful NFC tag opens', value: data.metrics.scans },
       { label: 'Visible posts and replies', value: data.metrics.posts },
@@ -141,7 +142,7 @@
     }
     const note = $('anaNote');
     let noteText = 'Coverage: Web landing and store-click events start after deployment; old web events cannot be backfilled. ' +
-      'First opens require updated iOS/Android builds and are not App Store or Play Store download totals. ' +
+      'New anonymous sessions are reported by the current backend and may include reinstalls, storage resets or direct API calls. First opens require updated iOS/Android builds; neither is a verified download count. ' +
       'NFC opens are successful backend events, not every physical tap. ' +
       'Visitor counts are anonymous sessions, not verified people. Revenue sums current paid/fulfilled AUD orders, excluding refunded orders and before processing fees. ' +
       'Journey numbers come from different visitors and time windows and must not be treated as attributable conversion rates.';

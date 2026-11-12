@@ -54,6 +54,7 @@
     <div class="ana-actions"><label for="anaRange">Period</label><select id="anaRange" aria-label="Reporting period"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select><button id="anaRefresh" type="button">Refresh</button><a id="anaExport" class="ana-link" href="/admin/analytics/export.csv?days=30">Export CSV</a></div></div>
   <div id="anaStatus" class="ana-status" role="status" aria-live="polite"></div>
   <div class="ana-grid">
+    <div class="ana-card"><span class="ana-label">New anonymous sessions</span><strong class="ana-value" data-kpi="new_sessions">—</strong><span class="ana-desc">Backend requests · not verified downloads</span></div>
     <div class="ana-card"><span class="ana-label">First app opens</span><strong class="ana-value" data-kpi="first_opens">—</strong><span class="ana-desc">Instrumented iOS + Android builds</span></div>
     <div class="ana-card"><span class="ana-label">NFC Wall opens</span><strong class="ana-value" data-kpi="scans">—</strong><span class="ana-desc">Successful recorded tag opens</span></div>
     <div class="ana-card"><span class="ana-label">Unique Wall visitors</span><strong class="ana-value" data-kpi="visitors">—</strong><span class="ana-desc">Distinct anonymous sessions</span></div>
@@ -63,7 +64,7 @@
     <div class="ana-card"><span class="ana-label">Revenue (AUD)</span><strong class="ana-value" data-kpi="revenue_cents">—</strong><span class="ana-desc">Current paid/fulfilled orders; refunds excluded, before fees</span></div>
   </div>
   <div class="ana-section">
-    <section class="ana-panel"><div class="ana-panel-head"><div><h3>Activity over time</h3><p class="ana-sub">Daily event counts · Sydney dates</p></div><select id="anaMetric" aria-label="Activity metric"><option value="scans">NFC opens</option><option value="first_opens">First app opens</option><option value="posts">Posts</option><option value="paid_orders">Paid orders</option><option value="revenue">Revenue (AUD)</option><option value="store_click">App store link clicks</option></select></div><div id="anaChart" class="ana-chart"></div><div id="anaLegend" class="ana-legend"></div></section>
+    <section class="ana-panel"><div class="ana-panel-head"><div><h3>Activity over time</h3><p class="ana-sub">Daily event counts · Sydney dates</p></div><select id="anaMetric" aria-label="Activity metric"><option value="scans">NFC opens</option><option value="new_sessions">New API sessions</option><option value="first_opens">First app opens</option><option value="posts">Posts</option><option value="paid_orders">Paid orders</option><option value="revenue">Revenue (AUD)</option><option value="store_click">App store link clicks</option></select></div><div id="anaChart" class="ana-chart"></div><div id="anaLegend" class="ana-legend"></div></section>
     <section class="ana-panel"><h3>First opens by platform</h3><p class="ana-sub">Tracked native first launches — not store downloads</p><div id="anaPlatforms" class="ana-bars"></div><hr style="border:0;border-top:1px solid #edf0f2;margin:22px 0"><h3>How visitors arrived</h3><p class="ana-sub">Landing-page visits by coarse referral source</p><div id="anaSources" class="ana-bars"></div></section>
   </div>
   <div class="ana-section">

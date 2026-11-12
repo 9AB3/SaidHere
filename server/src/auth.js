@@ -9,14 +9,18 @@ export function makeToken(bytes = 32) {
   return crypto.randomBytes(bytes).toString('base64url');
 }
 
-export async function issueAnonymousSession() {
+export async function issueAnonymousSessionDetails() {
   const token = makeToken();
   const tokenHash = hashToken(token);
-  await pool.query(
-    `insert into visitor_sessions (token_hash) values ($1)`,
+  const created = await pool.query(
+    `insert into visitor_sessions (token_hash) values ($1) returning id`,
     [tokenHash],
   );
-  return token;
+  return { token, sessionId: created.rows[0].id };
+}
+
+export async function issueAnonymousSession() {
+  return (await issueAnonymousSessionDetails()).token;
 }
 
 export async function requireSession(req, res, next) {

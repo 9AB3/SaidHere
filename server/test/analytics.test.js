@@ -30,6 +30,7 @@ test('overview queries are aggregated, scoped and preserve zero values', async (
     [{ active_sessions: 6 }],
     [{ posts: 3, posters: 2 }],
     [{ first_opens: 4, ios: 3, android: 1 }],
+    [{ new_sessions: 7 }],
     [{ paid_orders: 2, revenue_cents: '3000', other_currency_orders: 0 }],
     [{ home_views: 15, nfc_views: 8, store_clicks: 5, shop_views: 4, checkouts: 3 }],
     [{ source: 'reddit', views: 8 }],
@@ -44,11 +45,12 @@ test('overview queries are aggregated, scoped and preserve zero values', async (
     },
   };
   const payload = await fetchAnalytics(30, db);
-  assert.equal(queries.length, 9);
+  assert.equal(queries.length, 10);
   assert.ok(queries.every((q) => q.params.length === 1 && q.params[0] === 30));
   assert.ok(queries.every((q) => q.sql.includes('Australia/Sydney')));
   assert.equal(payload.metrics.scans, 12);
   assert.equal(payload.metrics.active_sessions, 6);
+  assert.equal(payload.metrics.new_sessions, 7);
   assert.equal(payload.metrics.revenue_cents, 3000);
   assert.equal(payload.platforms.ios, 3);
   assert.equal(payload.top_walls[0].name, 'Test Wall');

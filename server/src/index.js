@@ -4,7 +4,7 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 
-import { hashToken, issueAnonymousSession, requireSession } from './auth.js';
+import { hashToken, issueAnonymousSessionDetails, requireSession } from './auth.js';
 import { pool } from './db.js';
 import { mountAdminSecurity } from './admin_security.js';
 import { mountAdminPortal } from './admin_portal.js';
@@ -20,6 +20,7 @@ import { mountCustomerPortal } from './customer_portal.runtime.js';
 import { mountCanonicalWebRedirect, mountPublicSite } from './public_site.js';
 import { mountWallDiscoveryLocations } from './wall_discovery_locations.js';
 import { mountFirstOpenNotifications } from './first_open_notifications.js';
+import { sendSessionNotification } from './session_notifications.js';
 import { mountSiteAnalytics } from './site_analytics.js';
 
 const app = express();
@@ -132,7 +133,13 @@ mountPublicSite(app);
 
 app.post('/api/session', sessionLimiter, async (_req, res, next) => {
   try {
-    return res.status(201).json({ token: await issueAnonymousSession() });
+    const { token, sessionId } = await issueAnonymousSessionDetails();
+    // The currently published app already calls this endpoint on its first
+    // API interaction. Alerting is best-effort and must not delay the app.
+    res.status(201).json({ token });
+    void sendSessionNotification({ pool, sessionId, source: 'session' })
+      .catch((error) => console.error('[session-push] New session alert failed:', error));
+    return;
   } catch (error) {
     return next(error);
   }
