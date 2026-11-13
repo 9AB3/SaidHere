@@ -93,9 +93,10 @@ async function orderLinksFor(admin) {
             o.quantity as order_quantity,
             o.purchaser_email,
             item.ordinal as order_item_ordinal,
-            item.nfc_write_value as current_nfc_tag
+            coalesce(admin_nfc.nfc_write_value, item.nfc_write_value) as current_nfc_tag
        from walls w
        ${accessJoin}
+       left join admin_wall_nfc_urls admin_nfc on admin_nfc.wall_id = w.id
        left join wall_ownerships wo
          on wo.wall_id = w.id
         and wo.ended_at is null
@@ -122,7 +123,9 @@ async function orderLinksFor(admin) {
 
   return result.rows.map((row) => ({
     wall_id: row.wall_id,
-    serial_code: row.serial_code || null,
+    // Unpurchased Walls have no physical plaque serial. Show a stable Wall ID
+    // derived from the real UUID rather than inventing a plaque/order.
+    serial_code: row.serial_code || `W-${String(row.wall_id).replace(/-/g, '').slice(0, 10).toUpperCase()}`,
     order_id: row.order_id || null,
     order_ref: row.order_id ? orderRef(row.order_id) : null,
     order_quantity: row.order_quantity == null ? null : Number(row.order_quantity),
@@ -251,7 +254,7 @@ const clientScript = String.raw`(() => {
     const itemText = meta.order_item_ordinal && meta.order_quantity
       ? meta.order_item_ordinal + ' of ' + meta.order_quantity
       : '—';
-    const orderValue = meta.order_ref || 'No purchase order';
+    const orderValue = meta.order_ref || 'Admin-created · No purchase';
     const orderHtml = meta.order_id && meta.can_open_order
       ? '<a href="/admin/orders?q=' + encodeURIComponent(meta.order_id) + '">' + esc(orderValue) + '</a>'
       : '<b>' + esc(orderValue) + '</b>';
