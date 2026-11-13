@@ -128,6 +128,13 @@ try {
     console.log('Created New Wall for NFC programming.');
   }
 
+  // Rename the initially provisioned NFC Wall once, without altering its slug,
+  // tag credential, or subsequent owner edits to its display name.
+  await pool.query(
+    `update walls set display_name = 'Station Street Shitter'
+     where slug = 'NewWall' and display_name = 'New Wall'`,
+  );
+
   // Keep long-running production databases from accumulating expired auth and
   // one-time fulfilment state.
   await pool.query(`delete from admin_sessions where expires_at <= now()`);
