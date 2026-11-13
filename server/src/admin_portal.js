@@ -266,6 +266,10 @@ async function createWall(displayName, locationHint) {
       `insert into wall_tags (wall_id, token_hash, active) values ($1, $2, true)`,
       [wallResult.rows[0].id, tokenHash],
     );
+    await client.query(
+      `insert into admin_wall_nfc_urls (wall_id, nfc_write_value) values ($1, $2)`,
+      [wallResult.rows[0].id, `${appBase}/t/${token}`],
+    );
     await client.query('commit');
     return { ...wallResult.rows[0], nfc_url: `${appBase}/t/${token}` };
   } catch (error) {
@@ -364,6 +368,13 @@ async function replaceNfc(wallId) {
     await client.query(
       `insert into wall_tags (wall_id, token_hash, active) values ($1, $2, true)`,
       [wallId, tokenHash],
+    );
+    await client.query(
+      `insert into admin_wall_nfc_urls (wall_id, nfc_write_value)
+       values ($1, $2)
+       on conflict (wall_id) do update
+         set nfc_write_value = excluded.nfc_write_value, updated_at = now()`,
+      [wallId, `${appBase}/t/${token}`],
     );
     await client.query('commit');
     return { ...wallResult.rows[0], nfc_url: `${appBase}/t/${token}` };
