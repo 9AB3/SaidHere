@@ -106,12 +106,27 @@ try {
   // Only seed when this exact token is still an active credential for the Wall.
   await pool.query(`
     insert into admin_wall_nfc_urls (wall_id, nfc_write_value)
-    select w.id, 'https://saidhere.app/t/sqwVucLu1HuIDbLlDUzhqJX2hPrkJCTqwW1cMbHf6PA'
+    select w.id, 'https://nfc.saidhere.app/t/sqwVucLu1HuIDbLlDUzhqJX2hPrkJCTqwW1cMbHf6PA'
       from walls w
       join wall_tags t on t.wall_id = w.id and t.active = true
      where w.slug = 'NewWall'
        and t.token_hash = '1bad0da057f7b865b67acb8585cb305c60c64d2dca210247ff55b7ca2fd520d9'
     on conflict (wall_id) do nothing
+  `);
+
+  // Correct legacy admin-created Station Street NFC URL to the app's
+  // associated domain. Only change the known original token, never a replaced tag.
+  await pool.query(`
+    update admin_wall_nfc_urls n
+       set nfc_write_value = 'https://nfc.saidhere.app/t/sqwVucLu1HuIDbLlDUzhqJX2hPrkJCTqwW1cMbHf6PA',
+           updated_at = now()
+      from walls w
+     where n.wall_id = w.id and w.slug = 'NewWall'
+       and n.nfc_write_value = 'https://saidhere.app/t/sqwVucLu1HuIDbLlDUzhqJX2hPrkJCTqwW1cMbHf6PA'
+       and exists (
+         select 1 from wall_tags t where t.wall_id = w.id and t.active = true
+           and t.token_hash = '1bad0da057f7b865b67acb8585cb305c60c64d2dca210247ff55b7ca2fd520d9'
+       )
   `);
 
   // One-time public Android test Wall, with only the SHA-256 tag hash in source.
