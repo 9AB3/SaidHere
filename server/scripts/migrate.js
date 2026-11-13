@@ -111,6 +111,23 @@ try {
     console.log('Created AndroidTesters public testing Wall.');
   }
 
+  // One-time unassigned physical Wall for NFC programming.
+  // Store only the tag token hash. Do not rotate on subsequent deploys.
+  const newNfcWall = await pool.query(
+    `insert into walls (slug, display_name, location_hint, active, setup_required)
+     values ('NewWall', 'New Wall', '', true, false)
+     on conflict (slug) do nothing
+     returning id`,
+  );
+  if (newNfcWall.rowCount > 0) {
+    await pool.query(
+      `insert into wall_tags (wall_id, token_hash, active)
+       values ($1, $2, true)`,
+      [newNfcWall.rows[0].id, '1bad0da057f7b865b67acb8585cb305c60c64d2dca210247ff55b7ca2fd520d9'],
+    );
+    console.log('Created New Wall for NFC programming.');
+  }
+
   // Keep long-running production databases from accumulating expired auth and
   // one-time fulfilment state.
   await pool.query(`delete from admin_sessions where expires_at <= now()`);
