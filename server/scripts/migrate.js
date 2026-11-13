@@ -94,6 +94,26 @@ try {
     }
   }
 
+  // NFC write URLs for administrator-created Walls are separate from purchased
+  // order items. Only authenticated admin pages may expose these bearer URLs.
+  await pool.query(`create table if not exists admin_wall_nfc_urls (
+    wall_id uuid primary key references walls(id) on delete cascade,
+    nfc_write_value text not null,
+    updated_at timestamptz not null default now()
+  )`);
+
+  // Restore the existing Station Street Shitter credential without rotating it.
+  // Only seed when this exact token is still an active credential for the Wall.
+  await pool.query(`
+    insert into admin_wall_nfc_urls (wall_id, nfc_write_value)
+    select w.id, 'https://saidhere.app/t/sqwVucLu1HuIDbLlDUzhqJX2hPrkJCTqwW1cMbHf6PA'
+      from walls w
+      join wall_tags t on t.wall_id = w.id and t.active = true
+     where w.slug = 'NewWall'
+       and t.token_hash = '1bad0da057f7b865b67acb8585cb305c60c64d2dca210247ff55b7ca2fd520d9'
+    on conflict (wall_id) do nothing
+  `);
+
   // One-time public Android test Wall, with only the SHA-256 tag hash in source.
   // Re-running migrations must never reset the Wall or its tag.
   const androidTestWall = await pool.query(
